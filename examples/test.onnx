@@ -1,0 +1,73 @@
+ir_version: 9
+graph {
+  node {
+    input: "X"
+    input: "A"
+    output: "XA"
+    op_type: "MatMul"
+  }
+  node {
+    input: "XA"
+    input: "B"
+    output: "Y"
+    op_type: "Add"
+  }
+  name: "lr"
+  input {
+    name: "X"
+    type {
+      tensor_type {
+        elem_type: 1
+        shape {
+          dim {
+          }
+          dim {
+          }
+        }
+      }
+    }
+  }
+  input {
+    name: "A"
+    type {
+      tensor_type {
+        elem_type: 1
+        shape {
+          dim {
+          }
+          dim {
+          }
+        }
+      }
+    }
+  }
+  input {
+    name: "B"
+    type {
+      tensor_type {
+        elem_type: 1
+        shape {
+          dim {
+          }
+          dim {
+          }
+        }
+      }
+    }
+  }
+  output {
+    name: "Y"
+    type {
+      tensor_type {
+        elem_type: 1
+        shape {
+          dim {
+          }
+        }
+      }
+    }
+  }
+}
+opset_import {
+  version: 20
+}
