@@ -8,6 +8,7 @@ build = "build.rs"
 
 [dependencies]
 protobuf = "3.2.0"
+walkdir = "2.3.3"
 
 [build-dependencies]
 protobuf = "3.2.0"
