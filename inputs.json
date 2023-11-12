@@ -1,0 +1,11 @@
+{
+    "inputs": [
+        {
+            "name": "input",
+            "datafile": "test.bin",
+            "attributes": {
+                "batch_size": 1
+            }
+        }
+    ]
+}

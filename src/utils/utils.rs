@@ -1,25 +1,73 @@
 use std::io::Read;
 use std::{error::Error, path::Path, collections::HashMap, io};
 
-use ndarray::{ArrayViewD, IxDyn};
+use ndarray::{ArrayViewD, IxDyn, ArrayD};
 use protobuf::Enum;
 
+use crate::{FileInputs, FileInput};
 use crate::onnxparser::onnx;
 use crate::onnxparser::onnx::tensor_proto;
 use crate::onnxparser::onnx::tensor_shape_proto::Dimension;
 
 static UNKNOWN: &str = "<unknown>";
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ValueType {
+    I64,
+    F32
+}
+
+
+#[derive(Debug)]
 pub enum ArrayType<'a> {
+    OwnI64(ArrayD<i64>),
+    OwnF32(ArrayD<f32>),
     I64(ArrayViewD<'a, i64>),
     F32(ArrayViewD<'a, f32>),
+}
+
+impl std::fmt::Display for ArrayType<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArrayType::OwnI64(a) => write!(f, "{}", a),
+            ArrayType::OwnF32(a) => write!(f, "{}", a),
+            ArrayType::I64(a) => write!(f, "{}", a),
+            ArrayType::F32(a) => write!(f, "{}", a),
+        }
+    }
 }
 
 impl<'a> ArrayType<'a> {
     pub fn shape(&self) -> &[usize] {
         match self {
+            ArrayType::OwnI64(a) => a.shape(),
+            ArrayType::OwnF32(a) => a.shape(),
             ArrayType::I64(a) => a.shape(),
             ArrayType::F32(a) => a.shape(),
+        }
+    }
+    pub fn to_owned(&self) -> ArrayType<'a> {
+        match self {
+            ArrayType::OwnI64(a) => ArrayType::OwnI64(a.clone()),
+            ArrayType::OwnF32(a) => ArrayType::OwnF32(a.clone()),
+            ArrayType::I64(a) => ArrayType::OwnI64(a.to_owned()),
+            ArrayType::F32(a) => ArrayType::OwnF32(a.to_owned()),
+        }
+    }
+    pub fn view(&'a self) -> ArrayType<'a> {
+        match self {
+            ArrayType::OwnI64(a) => ArrayType::I64(a.view()),
+            ArrayType::OwnF32(a) => ArrayType::F32(a.view()),
+            ArrayType::I64(a) => ArrayType::I64(a.view()),
+            ArrayType::F32(a) => ArrayType::F32(a.view()),
+        }
+    }
+    pub fn value_type(&self) -> ValueType {
+        match self {
+            ArrayType::OwnI64(_) => ValueType::I64,
+            ArrayType::OwnF32(_) => ValueType::F32,
+            ArrayType::I64(_) => ValueType::I64,
+            ArrayType::F32(_) => ValueType::F32,
         }
     }
 }
@@ -88,15 +136,22 @@ pub fn make_initializers<'a>(graph: &'a onnx::GraphProto) -> HashMap<String, Arr
     initializers
 }
 
-pub fn get_dim(dim: &Dimension) -> i64 {
+pub fn get_dim(dim: &Dimension, file_input: Option<&FileInput>) -> i64 {
     if dim.has_dim_value() {
         dim.dim_value()
-    } else if dim.has_dim_param() {
-        let mut input_line = String::new();
-        println!("Enter {} for input {}", dim.dim_param(), dim.denotation());
-        io::stdin().read_line(&mut input_line).unwrap_or_default();
-        let x: i64 = input_line.trim().parse().unwrap_or_default();
-        x
+    } else if let Some(onnx::tensor_shape_proto::dimension::Value::DimParam(p)) = &dim.value {
+        if let Some(attr) = file_input.and_then(|i| i.attributes.get(p)) {
+            match attr {
+                serde_json::Value::Number(n) => n.as_i64().unwrap_or_default(),
+                _ => panic!("Invalid attribute type"),
+            }
+        } else {
+            let mut input_line = String::new();
+            println!("Enter {} for input {}", dim.dim_param(), dim.denotation());
+            io::stdin().read_line(&mut input_line).unwrap_or_default();
+            let x: i64 = input_line.trim().parse().unwrap_or_default();
+            x
+        }
     } else {
         panic!("Invalid dim")
     }
@@ -113,11 +168,22 @@ pub fn get_bytedata(name: &str) -> Vec<u8> {
     std::fs::read(fp).unwrap()
 }
 
-pub fn make_external_inputs(graph: &onnx::GraphProto) -> HashMap<String, Vec<u8>> {
+pub fn get_bytedata_from_file(filename: &str) -> Vec<u8> {
+    let p = Path::new(filename.trim());
+    let fp = std::env::current_dir().unwrap().join(p);
+    println!("PATH: {:?}", fp);
+    std::fs::read(fp).unwrap()
+}
+
+pub fn make_external_inputs(graph: &onnx::GraphProto, inputs_file: &FileInputs) -> HashMap<String, Vec<u8>> {
     let mut map = HashMap::new();
     for input in graph.input.iter() {
         let input_name = input.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
-        map.insert(input_name.to_string(), get_bytedata(input_name));
+        if let Some(input_from_file) = inputs_file.inputs.iter().find(|i| i.name == input_name) {
+            map.insert(input_name.to_string(), get_bytedata_from_file(&input_from_file.datafile));
+        } else {
+            map.insert(input_name.to_string(), get_bytedata(input_name));
+        }
     }
     map
 }
@@ -125,6 +191,7 @@ pub fn make_external_inputs(graph: &onnx::GraphProto) -> HashMap<String, Vec<u8>
 pub fn make_inputs<'a>(
     graph: &'a onnx::GraphProto,
     external_data: &'a HashMap<String, Vec<u8>>,
+    inputs_file: &FileInputs
 ) -> HashMap<String, ArrayType<'a>> {
     let mut inputs: HashMap<String, ArrayType<'a>> = HashMap::new();
     for input in graph.input.iter() {
@@ -133,7 +200,7 @@ pub fn make_inputs<'a>(
             Some(onnx::type_proto::Value::TensorType(t)) => match (t.elem_type, &t.shape) {
                 (Some(et), protobuf::MessageField(Some(s))) => {
                     match make_tensor(
-                        &s.dim.iter().map(get_dim).collect::<Vec<i64>>(),
+                        &s.dim.iter().map(|d| get_dim(d, inputs_file.inputs.iter().find(|i| i.name == input_name))).collect::<Vec<i64>>(),
                         external_data.get(input_name).unwrap(),
                         et,
                     ) {

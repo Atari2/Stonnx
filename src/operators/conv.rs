@@ -1,9 +1,15 @@
-use std::error::Error;
+use ndarray::ArrayView;
+use ndarray::Dim;
+use ndarray::IxDynImpl;
+use ndarray::ViewRepr;
+use ndarray::s;
+use ndarray::IxDyn;
 
-use super::super::utils::utils::ArrayType;
 use super::super::onnx::AttributeProto;
 use super::super::onnx::NodeProto;
+use super::super::utils::utils::ArrayType;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum ConvAutoPad {
     NotSet,
     SameUpper,
@@ -33,6 +39,16 @@ struct ConvAttributes {
 }
 
 impl ConvAttributes {
+    fn new_for_recursion(other: &Self) -> Self {
+        Self {
+            auto_pad: other.auto_pad,
+            dilations: other.dilations.clone(),
+            group: 1,
+            kernel_shape: other.kernel_shape.clone(),
+            pads: other.pads.clone(),
+            strides: other.strides.clone(),
+        }
+    }
     fn new<'a>(node: &NodeProto, x: &ArrayType<'a>, w: &ArrayType<'a>) -> Self {
         Self {
             auto_pad: node
@@ -64,7 +80,7 @@ impl ConvAttributes {
             pads: node
                 .attribute
                 .iter()
-                .find(|a| a.name() == "strides")
+                .find(|a| a.name() == "pads")
                 .map_or_else(
                     || {
                         std::iter::repeat(0_i64)
@@ -102,70 +118,308 @@ impl ConvAttributes {
 ///         B: bias (M)
 /// outputs: Y
 ///         Y: output
-fn conv2<'a>(
+fn conv_impl<'a>(
     x: &ArrayType<'a>,
     w: &ArrayType<'a>,
-    attrs: ConvAttributes,
-) -> Result<(), Box<dyn Error>> {
+    b: Option<&ArrayType<'a>>,
+    mut attrs: ConvAttributes,
+) -> Result<ArrayType<'a>, Box<dyn std::error::Error>> {
     match (x, w) {
         (ArrayType::F32(x), ArrayType::F32(w)) => {
-            let batch_size = x.shape()[0];
-            let num_channels = x.shape()[1];
-            let height = x.shape()[2];
-            let width = x.shape()[3];
-            let num_feature_maps = w.shape()[0];
-            let num_input_channels = w.shape()[1];
-            let kernel_height = w.shape()[2];
-            let kernel_width = w.shape()[3];
-            println!("  Convolution: batch_size: {}, num_channels: {}, height: {}, width: {}, num_feature_maps: {}, num_input_channels: {}, kernel_height: {}, kernel_width: {}", batch_size, num_channels, height, width, num_feature_maps, num_input_channels, kernel_height, kernel_width);
-        }
-        _ => {
-            todo!("Data type not implemented");
-        }
-    }
-    Ok(())
-}
-fn conv3<'a>(
-    x: &ArrayType<'a>,
-    w: &ArrayType<'a>,
-    b: &ArrayType<'a>,
-    attrs: ConvAttributes,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match (x, w, b) {
-        (ArrayType::F32(x), ArrayType::F32(w), ArrayType::F32(b)) => {
-            let b = b.clone().into_dimensionality::<ndarray::Ix1>()?; // NDR: this clone is fine because we only clone the view
             let x_shape = x.shape();
+            let w_shape = w.shape();
+            let mut w = w.clone().into_owned();
 
-            let batch_size = x.shape()[0];
-            let num_channels = x.shape()[1];
-            let height = x.shape()[2];
-            let width = x.shape()[3];
-            let num_feature_maps = w.shape()[0];
-            let num_input_channels = w.shape()[1];
-            let kernel_height = w.shape()[2];
-            let kernel_width = w.shape()[3];
-            let bias = b.shape()[0];
-            println!("  Convolution: batch_size: {}, num_channels: {}, height: {}, width: {}, num_feature_maps: {}, num_input_channels: {}, kernel_height: {}, kernel_width: {}, bias_size: {}", batch_size, num_channels, height, width, num_feature_maps, num_input_channels, kernel_height, kernel_width, bias);
+            let num_channels = x_shape[1];
+            let num_feature_maps = w_shape[0];
+            let num_input_channels = w_shape[1];
+            let group = attrs.group as usize;
+            if num_channels != (num_input_channels * group) || num_feature_maps % group != 0 {
+                return Err("Shape inconsistency".into());
+            }
+
+            if group > 1 {
+                let mut res = vec![];
+                let mut td = 0;
+                let mg = num_feature_maps;
+                let dw = num_input_channels;
+
+                for b in 0..x_shape[0] {
+                    for g in 0..group {
+                        let gx = x.slice(s![b, g * dw..(g + 1) * dw, .., ..]);
+                        let gw = w.slice(s![g * mg..(g + 1) * mg, .., .., ..]);
+                        let agx = ArrayType::F32(gx.into_dimensionality::<IxDyn>()?);
+                        let agw = ArrayType::F32(gw.into_dimensionality::<IxDyn>()?);
+                        let cv = match conv_impl(
+                            &agx,
+                            &agw,
+                            None,
+                            ConvAttributes::new_for_recursion(&attrs),
+                        ) {
+                            Ok(ArrayType::OwnF32(v)) => v,
+                            Ok(_) => return Err("Conv on f32 returned another type".into()),
+                            Err(e) => return Err(e),
+                        };
+
+                        if b == 0 {
+                            td += cv.shape()[1];
+                        }
+                        res.push((b, cv));
+                    }
+                }
+                let mut new_shape = vec![x_shape[0]];
+                new_shape.extend(res[0].1.shape().iter().skip(1));
+                new_shape[1] = td;
+                let mut final_ = ndarray::Array::from_shape_simple_fn(new_shape, || 0_f32);
+                let mut p = 0;
+                for (b, cv) in res.iter() {
+                    final_
+                        .slice_mut(s![*b, p..p + cv.shape()[1], .., ..])
+                        .assign(cv);
+                    p += cv.shape()[1];
+                    if p >= final_.shape()[1] {
+                        p = 0;
+                    }
+                }
+                if let Some(ArrayType::F32(b)) = b {
+                    let b = b.clone().into_dimensionality::<ndarray::Ix1>()?;
+                    new_shape = std::iter::repeat(1).take(final_.shape().len()).collect();
+                    new_shape[1] = b.shape()[0];
+                    let sb = b.into_shape(IxDyn(&new_shape))?;
+                    final_ += &sb;
+                    return Ok(ArrayType::OwnF32(final_));
+                }
+            }
+
+            let dilations = &attrs.dilations;
+            if dilations[0] != 1 || dilations.iter().min() != dilations.iter().max() {
+                let nd = dilations.len();
+                let mut new_kernel_shape = vec![];
+                let mut new_shape: Vec<usize> =
+                    w_shape.iter().take(w_shape.len() - nd).copied().collect();
+                for (i, d) in dilations.iter().enumerate() {
+                    let di = w_shape.len() - nd + i;
+                    new_shape.push(w_shape[di] + (w_shape[di] - 1) * (d - 1) as usize);
+                    new_kernel_shape
+                        .push(attrs.kernel_shape[i] + (attrs.kernel_shape[i] - 1) * (d - 1));
+                }
+                let mut new_w = ndarray::Array::from_shape_fn(new_shape, |_| 0 as f32);
+                let mut indices = vec![s![0..new_w.shape()[0]], s![0..new_w.shape()[1]]];
+                for (i, d) in dilations.iter().enumerate() {
+                    let di = w_shape.len() - nd + i;
+                    let slice_idx = new_w.shape()[di];
+                    indices.push(s![0..slice_idx; *d as usize]);
+                }
+                // FIXME: new_w[tuple(indices)] = w;
+                for s in indices.iter() {
+                    new_w.slice_mut(s).assign(&w);
+                }
+                w = new_w;
+                attrs.kernel_shape = new_kernel_shape;
+            }
+
+            if attrs.auto_pad != ConvAutoPad::NotSet {
+                let mut head = vec![];
+                let mut tail = vec![];
+                for (i, item) in x_shape.iter().enumerate().take(x_shape.len() - 2) {
+                    let d = *item as i64;
+                    let target_size = (d + attrs.strides[i] - 1) / attrs.strides[i];
+                    let pad_needed =
+                        (target_size - 1) * attrs.strides[i] + attrs.kernel_shape[i] - d;
+                    let pad_head = if attrs.auto_pad == ConvAutoPad::SameLower {
+                        (pad_needed + 1) / 2
+                    } else {
+                        pad_needed / 2
+                    };
+                    let pad_tail = pad_needed - pad_head;
+                    head.push(pad_head);
+                    tail.push(pad_tail);
+                }
+                attrs.pads = head.into_iter().chain(tail).collect();
+            }
+
+            if x_shape.len() == 3 {
+                let (s_n, s_c, s_h) = (x_shape[0] as i64, x_shape[1] as i64, x_shape[2] as i64);
+                let kh = attrs.kernel_shape[0];
+                let sth = attrs.strides[0];
+
+                let h_out = ((s_h - kh + attrs.pads[0] + attrs.pads[1]) / sth) + 1;
+
+                let h0 = attrs.pads[0];
+                let oh = -(kh % 2);
+                let bh = -h0;
+                let eh = h_out * sth;
+                let mut res = ndarray::Array::from_shape_simple_fn(
+                    vec![x_shape[0], w_shape[0], h_out as usize],
+                    || 0_f32,
+                );
+                if let Some(ArrayType::F32(b)) = b {
+                    let b = b.clone().into_dimensionality::<ndarray::Ix1>()?;
+                    let sb = b.into_shape((1, b.shape()[0], 1))?;
+                    let mut mutview = res.slice_mut(s![.., .., ..]);
+                    mutview += &sb;
+                }
+                for n in 0..s_n as usize {
+                    for nw in 0..w_shape[0] {
+                        for c in 0..s_c as usize {
+                            // w = W[nw : nw + 1, c : c + 1]
+                            let w = w.slice(s![nw..nw + 1, c..c + 1, .., ..]);
+                            for io in (bh..eh).step_by(sth as usize) {
+                                let hr = (io - bh) / sth;
+                                if hr >= h_out {
+                                    continue;
+                                }
+                                let i = io + kh % 2;
+                                let (ih1, ih2) =
+                                    (std::cmp::max(0, i + oh), std::cmp::min(i + oh + kh, s_h));
+                                let img =
+                                    x.slice(s![n..n + 1, c..c + 1, ih1 as usize..ih2 as usize, ..]);
+                                let s = if img.shape() != w_shape {
+                                    let (jh1, jh2) = (
+                                        std::cmp::max(-oh - i, 0),
+                                        std::cmp::min(kh, kh + s_h - (i + oh + kh)),
+                                    );
+                                    let w_ = w.slice(s![..1, ..1, jh1 as usize..jh2 as usize, ..]);
+                                    if img.shape() != w_.shape() {
+                                        return Err("Shape unexpected".into());
+                                    }
+                                    let imgs = img.into_shape((1, img.shape().iter().product()))?;
+                                    let w_s = w_.into_shape((w_.shape().iter().product(), 1))?;
+                                    ndarray::ArrayView2::dot(&imgs, &w_s)[[0, 0]]
+                                } else {
+                                    let imgs = img.into_shape((1, img.shape().iter().product()))?;
+                                    let ws = w.into_shape((w.shape().iter().product(), 1))?;
+                                    ndarray::ArrayView2::dot(&imgs, &ws)[[0, 0]]
+                                };
+                                res[[n, nw, hr as usize]] += s;
+                            }
+                        }
+                    }
+                }
+                return Ok(ArrayType::OwnF32(res));
+            }
+
+            if x_shape.len() == 4 {
+                let (s_n, s_c, s_h, s_w) = (
+                    x_shape[0] as i64,
+                    x_shape[1] as i64,
+                    x_shape[2] as i64,
+                    x_shape[3] as i64,
+                );
+                let (kh, kw) = (attrs.kernel_shape[0], attrs.kernel_shape[1]);
+                let (sth, stw) = (attrs.strides[0], attrs.strides[1]);
+
+                let h_out = ((s_h - kh + attrs.pads[0] + attrs.pads[2]) / sth) + 1;
+                let w_out = ((s_w - kw + attrs.pads[1] + attrs.pads[3]) / stw) + 1;
+
+                let (h0, w0) = (attrs.pads[0], attrs.pads[1]);
+                let (oh, ow) = (-(kh % 2), -(kw % 2));
+                let (bh, bw) = (-h0, -w0);
+                let (eh, ew) = (h_out * sth, w_out * stw);
+                let mut res = ndarray::Array::from_shape_simple_fn(
+                    vec![x_shape[0], w_shape[0], h_out as usize, w_out as usize],
+                    || 0_f32,
+                );
+                if let Some(ArrayType::F32(b)) = b {
+                    let b = b.clone().into_dimensionality::<ndarray::Ix1>()?;
+                    let sb = b.into_shape((1, b.shape()[0], 1, 1))?;
+                    let mut mutview = res.slice_mut(s![.., .., .., ..]);
+                    mutview += &sb;
+                }
+                for n in 0..s_n as usize {
+                    for nw in 0..w_shape[0] {
+                        for c in 0..s_c as usize {
+                            // w = W[nw : nw + 1, c : c + 1]
+                            let w = w.slice(s![nw..nw + 1, c..c + 1, .., ..]);
+                            for io in (bh..eh).step_by(sth as usize) {
+                                let hr = (io - bh) / sth;
+                                if hr >= h_out {
+                                    continue;
+                                }
+                                let i = io + kh % 2;
+                                let (ih1, ih2) =
+                                    (std::cmp::max(0, i + oh), std::cmp::min(i + oh + kh, s_h));
+                                for jo in (bw..ew).step_by(stw as usize) {
+                                    let wr = (jo - bw) / stw;
+                                    if wr >= w_out {
+                                        continue;
+                                    }
+                                    let j = jo + kw % 2;
+                                    let (jw1, jw2) =
+                                        (std::cmp::max(0, j + ow), std::cmp::min(j + ow + kw, s_w));
+                                    let img = x.slice(s![
+                                        n..n + 1,
+                                        c..c + 1,
+                                        ih1 as usize..ih2 as usize,
+                                        jw1 as usize..jw2 as usize
+                                    ]);
+                                    let s = if img.shape() != w_shape {
+                                        let (jh1, jh2) = (
+                                            std::cmp::max(-oh - i, 0),
+                                            std::cmp::min(kh, kh + s_h - (i + oh + kh)),
+                                        );
+                                        let (jw1, jw2) = (
+                                            std::cmp::max(-ow - j, 0),
+                                            std::cmp::min(kw, kw + s_w - (j + ow + kw)),
+                                        );
+                                        let w_ = w.slice(s![
+                                            ..1,
+                                            ..1,
+                                            jh1 as usize..jh2 as usize,
+                                            jw1 as usize..jw2 as usize
+                                        ]);
+                                        if img.shape() != w_.shape() {
+                                            return Err("Shape unexpected".into());
+                                        }
+                                        let copied_img = ndarray::Array::from_shape_vec(
+                                            img.raw_dim(),
+                                            img.iter().cloned().collect(),
+                                        )?;
+                                        let imgs = copied_img
+                                            .view()
+                                            .into_shape((1, img.shape().iter().product()))?;
+                                        let copied_w = ndarray::Array::from_shape_vec(
+                                            w_.raw_dim(),
+                                            w_.iter().cloned().collect(),
+                                        )?;
+                                        let w_s = copied_w
+                                            .view()
+                                            .into_shape((w_.shape().iter().product(), 1))?;
+                                        ndarray::ArrayView2::dot(&imgs, &w_s)[[0, 0]]
+                                    } else {
+                                        let imgs =
+                                            img.into_shape((1, img.shape().iter().product()))?;
+                                        let ws = w.into_shape((w.shape().iter().product(), 1))?;
+                                        ndarray::ArrayView2::dot(&imgs, &ws)[[0, 0]]
+                                    };
+                                    res[[n, nw, hr as usize, wr as usize]] += s;
+                                }
+                            }
+                        }
+                    }
+                }
+                return Ok(ArrayType::OwnF32(res));
+            }
         }
         _ => {
             todo!("Data type not implemented");
         }
     }
-    Ok(())
+    Err("Not implemented".into())
 }
 
-pub fn conv(inputs: &[&ArrayType], outputs: &mut Vec<&String>, node: &NodeProto) {
-    assert_eq!(outputs.len(), 1);
+pub fn conv<'a>(
+    inputs: &[ArrayType<'a>],
+    node: &NodeProto,
+) -> Result<ArrayType<'a>, Box<dyn std::error::Error>> {
     match inputs.len() {
         2 => {
-            let (x, w) = (inputs[0], inputs[1]);
-            let attributes = ConvAttributes::new(node, x, w);
-            conv2(x, w, attributes).unwrap()
+            let attributes = ConvAttributes::new(node, &inputs[0], &inputs[1]);
+            conv_impl(&inputs[0], &inputs[1], None, attributes)
         }
         3 => {
-            let (x, w, b) = (inputs[0], inputs[1], inputs[2]);
-            let attributes = ConvAttributes::new(node, x, w);
-            conv3(x, w, b, attributes).unwrap()
+            let attributes = ConvAttributes::new(node, &inputs[0], &inputs[1]);
+            conv_impl(&inputs[0], &inputs[1], Some(&inputs[2]), attributes)
         }
         _ => {
             panic!("  Convolution has {} inputs", inputs.len());
