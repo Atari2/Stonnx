@@ -1,75 +1,66 @@
+mod operators;
 mod onnxparser;
+mod utils;
 
-use std::{path::Path, io::Read};
+pub use onnxparser::onnx;
+pub use utils::utils::{read_model_binary, make_external_inputs, make_initializers, make_inputs};
 
-use onnxparser::onnx;
-use walkdir::WalkDir;
+use operators::conv::conv;
+use std::path::Path;
 
-fn read_model_binary(p: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let file = std::fs::File::open(p)?;
-    let mut reader = std::io::BufReader::new(file);
-    let model: onnx::ModelProto = protobuf::Message::parse_from_reader(&mut reader)?;
-    for graph in model.graph.iter() {
-        println!("Graph: {}", graph.name.as_ref().unwrap_or(&"<unknown>".to_string()));
-        for (i, node) in graph.node.iter().enumerate() {
-            match node.op_type {
-                Some(ref op_type) => match op_type.as_str() {
-                    "MatMul" => {
-                        println!("{}: MatMul", i);
-                    }
-                    "Add" => {
-                        println!("{}: Add", i);
-                    }
-                    "Conv" => {
-                        println!("{}: Conv", i);
-                    },
-                    "Clip" => {
-                        println!("{}: Clip", i);
-                    },
-                    "Shape" => {
-                        println!("{}: Shape", i);
-                    },
-                    "Reshape" => {
-                        println!("{}: Reshape", i);
-                    },
-                    "Concat" => {
-                        println!("{}: Concat", i);
-                    },
-                    "Constant" => {
-                        println!("{}: Constant", i);
-                    },
-                    "Gemm" => {
-                        println!("{}: Gemm", i);
-                    },
-                    "Gather" => {
-                        println!("{}: Gather", i);
-                    },
-                    "GlobalAveragePool" => {
-                        println!("{}: GlobalAveragePool", i);
-                    },
-                    "Unsqueeze" => {
-                        println!("{}: Unsqueeze", i);
-                    },
-                    _ => println!("Unimplemented op: {}", op_type),
-                },
-                None => println!("{}: <unknown>", i),
-            }
-        }
-    }
-    Ok(())
-}
+use clap::Parser;
 
-fn read_model_text(p: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let file = std::fs::File::open(p)?;
-    let mut reader = std::io::BufReader::new(file);
-    let mut buf = String::new();
-    reader.read_to_string(&mut buf)?;
-    let _model: onnx::ModelProto = protobuf::text_format::parse_from_str(&buf)?;
-    Ok(())
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long, default_value = "definitions.json")]
+    pub definitions: String
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    read_model_binary(Path::new("examples/mobilenetv2-10.onnx"))?;
+    let args = Args::parse();
+    println!("Definitions: {}", args.definitions);
+    let model = read_model_binary(Path::new("examples/mobilenetv2-10.onnx"))?;
+    for graph in model.graph.iter() {
+        let initializers = make_initializers(graph);
+        let external_inputs = make_external_inputs(graph);
+        let node_inputs = make_inputs(graph, &external_inputs);
+        for node in graph.node.iter() {
+            let mut inputs = vec![];
+            let mut outputs = vec![];
+            let mut all_nodes_have_init = true;
+            for input in node.input.iter() {
+                if let Some(i) = initializers.get(input) {
+                    println!("  Input: {} is initializer", input);
+                    inputs.push(i);
+                } else {
+                    println!("  Input: {} is not initializer", input);
+                    if let Some(k) = node_inputs.get(input) {
+                        inputs.push(k);
+                    } else {
+                        all_nodes_have_init = false;
+                    }
+                }
+            }
+            for output in node.output.iter() {
+                println!("  Output: {}", output);
+                outputs.push(output);
+            }
+            if !all_nodes_have_init {
+                continue;
+            }
+            match node.op_type.as_deref() {
+                Some("Conv") => {
+                    conv(&inputs, &mut outputs, node);
+                }
+                Some(n) => {
+                    println!("Op type {:?} not implemented", n)
+                }
+                None => {
+                    panic!("  Node has no op type");
+                }
+            }
+        }
+    }
     // for entry in WalkDir::new("examples") {
     //     let entry = entry?;
     //     if entry.path().extension().map_or(false, |e| e == "onnx") {

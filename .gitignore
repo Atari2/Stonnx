@@ -1,3 +1,6 @@
 /target
 # generated files during build (check build.rs)
 /src/onnxparser
+.idea
+.vscode
+*.bin
