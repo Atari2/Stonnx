@@ -269,7 +269,10 @@ pub fn make_tensor(
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
             Ok(data) => {
                 assert_eq!(data.len(), shape.iter().product::<usize>());
-                let a = ArrayD::<bool>::from_shape_vec(IxDyn(&shape), data.iter().map(|x| *x != 0).collect())?;
+                let a = ArrayD::<bool>::from_shape_vec(
+                    IxDyn(&shape),
+                    data.iter().map(|x| *x != 0).collect(),
+                )?;
                 Ok(ArrayType::Bool(a))
             }
             Err(e) => Err(e.to_string().into()),
@@ -440,16 +443,16 @@ pub fn make_inputs<'a>(
             },
             Some(Value::SparseTensorType(_)) => {
                 todo!("  Input: {} has type SparseTensor", input_name)
-            },
+            }
             Some(Value::SequenceType(_)) => {
                 todo!("  Input: {} has type Sequence", input_name)
-            },
+            }
             Some(Value::MapType(_)) => {
                 todo!("  Input: {} has type Map", input_name)
-            },
+            }
             Some(Value::OptionalType(_)) => {
                 todo!("  Input: {} has type Optional", input_name)
-            },
+            }
             None => {
                 panic!("  Input: {} has no type", input_name)
             }

@@ -419,8 +419,6 @@ fn conv_impl(
     b: Option<&ArrayType>,
     attrs: ConvAttributes,
 ) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    // FIXME: questo match è assolutamente la cosa più orribile mai concepita dall'uomo
-    // FIXME: bisogna riscrivere questo codice usando i generici al più presto, perchè altrimenti mi viene il cancro
     match (x, w, b) {
         (ArrayType::F32(x), ArrayType::F32(w), Some(ArrayType::F32(b))) => {
             return _conv_impl(x.view(), w.view(), Some(b.view()), attrs);
@@ -438,6 +436,8 @@ fn conv_impl(
     }
 }
 
+/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_conv.py
+/// https://onnx.ai/onnx/operators/onnx__Conv.html
 pub fn conv(
     inputs: &[&ArrayType],
     node: &NodeProto,

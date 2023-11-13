@@ -85,6 +85,8 @@ fn clip_11(inputs: &[&ArrayType]) -> Result<ArrayType, Box<dyn std::error::Error
     }
 }
 
+/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_clip.py
+/// https://onnx.ai/onnx/operators/onnx__Clip.html
 pub fn clip(
     inputs: &[&ArrayType],
     node: &NodeProto,
