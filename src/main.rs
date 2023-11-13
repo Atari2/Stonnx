@@ -7,6 +7,7 @@ pub use utils::{make_external_inputs, make_initializers, make_inputs, read_model
 
 use operators::clip::clip;
 use operators::conv::conv;
+use operators::add::add;
 use std::path::Path;
 
 use clap::Parser;
@@ -104,6 +105,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     assert_eq!(outputs.len(), 1);
                     let output_name = outputs[0];
                     node_inputs.insert(output_name.to_string(), clip_result);
+                }
+                Some ("Add") => {
+                    let input_names = node.input.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+                    let output_names = node
+                        .output
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<&str>>();
+                    println!(
+                        "Running add operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let add_result = add(&inputs, node, opset_version)?;
+                    assert_eq!(outputs.len(), 1);
+                    let output_name = outputs[0];
+                    node_inputs.insert(output_name.to_string(), add_result);
                 }
                 Some(n) => {
                     todo!("Op type {:?}", n)
