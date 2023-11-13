@@ -7,5 +7,6 @@
                 "batch_size": 1
             }
         }
-    ]
+    ],
+    "modelpath": "examples/mobilenetv2-10.onnx"
 }

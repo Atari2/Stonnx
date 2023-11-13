@@ -29,10 +29,10 @@ pub enum ArrayType<'a> {
 impl std::fmt::Display for ArrayType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArrayType::OwnI64(a) => write!(f, "{}", a),
-            ArrayType::OwnF32(a) => write!(f, "{}", a),
-            ArrayType::I64(a) => write!(f, "{}", a),
-            ArrayType::F32(a) => write!(f, "{}", a),
+            ArrayType::OwnI64(_) => write!(f, "OwnI64"),
+            ArrayType::OwnF32(_) => write!(f, "OwnF32"),
+            ArrayType::I64(_) => write!(f, "I64"),
+            ArrayType::F32(_) => write!(f, "F32"),
         }
     }
 }
@@ -54,7 +54,7 @@ impl<'a> ArrayType<'a> {
             ArrayType::F32(a) => ArrayType::OwnF32(a.to_owned()),
         }
     }
-    pub fn view(&'a self) -> ArrayType<'a> {
+    pub fn array_view(&'a self) -> ArrayType<'a> {
         match self {
             ArrayType::OwnI64(a) => ArrayType::I64(a.view()),
             ArrayType::OwnF32(a) => ArrayType::F32(a.view()),
@@ -102,13 +102,6 @@ pub fn make_tensor<'a>(
             todo!("Data type {:?} not implemented", default);
         }
     }
-}
-
-pub fn read_model_binary(p: &Path) -> Result<onnx::ModelProto, Box<dyn std::error::Error>> {
-    let file = std::fs::File::open(p)?;
-    let mut reader = std::io::BufReader::new(file);
-    let model: onnx::ModelProto = protobuf::Message::parse_from_reader(&mut reader)?;
-    Ok(model)
 }
 
 pub fn make_initializers<'a>(graph: &'a onnx::GraphProto) -> HashMap<String, ArrayType<'a>> {
@@ -233,11 +226,35 @@ pub fn make_inputs<'a>(
     inputs
 }
 
-pub fn read_model_text(p: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn read_model_text(p: &Path) -> Result<onnx::ModelProto, Box<dyn Error>> {
     let file = std::fs::File::open(p)?;
-    let mut reader = std::io::BufReader::new(file);
+    let mut reader = io::BufReader::new(file);
     let mut buf = String::new();
     reader.read_to_string(&mut buf)?;
-    let _model: onnx::ModelProto = protobuf::text_format::parse_from_str(&buf)?;
-    Ok(())
+    let model = protobuf::text_format::parse_from_str(&buf)?;
+    Ok(model)
+}
+fn read_model_binary(p: &Path) -> Result<onnx::ModelProto, Box<dyn Error>> {
+    let file = std::fs::File::open(p)?;
+    let mut reader = io::BufReader::new(file);
+    let model: onnx::ModelProto = protobuf::Message::parse_from_reader(&mut reader)?;
+    Ok(model)
+}
+
+pub fn read_model(p: &Path) -> Result<onnx::ModelProto, Box<dyn Error>> {
+    if let Ok(m) = read_model_binary(p) {
+        Ok(m)
+    } else {
+        read_model_text(p)
+    }
+}
+
+pub fn pick_opset_version(target_ver: i64, opset_versions: &[i64]) -> i64 {
+    let mut opset_version = 0;
+    for v in opset_versions.iter() {
+        if *v <= target_ver && *v > opset_version {
+            opset_version = *v;
+        }
+    }
+    opset_version
 }
