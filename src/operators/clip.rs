@@ -1,47 +1,48 @@
-use crate::{utils::utils::pick_opset_version, onnx::{NodeProto}};
-
-use super::super::utils::utils::ArrayType;
-
+use crate::{
+    onnx::NodeProto,
+    utils::{pick_opset_version, ArrayType},
+};
 
 const OPSET_VERSIONS: [i64; 5] = [1, 6, 11, 12, 13];
 
 #[derive(Debug)]
 struct ClipAttrs {
     max: f32,
-    min: f32
+    min: f32,
 }
 
 impl ClipAttrs {
     fn new(node: &NodeProto) -> Self {
         Self {
-            max: node.attribute.iter().find(|a| a.name() == "max").map_or(std::f32::MAX, |a| a.f.unwrap_or(std::f32::MAX)),
-            min: node.attribute.iter().find(|a| a.name() == "min").map_or(std::f32::MIN, |a| a.f.unwrap_or(std::f32::MIN)),
+            max: node
+                .attribute
+                .iter()
+                .find(|a| a.name() == "max")
+                .map_or(std::f32::MAX, |a| a.f.unwrap_or(std::f32::MAX)),
+            min: node
+                .attribute
+                .iter()
+                .find(|a| a.name() == "min")
+                .map_or(std::f32::MIN, |a| a.f.unwrap_or(std::f32::MIN)),
         }
     }
 }
 
-fn clip_6<'a>(
+fn clip_6(
     inputs: &[&ArrayType],
-    attrs: ClipAttrs
-) -> Result<ArrayType<'a>, Box<dyn std::error::Error>> {
+    attrs: ClipAttrs,
+) -> Result<ArrayType, Box<dyn std::error::Error>> {
     if let ArrayType::F32(a) = &inputs[0] {
         let mut a = a.to_owned();
         a.mapv_inplace(|v| v.max(attrs.min));
         a.mapv_inplace(|v| v.min(attrs.max));
-        return Ok(ArrayType::OwnF32(a));
-    } else if let ArrayType::OwnF32(a) = &inputs[0] {
-        let mut a = a.clone();
-        a.mapv_inplace(|v| v.max(attrs.min));
-        a.mapv_inplace(|v| v.min(attrs.max));
-        return Ok(ArrayType::OwnF32(a));
+        Ok(ArrayType::F32(a))
     } else {
         todo!("Clip for type {}", inputs[0])
     }
 }
 
-fn clip_11<'a>(
-    inputs: &[&ArrayType<'a>],
-) -> Result<ArrayType<'a>, Box<dyn std::error::Error>> {
+fn clip_11(inputs: &[&ArrayType]) -> Result<ArrayType, Box<dyn std::error::Error>> {
     let ilen = inputs.len();
     if ilen == 1 {
         return Ok(inputs[0].to_owned());
@@ -55,10 +56,8 @@ fn clip_11<'a>(
             } else {
                 todo!("Clip amin for type {}", a)
             }
-        },
-        None => {
-            None
         }
+        None => None,
     };
     let amax = match inputs.get(2) {
         Some(a) => {
@@ -69,10 +68,8 @@ fn clip_11<'a>(
             } else {
                 todo!("Clip amax for type {}", a)
             }
-        },
-        None => {
-            None
         }
+        None => None,
     };
     if let ArrayType::F32(a) = &inputs[0] {
         let mut a = a.to_owned();
@@ -82,17 +79,17 @@ fn clip_11<'a>(
         if let Some(amax) = amax {
             a.mapv_inplace(|v| v.min(amax));
         }
-        return Ok(ArrayType::OwnF32(a));
+        Ok(ArrayType::F32(a))
     } else {
         todo!("CLIP for type {}", inputs[0])
     }
 }
 
-pub fn clip<'a>(
-    inputs: &[&ArrayType<'a>],
+pub fn clip(
+    inputs: &[&ArrayType],
     node: &NodeProto,
-    opset_version: i64
-) -> Result<ArrayType<'a>, Box<dyn std::error::Error>> {
+    opset_version: i64,
+) -> Result<ArrayType, Box<dyn std::error::Error>> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version < 11 {
         // 1, 6

@@ -1,12 +1,12 @@
-mod operators;
 mod onnxparser;
+mod operators;
 mod utils;
 
 pub use onnxparser::onnx;
-pub use utils::utils::{read_model, make_external_inputs, make_initializers, make_inputs};
+pub use utils::{make_external_inputs, make_initializers, make_inputs, read_model};
 
-use operators::conv::conv;
 use operators::clip::clip;
+use operators::conv::conv;
 use std::path::Path;
 
 use clap::Parser;
@@ -16,20 +16,20 @@ use serde::{Deserialize, Serialize};
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(short, long, default_value = "inputs.json")]
-    pub inputs_file: String
+    pub inputs_file: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct FileInputs {
     pub inputs: Vec<FileInput>,
-    pub modelpath: String
+    pub modelpath: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct FileInput {
     pub name: String,
     pub datafile: String,
-    pub attributes: serde_json::Map<String, serde_json::Value>
+    pub attributes: serde_json::Map<String, serde_json::Value>,
 }
 
 const MAX_OPSET_VERSION: i64 = 20;
@@ -75,8 +75,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match node.op_type.as_deref() {
                 Some("Conv") => {
                     let input_names = node.input.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
-                    let output_names = node.output.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
-                    println!("Running conv operator between {:?} to get {:?}", input_names, output_names);
+                    let output_names = node
+                        .output
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<&str>>();
+                    println!(
+                        "Running conv operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
                     let conv_result = conv(&inputs, node, opset_version)?;
                     assert_eq!(outputs.len(), 1);
                     let output_name = outputs[0];
@@ -84,8 +91,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Some("Clip") => {
                     let input_names = node.input.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
-                    let output_names = node.output.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
-                    println!("Running clip operator between {:?} to get {:?}", input_names, output_names);
+                    let output_names = node
+                        .output
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<&str>>();
+                    println!(
+                        "Running clip operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
                     let clip_result = clip(&inputs, node, opset_version)?;
                     assert_eq!(outputs.len(), 1);
                     let output_name = outputs[0];

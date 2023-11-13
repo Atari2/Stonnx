@@ -1,9 +1,9 @@
 use ndarray::s;
 use ndarray::IxDyn;
 
-use super::super::onnx::AttributeProto;
-use super::super::onnx::NodeProto;
-use super::super::utils::utils::ArrayType;
+use crate::onnx::AttributeProto;
+use crate::onnx::NodeProto;
+use crate::utils::ArrayType;
 
 // Defined but never used because even thought Conv has 2 versions, they both act the same
 const _OPSET_VERSIONS: [i64; 2] = [1, 11];
@@ -48,7 +48,7 @@ impl ConvAttributes {
             strides: other.strides.clone(),
         }
     }
-    fn new<'a>(node: &NodeProto, x: &ArrayType<'a>, w: &ArrayType<'a>) -> Self {
+    fn new(node: &NodeProto, x: &ArrayType, w: &ArrayType) -> Self {
         Self {
             auto_pad: node
                 .attribute
@@ -100,12 +100,12 @@ impl ConvAttributes {
     }
 }
 
-fn _conv_impl<'a>(
+fn _conv_impl(
     x: ndarray::ArrayViewD<f32>,
     w: ndarray::ArrayViewD<f32>,
     b: Option<ndarray::ArrayViewD<f32>>,
     mut attrs: ConvAttributes,
-) -> Result<ArrayType<'a>, Box<dyn std::error::Error>> {
+) -> Result<ArrayType, Box<dyn std::error::Error>> {
     let x_shape = x.shape();
     let w_shape = w.shape();
     let mut w = w.clone().into_owned();
@@ -115,7 +115,14 @@ fn _conv_impl<'a>(
     let num_input_channels = w_shape[1];
     let group = attrs.group as usize;
     if num_channels != (num_input_channels * group) || num_feature_maps % group != 0 {
-        return Err(format!("Shape inconsistency {} != {} || {} % {} != 0", num_channels, num_input_channels * group, num_feature_maps, group).into());
+        return Err(format!(
+            "Shape inconsistency {} != {} || {} % {} != 0",
+            num_channels,
+            num_input_channels * group,
+            num_feature_maps,
+            group
+        )
+        .into());
     }
 
     if group > 1 {
@@ -126,16 +133,16 @@ fn _conv_impl<'a>(
 
         for b in 0..x_shape[0] {
             for g in 0..group {
-                let gx = x.slice(s![b..b+1, g * dw..(g+1)*dw, .., ..]);
-                let gw = w.slice(s![g * mg..(g+1)*mg, .., .., ..]);
-                let agx = ArrayType::F32(gx.into_dimensionality::<IxDyn>()?);
-                let agw = ArrayType::F32(gw.into_dimensionality::<IxDyn>()?);
-                let cv =
-                    match conv_impl(&agx, &agw, None, ConvAttributes::new_for_recursion(&attrs)) {
-                        Ok(ArrayType::OwnF32(v)) => v,
-                        Ok(_) => return Err("Conv on f32 returned another type".into()),
-                        Err(e) => return Err(e),
-                    };
+                let gx = x.slice(s![b..b + 1, g * dw..(g + 1) * dw, .., ..]);
+                let gw = w.slice(s![g * mg..(g + 1) * mg, .., .., ..]);
+                let agx = gx.into_dimensionality::<IxDyn>()?;
+                let agw = gw.into_dimensionality::<IxDyn>()?;
+                let cv = match _conv_impl(agx, agw, None, ConvAttributes::new_for_recursion(&attrs))
+                {
+                    Ok(ArrayType::F32(v)) => v,
+                    Ok(_) => return Err("Conv on f32 returned another type".into()),
+                    Err(e) => return Err(e),
+                };
 
                 if b == 0 {
                     td += cv.shape()[1];
@@ -150,7 +157,7 @@ fn _conv_impl<'a>(
         let mut p = 0;
         for (b, cv) in res.iter() {
             final_
-                .slice_mut(s![*b..*b+1, p..p + cv.shape()[1], .., ..])
+                .slice_mut(s![*b..*b + 1, p..p + cv.shape()[1], .., ..])
                 .assign(cv);
             p += cv.shape()[1];
             if p >= final_.shape()[1] {
@@ -163,7 +170,7 @@ fn _conv_impl<'a>(
             new_shape[1] = b.shape()[0];
             let sb = b.into_shape(IxDyn(&new_shape))?;
             final_ += &sb;
-            return Ok(ArrayType::OwnF32(final_));
+            return Ok(ArrayType::F32(final_));
         }
     }
 
@@ -267,7 +274,7 @@ fn _conv_impl<'a>(
                 }
             }
         }
-        return Ok(ArrayType::OwnF32(res));
+        return Ok(ArrayType::F32(res));
     }
 
     if x_shape.len() == 4 {
@@ -358,10 +365,20 @@ fn _conv_impl<'a>(
                                     .into_shape((w_.shape().iter().product(), 1))?;
                                 ndarray::ArrayView2::dot(&imgs, &w_s)[[0, 0]]
                             } else {
-                                let copied_img = ndarray::Array::from_shape_vec(img.raw_dim(), img.iter().cloned().collect())?;
-                                let imgs = copied_img.view().into_shape((1, img.shape().iter().product()))?;
-                                let copied_w = ndarray::Array::from_shape_vec(w.raw_dim(), w.iter().cloned().collect())?;
-                                let ws = copied_w.view().into_shape((w.shape().iter().product(), 1))?;
+                                let copied_img = ndarray::Array::from_shape_vec(
+                                    img.raw_dim(),
+                                    img.iter().cloned().collect(),
+                                )?;
+                                let imgs = copied_img
+                                    .view()
+                                    .into_shape((1, img.shape().iter().product()))?;
+                                let copied_w = ndarray::Array::from_shape_vec(
+                                    w.raw_dim(),
+                                    w.iter().cloned().collect(),
+                                )?;
+                                let ws = copied_w
+                                    .view()
+                                    .into_shape((w.shape().iter().product(), 1))?;
                                 ndarray::ArrayView2::dot(&imgs, &ws)[[0, 0]]
                             };
                             res[[n, nw, hr as usize, wr as usize]] += s;
@@ -370,7 +387,7 @@ fn _conv_impl<'a>(
                 }
             }
         }
-        return Ok(ArrayType::OwnF32(res));
+        return Ok(ArrayType::F32(res));
     }
 
     if x_shape.len() == 5 {
@@ -396,45 +413,21 @@ fn _conv_impl<'a>(
 ///         B: bias (M)
 /// outputs: Y
 ///         Y: output
-fn conv_impl<'a>(
-    x: &ArrayType<'a>,
-    w: &ArrayType<'a>,
-    b: Option<&ArrayType<'a>>,
+fn conv_impl(
+    x: &ArrayType,
+    w: &ArrayType,
+    b: Option<&ArrayType>,
     attrs: ConvAttributes,
-) -> Result<ArrayType<'a>, Box<dyn std::error::Error>> {
+) -> Result<ArrayType, Box<dyn std::error::Error>> {
     // FIXME: questo match è assolutamente la cosa più orribile mai concepita dall'uomo
     // FIXME: bisogna riscrivere questo codice usando i generici al più presto, perchè altrimenti mi viene il cancro
     match (x, w, b) {
         (ArrayType::F32(x), ArrayType::F32(w), Some(ArrayType::F32(b))) => {
             return _conv_impl(x.view(), w.view(), Some(b.view()), attrs);
-        },
-        (ArrayType::OwnF32(x), ArrayType::OwnF32(w), Some(ArrayType::OwnF32(b))) => {
-            return _conv_impl(x.view(), w.view(), Some(b.view()), attrs);
-        },
+        }
         (ArrayType::F32(x), ArrayType::F32(w), None) => {
             return _conv_impl(x.view(), w.view(), None, attrs);
-        },
-        (ArrayType::OwnF32(x), ArrayType::OwnF32(w), None) => {
-            return _conv_impl(x.view(), w.view(), None, attrs);
-        },
-        (ArrayType::F32(x), ArrayType::OwnF32(w), Some(ArrayType::OwnF32(b))) => {
-            return _conv_impl(x.view(), w.view(), Some(b.view()), attrs);
-        },
-        (ArrayType::OwnF32(x), ArrayType::F32(w), Some(ArrayType::OwnF32(b))) => {
-            return _conv_impl(x.view(), w.view(), Some(b.view()), attrs);
-        },
-        (ArrayType::OwnF32(x), ArrayType::OwnF32(w), Some(ArrayType::F32(b))) => {
-            return _conv_impl(x.view(), w.view(), Some(b.view()), attrs);
-        },
-        (ArrayType::OwnF32(x), ArrayType::F32(w), Some(ArrayType::F32(b))) => {
-            return _conv_impl(x.view(), w.view(), Some(b.view()), attrs);
-        },
-        (ArrayType::OwnF32(x), ArrayType::F32(w), None) => {
-            return _conv_impl(x.view(), w.view(), None, attrs);
         }
-        (ArrayType::F32(x), ArrayType::OwnF32(w), None) => {
-            return _conv_impl(x.view(), w.view(), None, attrs)
-        },
         (x, w, b) => {
             if let Some(b) = b {
                 todo!("Conv not implemented for types {}, {}, {}", x, w, b);
@@ -445,11 +438,11 @@ fn conv_impl<'a>(
     }
 }
 
-pub fn conv<'a>(
-    inputs: &[&ArrayType<'a>],
+pub fn conv(
+    inputs: &[&ArrayType],
     node: &NodeProto,
-    _opset_version: i64 // defined but never used because even thought Conv has 2 versions they both do the same thing
-) -> Result<ArrayType<'a>, Box<dyn std::error::Error>> {
+    _opset_version: i64, // defined but never used because even thought Conv has 2 versions they both do the same thing
+) -> Result<ArrayType, Box<dyn std::error::Error>> {
     match inputs.len() {
         2 => {
             let attributes = ConvAttributes::new(node, inputs[0], inputs[1]);
