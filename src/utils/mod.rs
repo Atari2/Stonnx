@@ -5,8 +5,9 @@ use std::{collections::HashMap, error::Error, io, path::Path};
 use ndarray::{ArrayD, IxDyn};
 use protobuf::Enum;
 
+use crate::onnx::TensorProto;
+use crate::onnx::tensor_proto::DataType;
 use crate::onnxparser::onnx;
-use crate::onnxparser::onnx::tensor_proto;
 use crate::onnxparser::onnx::tensor_shape_proto::Dimension;
 use crate::{FileInput, FileInputs};
 use half::{bf16, f16};
@@ -139,6 +140,26 @@ impl ArrayType {
             ArrayType::Bool(a) => a.shape(),
         }
     }
+    pub fn ndim(&self) -> usize {
+        match self {
+            ArrayType::I8(a) => a.ndim(),
+            ArrayType::I16(a) => a.ndim(),
+            ArrayType::I32(a) => a.ndim(),
+            ArrayType::I64(a) => a.ndim(),
+            ArrayType::U8(a) => a.ndim(),
+            ArrayType::U16(a) => a.ndim(),
+            ArrayType::U32(a) => a.ndim(),
+            ArrayType::U64(a) => a.ndim(),
+            ArrayType::F16(a) => a.ndim(),
+            ArrayType::BF16(a) => a.ndim(),
+            ArrayType::F32(a) => a.ndim(),
+            ArrayType::F64(a) => a.ndim(),
+            ArrayType::C64(a) => a.ndim(),
+            ArrayType::C128(a) => a.ndim(),
+            ArrayType::Str(a) => a.ndim(),
+            ArrayType::Bool(a) => a.ndim(),
+        }
+    }
     pub fn value_type(&self) -> ValueType {
         match self {
             ArrayType::I64(_) => ValueType::I64,
@@ -161,12 +182,38 @@ impl ArrayType {
     }
 }
 
+// FIXME: data in tensor may be external. Need to handle that.
+
+pub fn make_tensor_from_proto(
+    proto: &TensorProto
+) -> Result<ArrayType, Box<dyn Error>> {
+    let shape = &proto.dims;
+    if let Some(DataType::STRING) = DataType::from_i32(proto.data_type()) {
+        let bytedata = &proto.string_data;
+        make_string_tensor(&shape, &bytedata)
+    } else {
+        let bytedata = proto.raw_data();
+        make_tensor(&shape, bytedata, proto.data_type())
+    }
+}
+
+pub fn make_string_tensor(
+    shape: &[i64],
+    bytedata: &[impl AsRef<[u8]>],
+) -> Result<ArrayType, Box<dyn Error>> {
+    let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
+    let a = ArrayD::<String>::from_shape_vec(
+        IxDyn(&shape),
+        bytedata.iter().map(|v| String::from_utf8_lossy(v.as_ref()).to_string()).collect(),
+    )?;
+    Ok(ArrayType::Str(a))
+}
+
 pub fn make_tensor(
     shape: &[i64],
     bytedata: &[u8],
     data_type: i32,
 ) -> Result<ArrayType, Box<dyn Error>> {
-    use tensor_proto::DataType;
     let enum_dt = DataType::from_i32(data_type).unwrap_or_default();
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
     match enum_dt {
@@ -265,7 +312,7 @@ pub fn make_tensor(
             }
             Err(e) => Err(e.to_string().into()),
         },
-        DataType::STRING => todo!("String data type not implemented"),
+        DataType::STRING => panic!("String data type not supported, use make_string_tensor()"),
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
             Ok(data) => {
                 assert_eq!(data.len(), shape.iter().product::<usize>());
@@ -325,7 +372,7 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> HashMap<String, ArrayType>
         if !tensor.has_data_type() {
             println!("  Tensor: {} has no data type", tensor_name);
         } else {
-            match make_tensor(&tensor.dims, tensor.raw_data(), tensor.data_type()) {
+            match make_tensor_from_proto(&tensor) {
                 Ok(a) => {
                     initializers.insert(tensor_name.to_string(), a);
                 }

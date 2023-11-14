@@ -11,6 +11,7 @@ use operators::constant::constant;
 use operators::conv::conv;
 use operators::globalaveragepool::global_average_pool;
 use operators::shape::shape;
+use operators::gather::gather;
 use std::path::Path;
 
 use clap::Parser;
@@ -141,6 +142,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let constant = constant(&inputs, node, opset_version)?;
                     let output_name = outputs[0];
                     node_inputs.insert(output_name.to_string(), constant);
+                }
+                Some("Gather") => {
+                    println!(
+                        "Running gather operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let gather = gather(&inputs, node, opset_version)?;
+                    let output_name = outputs[0];
+                    node_inputs.insert(output_name.to_string(), gather);
                 }
                 Some(n) => {
                     todo!("Op type {:?}", n)

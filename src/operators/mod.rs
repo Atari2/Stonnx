@@ -4,3 +4,4 @@ pub mod constant;
 pub mod conv;
 pub mod globalaveragepool;
 pub mod shape;
+pub mod gather;
