@@ -5,3 +5,4 @@ pub mod conv;
 pub mod gather;
 pub mod globalaveragepool;
 pub mod shape;
+pub mod unsqueeze;

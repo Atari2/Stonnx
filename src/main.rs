@@ -12,6 +12,7 @@ use operators::conv::conv;
 use operators::gather::gather;
 use operators::globalaveragepool::global_average_pool;
 use operators::shape::shape;
+use operators::unsqueeze::unsqueeze;
 use std::path::Path;
 
 use clap::Parser;
@@ -156,7 +157,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let output_name = outputs[0];
                     node_inputs.insert(output_name.to_string(), gather);
                 }
-                // Unsqueeze
+                Some("Unsqueeze") => {
+                    println!("
+                    Running unsqueeze operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let unsqueeze = unsqueeze(&inputs, node, opset_version)?;
+                    let output_name = outputs[0];
+                    node_inputs.insert(output_name.to_string(), unsqueeze);
+                }
                 // Concat
                 // Reshape
                 // Gemm
