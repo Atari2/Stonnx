@@ -1,4 +1,5 @@
 use ndarray::{ArrayD, ArrayViewD};
+use num::{traits::AsPrimitive, Zero};
 use protobuf::Enum;
 
 use crate::{
@@ -69,8 +70,8 @@ impl Iterator for NDIndex<'_> {
 }
 
 fn _gather_generic<
-    A: std::clone::Clone + Copy + num::Zero,
-    B: std::clone::Clone + num::Zero + num::cast::AsPrimitive<usize>,
+    A: Clone + Copy + Zero,
+    B: Clone + Zero + AsPrimitive<usize>,
 >(
     data: ArrayViewD<A>,
     i: ArrayViewD<B>,
