@@ -13,6 +13,9 @@ use operators::gather::gather;
 use operators::globalaveragepool::global_average_pool;
 use operators::shape::shape;
 use operators::unsqueeze::unsqueeze;
+use operators::concat::concat;
+use operators::reshape::reshape;
+use operators::gemm::gemm;
 use std::path::Path;
 
 use clap::Parser;
@@ -158,17 +161,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     node_inputs.insert(output_name.to_string(), gather);
                 }
                 Some("Unsqueeze") => {
-                    println!("
-                    Running unsqueeze operator between {:?} to get {:?}",
+                    println!(
+                        "Running unsqueeze operator between {:?} to get {:?}",
                         input_names, output_names
                     );
                     let unsqueeze = unsqueeze(&inputs, node, opset_version)?;
                     let output_name = outputs[0];
                     node_inputs.insert(output_name.to_string(), unsqueeze);
                 }
-                // Concat
-                // Reshape
-                // Gemm
+                Some("Concat") => {
+                    println!(
+                        "Running concat operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let concat = concat(&inputs, node, opset_version)?;
+                    let output_name = outputs[0];
+                    node_inputs.insert(output_name.to_string(), concat);
+                }
+                Some("Reshape") => {
+                    println!(
+                        "Running reshape operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let reshape = reshape(&inputs, node, opset_version)?;
+                    let output_name = outputs[0];
+                    node_inputs.insert(output_name.to_string(), reshape);
+                }
+                Some("Gemm") => {
+                    println!(
+                        "Running gemm operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let reshape = gemm(&inputs, node, opset_version)?;
+                    let output_name = outputs[0];
+                    node_inputs.insert(output_name.to_string(), reshape);
+                }
                 Some(n) => {
                     todo!("Op type {:?}", n)
                 }
