@@ -1,5 +1,6 @@
 use ndarray::s;
 use ndarray::IxDyn;
+use ndarray::Order;
 
 use crate::onnx::AttributeProto;
 use crate::onnx::NodeProto;
@@ -349,21 +350,17 @@ fn _conv_impl(
                                 if img.shape() != w_.shape() {
                                     return Err("Shape unexpected".into());
                                 }
-                                let copied_img = ndarray::Array::from_shape_vec(
-                                    img.raw_dim(),
-                                    img.iter().cloned().collect(),
-                                )?;
-                                let imgs = copied_img
-                                    .view()
-                                    .into_shape((1, img.shape().iter().product()))?;
-                                let copied_w = ndarray::Array::from_shape_vec(
-                                    w_.raw_dim(),
-                                    w_.iter().cloned().collect(),
-                                )?;
-                                let w_s = copied_w
-                                    .view()
-                                    .into_shape((w_.shape().iter().product(), 1))?;
-                                ndarray::ArrayView2::dot(&imgs, &w_s)[[0, 0]]
+                                let imgs = img.to_shape((
+                                    (1, img.shape().iter().product()),
+                                    Order::RowMajor,
+                                ))?;
+                                let w_s = w_.to_shape((
+                                    (w_.shape().iter().product(), 1),
+                                    Order::RowMajor,
+                                ))?;
+                                let imgview = imgs.view();
+                                let wview = w_s.view();
+                                ndarray::ArrayView2::dot(&imgview, &wview)[[0, 0]]
                             } else {
                                 let copied_img = ndarray::Array::from_shape_vec(
                                     img.raw_dim(),

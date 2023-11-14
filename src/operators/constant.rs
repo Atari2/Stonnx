@@ -1,8 +1,10 @@
 use crate::{
-    onnx::{NodeProto, tensor_proto::DataType},
-    utils::{pick_opset_version, ArrayType, make_tensor, make_tensor_from_proto, make_string_tensor},
+    onnx::{tensor_proto::DataType, NodeProto},
+    utils::{
+        make_string_tensor, make_tensor, make_tensor_from_proto, pick_opset_version, ArrayType,
+    },
 };
-use protobuf::{MessageField, Enum};
+use protobuf::{Enum, MessageField};
 
 const OPSET_VERSION: [i64; 6] = [1, 9, 11, 12, 13, 19];
 
@@ -54,57 +56,58 @@ impl ConstantAttrs {
                 .attribute
                 .iter()
                 .find(|a| a.name() == "value_ints")
-                .map(|a| a.ints.iter().copied().collect()),
-                value_string: node
+                .map(|a| a.ints.to_vec()),
+            value_string: node
                 .attribute
                 .iter()
                 .find(|a| a.name() == "value_string")
-                .and_then(|a| a.s.clone().as_ref().map(|s| String::from_utf8_lossy(s).to_string())),
+                .and_then(|a| {
+                    a.s.clone()
+                        .as_ref()
+                        .map(|s| String::from_utf8_lossy(s).to_string())
+                }),
             value_strings: node
                 .attribute
                 .iter()
                 .find(|a| a.name() == "value_strings")
-                .map(|a| a.strings.iter().map(|s| String::from_utf8_lossy(s).to_string()).collect()),
+                .map(|a| {
+                    a.strings
+                        .iter()
+                        .map(|s| String::from_utf8_lossy(s).to_string())
+                        .collect()
+                }),
         }
     }
 }
 
-
-fn constant_1(
-    attrs: ConstantAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn constant_1(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
     let value = attrs
         .value
         .ok_or("Constant_1 operator requires the 'value' attribute")?;
     Ok(value)
 }
 
-fn constant_9(
-    attrs: ConstantAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn constant_9(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
     constant_1(attrs)
 }
 
-fn constant_11(
-    attrs: ConstantAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn constant_11(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
     let value = attrs.value;
     let sparse_value = attrs.sparse_value;
 
     match (sparse_value, value) {
         (Some(_), None) => {
             todo!("Constant_11 sparse_value")
-        },
-        (None, Some(value)) => Ok(value),
-        _ => {
-            return Err("Constant_11 operator requires either 'sparse_value' or 'value' attribute, not both".into());
         }
+        (None, Some(value)) => Ok(value),
+        _ => Err(
+            "Constant_11 operator requires either 'sparse_value' or 'value' attribute, not both"
+                .into(),
+        ),
     }
 }
 
-fn constant_12(
-    attrs: ConstantAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn constant_12(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
     let v = attrs.value;
     let s_v = attrs.sparse_value;
     let v_f = attrs.value_float;
@@ -121,29 +124,36 @@ fn constant_12(
         (None, None, Some(v_f), None, None, None, None, None) => {
             let float_value = v_f.to_le_bytes();
             Ok(make_tensor(&[], &float_value, DataType::FLOAT.value())?)
-        },
+        }
         (None, None, None, Some(v_fs), None, None, None, None) => {
             let float_value: Vec<u8> = v_fs.iter().flat_map(|v| v.to_le_bytes().to_vec()).collect();
-            Ok(make_tensor(&[v_fs.len() as i64], &float_value, DataType::FLOAT.value())?)
+            Ok(make_tensor(
+                &[v_fs.len() as i64],
+                &float_value,
+                DataType::FLOAT.value(),
+            )?)
         }
         (None, None, None, None, Some(v_i), None, None, None) => {
             let int_value = v_i.to_le_bytes();
             Ok(make_tensor(&[], &int_value, DataType::INT64.value())?)
-        },
+        }
         (None, None, None, None, None, Some(v_is), None, None) => {
             let int_value: Vec<u8> = v_is.iter().flat_map(|v| v.to_le_bytes().to_vec()).collect();
-            Ok(make_tensor(&[v_is.len() as i64], &int_value, DataType::INT64.value())?)
-        },
+            Ok(make_tensor(
+                &[v_is.len() as i64],
+                &int_value,
+                DataType::INT64.value(),
+            )?)
+        }
         (None, None, None, None, None, None, Some(v_s), None) => {
             let string_value = v_s.as_bytes();
             Ok(make_string_tensor(&[], &[string_value])?)
-        },
+        }
         (None, None, None, None, None, None, None, Some(v_ss)) => {
             let string_value: Vec<&[u8]> = v_ss.iter().map(|s| s.as_bytes()).collect();
             Ok(make_string_tensor(&[v_ss.len() as i64], &string_value)?)
-        },
+        }
         _ => todo!(),
-
     }
 }
 

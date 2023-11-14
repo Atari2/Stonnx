@@ -5,8 +5,8 @@ use std::{collections::HashMap, error::Error, io, path::Path};
 use ndarray::{ArrayD, IxDyn};
 use protobuf::Enum;
 
-use crate::onnx::TensorProto;
 use crate::onnx::tensor_proto::DataType;
+use crate::onnx::TensorProto;
 use crate::onnxparser::onnx;
 use crate::onnxparser::onnx::tensor_shape_proto::Dimension;
 use crate::{FileInput, FileInputs};
@@ -184,16 +184,14 @@ impl ArrayType {
 
 // FIXME: data in tensor may be external. Need to handle that.
 
-pub fn make_tensor_from_proto(
-    proto: &TensorProto
-) -> Result<ArrayType, Box<dyn Error>> {
+pub fn make_tensor_from_proto(proto: &TensorProto) -> Result<ArrayType, Box<dyn Error>> {
     let shape = &proto.dims;
     if let Some(DataType::STRING) = DataType::from_i32(proto.data_type()) {
         let bytedata = &proto.string_data;
-        make_string_tensor(&shape, &bytedata)
+        make_string_tensor(shape, bytedata)
     } else {
         let bytedata = proto.raw_data();
-        make_tensor(&shape, bytedata, proto.data_type())
+        make_tensor(shape, bytedata, proto.data_type())
     }
 }
 
@@ -204,7 +202,10 @@ pub fn make_string_tensor(
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
     let a = ArrayD::<String>::from_shape_vec(
         IxDyn(&shape),
-        bytedata.iter().map(|v| String::from_utf8_lossy(v.as_ref()).to_string()).collect(),
+        bytedata
+            .iter()
+            .map(|v| String::from_utf8_lossy(v.as_ref()).to_string())
+            .collect(),
     )?;
     Ok(ArrayType::Str(a))
 }
@@ -372,7 +373,7 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> HashMap<String, ArrayType>
         if !tensor.has_data_type() {
             println!("  Tensor: {} has no data type", tensor_name);
         } else {
-            match make_tensor_from_proto(&tensor) {
+            match make_tensor_from_proto(tensor) {
                 Ok(a) => {
                     initializers.insert(tensor_name.to_string(), a);
                 }

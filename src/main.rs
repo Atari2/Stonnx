@@ -9,9 +9,9 @@ use operators::add::add;
 use operators::clip::clip;
 use operators::constant::constant;
 use operators::conv::conv;
+use operators::gather::gather;
 use operators::globalaveragepool::global_average_pool;
 use operators::shape::shape;
-use operators::gather::gather;
 use std::path::Path;
 
 use clap::Parser;
@@ -91,6 +91,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect::<Vec<&str>>();
             match node.op_type.as_deref() {
                 Some("Conv") => {
+                    println!(
+                        "Running conv operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
                     let conv_result = conv(&inputs, node, opset_version)?;
                     assert_eq!(outputs.len(), 1);
                     let output_name = outputs[0];
@@ -152,6 +156,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let output_name = outputs[0];
                     node_inputs.insert(output_name.to_string(), gather);
                 }
+                // Unsqueeze
+                // Concat
+                // Reshape
+                // Gemm
                 Some(n) => {
                     todo!("Op type {:?}", n)
                 }
