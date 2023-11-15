@@ -1,7 +1,9 @@
-#![allow(unused_variables, dead_code)] // TODO: remove this when operator is implemented
+#![allow(unused_variables, dead_code)] use ndarray::concatenate;
+
+// TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
-    utils::ArrayType,
+    utils::{ArrayType, pick_opset_version},
 };
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 4, 11, 13];
@@ -27,44 +29,14 @@ fn concat_1(
     inputs: &[&ArrayType],
     attrs: ConcatAttrs,
 ) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    let axis = attrs.axis;
-    if axis < 0 {
-        return Err("Axis must be non-negative".into());
-    }
-    let num_arrays = inputs.len();
-    if num_arrays == 0 {
-        return Err("Concat requires at least one input".into());
-    }
-    // check if all inputs have the same shape on the specified axis
-    for i in inputs.len()-1 {
-        if inputs[i].shape()[axis] != inputs[i+1].shape()[axis] {
-            return Err("All inputs must have the same shape on the specified axis".into());
-        }
-    }
-    Ok(ndarray::concatenate(axis, arrays))
+    todo!("Concat for type {}", inputs[0])
 }
 
 fn concat_11(
     inputs: &[&ArrayType],
     attrs: ConcatAttrs,
 ) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    // accept negative axis -> counting dimensions from the back
-    let axis = if attrs.axis < 0 {
-        inputs[0].shape().len() as i64 + attrs.axis
-    } else {
-        attrs.axis
-    };
-    let num_arrays = inputs.len();
-    if num_arrays == 0 {
-        return Err("Concat requires at least one input".into());
-    }
-    // check if all inputs have the same shape on the specified axis
-    for i in inputs.len()-1 {
-        if inputs[i].shape()[axis] != inputs[i+1].shape()[axis] {
-            return Err("All inputs must have the same shape on the specified axis".into());
-        }
-    }
-    Ok(ndarray::concatenate(axis, arrays))
+    todo!("Concat for type {}", inputs[0])
 }
 
 
