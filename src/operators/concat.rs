@@ -1,10 +1,6 @@
-#![allow(unused_variables, dead_code)] use ndarray::concatenate;
+use ndarray::{ArrayD, Axis, CowArray, IxDyn};
 
-// TODO: remove this when operator is implemented
-use crate::{
-    onnx::NodeProto,
-    utils::{ArrayType, pick_opset_version},
-};
+use crate::{onnx::NodeProto, utils::ArrayType, utils::ValueType};
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 4, 11, 13];
 
@@ -20,25 +16,93 @@ impl ConcatAttrs {
                 .attribute
                 .iter()
                 .find(|a| a.name() == "axis")
-                .map_or(0, |a| a.i.unwrap_or(1)),
+                .map_or(1, |a| a.i.unwrap_or(1)),
         }
     }
 }
 
-fn concat_1(
+fn _preprocess<'a, A: Clone>(
+    a: &'a ArrayD<A>,
+    axis: i64,
+) -> Result<CowArray<'a, A, IxDyn>, Box<dyn std::error::Error>> {
+    if a.shape().len() == 0 {
+        return Err("Input must be at least 1D".into());
+    }
+    if axis >= a.shape().len() as i64 {
+        let axis = axis as usize;
+        let new_shape = a
+            .shape()
+            .iter()
+            .chain(std::iter::repeat(&1).take(axis + 1 - a.shape().len()))
+            .copied()
+            .collect::<Vec<_>>();
+        Ok(a.to_shape(new_shape)?.into_dyn()) // can fail is array not contiguous
+    } else {
+        Ok(a.into())
+    }
+}
+
+fn _concat_i64(
     inputs: &[&ArrayType],
     attrs: ConcatAttrs,
 ) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    todo!("Concat for type {}", inputs[0])
+    let mut inputs_i64 = vec![];
+    let mut cow_array = vec![];
+    for input in inputs.iter() {
+        if let ArrayType::I64(x) = input {
+            cow_array.push(_preprocess(&x, attrs.axis)?);
+        } else {
+            return Err("Inputs not all of I64".into());
+        }
+    }
+    for array in cow_array.iter() {
+        inputs_i64.push(array.view());
+    }
+    if inputs_i64.is_empty() {
+        return Err("No inputs".into());
+    }
+    let shape_i64 = inputs_i64[0].shape();
+    let axis = if attrs.axis < 0 {
+        shape_i64.len() as i64 + attrs.axis
+    } else {
+        attrs.axis
+    } as usize;
+    Ok(ArrayType::I64(ndarray::concatenate(
+        Axis(axis),
+        &inputs_i64,
+    )?))
 }
 
-fn concat_11(
+fn _concat_f32(
     inputs: &[&ArrayType],
     attrs: ConcatAttrs,
 ) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    todo!("Concat for type {}", inputs[0])
+    let mut inputs_f32 = vec![];
+    let mut cow_array = vec![];
+    for input in inputs.iter() {
+        if let ArrayType::F32(x) = input {
+            cow_array.push(_preprocess(&x, attrs.axis)?);
+        } else {
+            return Err("Inputs not all of F32".into());
+        }
+    }
+    for array in cow_array.iter() {
+        inputs_f32.push(array.view());
+    }
+    if inputs_f32.is_empty() {
+        return Err("No inputs".into());
+    }
+    let shape_f32 = inputs_f32[0].shape();
+    let axis = if attrs.axis < 0 {
+        shape_f32.len() as i64 + attrs.axis
+    } else {
+        attrs.axis
+    } as usize;
+    Ok(ArrayType::F32(ndarray::concatenate(
+        Axis(axis),
+        &inputs_f32,
+    )?))
 }
-
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_concat.py
 /// https://onnx.ai/onnx/operators/onnx__Concat.html
@@ -47,13 +111,19 @@ pub fn concat(
     node: &NodeProto,
     _opset_version: i64,
 ) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    let target_version = pick_opset_version(_opset_version, &_OPSET_VERSIONS);
-    if target_version < 11 {
-        // 1, 2, 4
-        concat_1(inputs, ConcatAttrs::new(node)) 
+    let attrs = ConcatAttrs::new(node);
+
+    if inputs.is_empty() {
+        return Err("No inputs".into());
     }
-    else {
-        // 11, 13
-        concat_11(inputs, ConcatAttrs::new(node))
+
+    let type_ = inputs[0].value_type();
+
+    match type_ {
+        ValueType::I64 => _concat_i64(inputs, attrs),
+        ValueType::F32 => _concat_f32(inputs, attrs),
+        _ => {
+            return Err("Only f32 and i64 are supported".into());
+        }
     }
 }
