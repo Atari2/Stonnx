@@ -3,7 +3,7 @@ mod operators;
 mod utils;
 
 pub use onnxparser::onnx;
-pub use utils::{make_external_inputs, make_initializers, make_inputs, read_model};
+pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor};
 
 use operators::add::add;
 use operators::clip::clip;
@@ -22,6 +22,8 @@ use clap::Parser;
 
 use serde::{Deserialize, Serialize};
 
+use crate::utils::{make_external_outputs, make_graph_outputs};
+
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(short, long, default_value = "inputs.json")]
@@ -30,15 +32,9 @@ struct Args {
 
 #[derive(Serialize, Deserialize)]
 pub struct FileInputs {
-    pub inputs: Vec<FileInput>,
-    pub modelpath: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct FileInput {
-    pub name: String,
-    pub datafile: String,
-    pub attributes: serde_json::Map<String, serde_json::Value>,
+    pub inputs: Vec<String>,
+    pub outputs: Vec<String>,
+    pub modelpath: String
 }
 
 const MAX_OPSET_VERSION: i64 = 20;
@@ -66,8 +62,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     for graph in model.graph.iter() {
         let initializers = make_initializers(graph);
-        let external_inputs = make_external_inputs(graph, &fileinputs);
-        let mut node_inputs = make_inputs(graph, &external_inputs, &fileinputs);
+        let mut node_inputs = make_external_inputs(graph, &fileinputs)?;
+        let expected_outputs = make_external_outputs(graph, &fileinputs)?;
+        let mut graph_outputs = make_graph_outputs(graph)?;
         for node in graph.node.iter() {
             let mut inputs = vec![];
             let mut outputs = vec![];
@@ -201,6 +198,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 None => {
                     panic!("  Node has no op type");
+                }
+            }
+            for output_name in outputs.iter() {
+                if let Some(gout) = graph_outputs.get_mut(*output_name) {
+                    if let Some(produced) = node_inputs.get(*output_name) {
+                        gout.data = Some(produced.clone());
+                    }
                 }
             }
         }

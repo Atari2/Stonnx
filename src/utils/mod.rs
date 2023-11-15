@@ -1,15 +1,15 @@
 use std::io::Read;
 use std::os::raw::c_uchar;
+use std::path;
 use std::{collections::HashMap, error::Error, io, path::Path};
 
 use ndarray::{ArrayD, IxDyn};
 use protobuf::Enum;
 
 use crate::onnx::tensor_proto::DataType;
-use crate::onnx::TensorProto;
+use crate::onnx::{TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
-use crate::onnxparser::onnx::tensor_shape_proto::Dimension;
-use crate::{FileInput, FileInputs};
+use crate::FileInputs;
 use half::{bf16, f16};
 use num::complex::Complex;
 
@@ -36,6 +36,66 @@ pub enum ValueType {
     C128,
     String,
     Bool,
+}
+
+impl ValueType {
+    fn new(proto: onnx::tensor_proto::DataType) -> Result<ValueType, Box<dyn Error>> {
+        match proto {
+            DataType::UNDEFINED => Err("Undefined data type".into()),
+            DataType::UINT8 => {
+                Ok(ValueType::U8)
+            }
+            DataType::INT8 => {
+                Ok(ValueType::I8)
+            }
+            DataType::UINT16 => {
+                Ok(ValueType::U16)
+            }
+            DataType::INT16 => {
+                Ok(ValueType::I16)
+            }
+            DataType::INT32 => {
+                Ok(ValueType::I32)
+            }
+            DataType::INT64 => {
+                Ok(ValueType::I64)
+            }
+            DataType::STRING => {
+                Ok(ValueType::String)
+            }
+            DataType::BOOL => {
+                Ok(ValueType::Bool)
+            }
+            DataType::FLOAT16 => {
+                Ok(ValueType::F16)
+            }
+            DataType::DOUBLE => {
+                Ok(ValueType::F64)
+            }
+            DataType::UINT32 => {
+                Ok(ValueType::U32)
+            }
+            DataType::UINT64 => {
+                Ok(ValueType::U64)
+            }
+            DataType::COMPLEX64 => {
+                Ok(ValueType::C64)
+            }
+            DataType::COMPLEX128 => {
+                Ok(ValueType::C128)
+            }
+            DataType::BFLOAT16 => {
+                Ok(ValueType::BF16)
+            }
+            DataType::FLOAT
+            | DataType::FLOAT8E4M3FN
+            | DataType::FLOAT8E4M3FNUZ
+            | DataType::FLOAT8E5M2
+            | DataType::FLOAT8E5M2FNUZ => {
+                Ok(ValueType::F32)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -119,6 +179,8 @@ impl std::fmt::Display for ArrayType {
     }
 }
 
+pub trait ArrayTypeTrait: Clone + Copy + num::Zero {}
+
 impl ArrayType {
     pub fn shape(&self) -> &[usize] {
         match self {
@@ -178,6 +240,53 @@ impl ArrayType {
             ArrayType::C128(_) => ValueType::C128,
             ArrayType::Str(_) => ValueType::String,
             ArrayType::Bool(_) => ValueType::Bool,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ValueInfo {
+    pub name: String,
+    pub type_: (ValueType, Vec<i64>),
+    pub doc_string: String,
+}
+
+#[derive(Debug)]
+pub struct OutputInfo {
+    pub valueinfo: ValueInfo,
+    pub data: Option<ArrayType>
+}
+
+impl OutputInfo {
+    fn new(valueinfo: ValueInfo) -> Self {
+        Self {
+            valueinfo,
+            data: None
+        }
+    }
+}
+
+impl ValueInfo {
+    fn from_proto(proto: &ValueInfoProto) -> Result<Self, Box<dyn Error>> {
+        if let Some(onnx::type_proto::Value::TensorType(tensor)) = &proto.type_.value {
+            let dt = onnx::tensor_proto::DataType::from_i32(tensor.elem_type.unwrap_or_default())
+                .unwrap_or_default();
+            Ok(Self {
+                name: proto
+                    .name
+                    .as_ref()
+                    .map_or_else(|| UNKNOWN.to_owned(), |v| v.clone()),
+                type_: (
+                    ValueType::new(dt)?,
+                    tensor.shape.dim.iter().map(|v| v.dim_value()).collect(),
+                ),
+                doc_string: proto
+                    .doc_string
+                    .as_ref()
+                    .map_or_else(|| UNKNOWN.to_owned(), |v| v.clone()),
+            })
+        } else {
+            todo!("ValueInfoProto type not supported: {:?}", proto.type_)
         }
     }
 }
@@ -391,122 +500,66 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> HashMap<String, ArrayType>
     initializers
 }
 
-pub fn get_dim(dim: &Dimension, file_input: Option<&FileInput>) -> i64 {
-    if dim.has_dim_value() {
-        dim.dim_value()
-    } else if let Some(onnx::tensor_shape_proto::dimension::Value::DimParam(p)) = &dim.value {
-        if let Some(attr) = file_input.and_then(|i| i.attributes.get(p)) {
-            match attr {
-                serde_json::Value::Number(n) => n.as_i64().unwrap_or_default(),
-                _ => panic!("Invalid attribute type"),
-            }
-        } else {
-            let mut input_line = String::new();
-            println!("Enter {} for input {}", dim.dim_param(), dim.denotation());
-            io::stdin().read_line(&mut input_line).unwrap_or_default();
-            let x: i64 = input_line.trim().parse().unwrap_or_default();
-            x
-        }
-    } else {
-        panic!("Invalid dim")
+fn make_tensors_from_files(
+    graph: &onnx::GraphProto,
+    files: &[String],
+) -> Result<HashMap<String, ArrayType>, Box<dyn Error>> {
+    let mut map = HashMap::new();
+    let mut external_inputs_map = HashMap::new();
+    for input in files.iter() {
+        let input_tensor = read_tensor(path::Path::new(&input))?;
+        external_inputs_map.insert(
+            input_tensor
+                .name
+                .as_ref()
+                .map_or_else(|| UNKNOWN.to_owned(), |v| v.clone()),
+            input_tensor,
+        );
     }
-}
-
-pub fn get_bytedata(name: &str) -> Vec<u8> {
-    println!("Input filename for data {}: ", name);
-    let mut input_line = String::new();
-    io::stdin().read_line(&mut input_line).unwrap_or_default();
-
-    let p = Path::new(input_line.trim());
-    let fp = std::env::current_dir().unwrap().join(p);
-    println!("PATH: {:?}", fp);
-    std::fs::read(fp).unwrap()
-}
-
-pub fn get_bytedata_from_file(filename: &str) -> Vec<u8> {
-    let p = Path::new(filename.trim());
-    let fp = std::env::current_dir().unwrap().join(p);
-    println!("PATH: {:?}", fp);
-    std::fs::read(fp).unwrap()
+    for input in graph.input.iter() {
+        let input_name = input.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
+        if let Some(input_from_file) = external_inputs_map.get(input_name) {
+            map.insert(
+                input_name.to_string(),
+                make_tensor_from_proto(input_from_file)?,
+            );
+        } else {
+            return Err(format!("Input {} not found in inputs file", input_name).into());
+        }
+    }
+    Ok(map)
 }
 
 pub fn make_external_inputs(
     graph: &onnx::GraphProto,
-    inputs_file: &FileInputs,
-) -> HashMap<String, Vec<u8>> {
-    let mut map = HashMap::new();
-    for input in graph.input.iter() {
-        let input_name = input.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
-        if let Some(input_from_file) = inputs_file.inputs.iter().find(|i| i.name == input_name) {
-            map.insert(
-                input_name.to_string(),
-                get_bytedata_from_file(&input_from_file.datafile),
-            );
-        } else {
-            map.insert(input_name.to_string(), get_bytedata(input_name));
-        }
+    fileinputs: &FileInputs,
+) -> Result<HashMap<String, ArrayType>, Box<dyn Error>> {
+    if fileinputs.inputs.is_empty() {
+        return Ok(HashMap::new());
     }
-    map
+    make_tensors_from_files(graph, &fileinputs.inputs)
 }
 
-pub fn make_inputs<'a>(
-    graph: &'a onnx::GraphProto,
-    external_data: &'a HashMap<String, Vec<u8>>,
-    inputs_file: &FileInputs,
-) -> HashMap<String, ArrayType> {
-    let mut inputs: HashMap<String, ArrayType> = HashMap::new();
-    for input in graph.input.iter() {
-        use onnx::type_proto::Value;
-        let input_name = input.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
-        match &input.type_.value {
-            Some(Value::TensorType(t)) => match (t.elem_type, &t.shape) {
-                (Some(et), protobuf::MessageField(Some(s))) => {
-                    match make_tensor(
-                        &s.dim
-                            .iter()
-                            .map(|d| {
-                                get_dim(d, inputs_file.inputs.iter().find(|i| i.name == input_name))
-                            })
-                            .collect::<Vec<i64>>(),
-                        external_data.get(input_name).unwrap(),
-                        et,
-                    ) {
-                        Ok(a) => {
-                            inputs.insert(input_name.to_string(), a);
-                        }
-                        Err(e) => {
-                            println!(
-                                "  Input: {} has tensor type {:?} but error: {}",
-                                input_name, et, e
-                            );
-                        }
-                    }
-                }
-                _ => {
-                    panic!(
-                        "  Input: {} has tensor type but no element type",
-                        input_name
-                    )
-                }
-            },
-            Some(Value::SparseTensorType(_)) => {
-                todo!("  Input: {} has type SparseTensor", input_name)
-            }
-            Some(Value::SequenceType(_)) => {
-                todo!("  Input: {} has type Sequence", input_name)
-            }
-            Some(Value::MapType(_)) => {
-                todo!("  Input: {} has type Map", input_name)
-            }
-            Some(Value::OptionalType(_)) => {
-                todo!("  Input: {} has type Optional", input_name)
-            }
-            None => {
-                panic!("  Input: {} has no type", input_name)
-            }
-        }
+pub fn make_external_outputs(
+    graph: &onnx::GraphProto,
+    fileinputs: &FileInputs,
+) -> Result<HashMap<String, ArrayType>, Box<dyn Error>> {
+    if fileinputs.outputs.is_empty() {
+        return Ok(HashMap::new());
     }
-    inputs
+    make_tensors_from_files(graph, &fileinputs.inputs)
+}
+
+pub fn make_graph_outputs(graph: &onnx::GraphProto) -> Result<HashMap<String, OutputInfo>, Box<dyn Error>> {
+    let mut map = HashMap::new();
+    for output in graph.output.iter() {
+        let output_name = output.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
+        map.insert(
+            output_name.to_string(),
+            OutputInfo::new(ValueInfo::from_proto(output)?)
+        );
+    }
+    Ok(map)
 }
 
 fn read_model_text(p: &Path) -> Result<onnx::ModelProto, Box<dyn Error>> {
@@ -525,11 +578,21 @@ fn read_model_binary(p: &Path) -> Result<onnx::ModelProto, Box<dyn Error>> {
 }
 
 pub fn read_model(p: &Path) -> Result<onnx::ModelProto, Box<dyn Error>> {
-    if let Ok(m) = read_model_binary(p) {
-        Ok(m)
-    } else {
-        read_model_text(p)
+    let merr = read_model_binary(p);
+    match merr {
+        Ok(m) => Ok(m),
+        Err(e) => {
+            eprintln!("Error reading binary model: {}", e);
+            read_model_text(p)
+        }
     }
+}
+
+pub fn read_tensor(p: &Path) -> Result<onnx::TensorProto, Box<dyn Error>> {
+    let file = std::fs::File::open(p)?;
+    let mut reader = io::BufReader::new(file);
+    let model: onnx::TensorProto = protobuf::Message::parse_from_reader(&mut reader)?;
+    Ok(model)
 }
 
 pub fn pick_opset_version(target_ver: i64, opset_versions: &[i64]) -> i64 {

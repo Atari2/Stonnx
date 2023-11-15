@@ -1,12 +1,9 @@
 {
     "inputs": [
-        {
-            "name": "input",
-            "datafile": "test.bin",
-            "attributes": {
-                "batch_size": 1
-            }
-        }
+        "examples/test_data_set_0/input_0.pb"
+    ],
+    "outputs": [
+        "examples/test_data_set_0/output_0.pb"
     ],
     "modelpath": "examples/mobilenetv2-10.onnx"
 }
