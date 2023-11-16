@@ -1,9 +1,9 @@
 {
     "inputs": [
-        "examples/test_data_set_0/input_0.pb"
+        "examples/bvlcalexnet-12/test_data_set_0/input_0.pb"
     ],
     "outputs": [
-        "examples/test_data_set_0/output_0.pb"
+        "examples/bvlcalexnet-12/test_data_set_0/output_0.pb"
     ],
-    "modelpath": "examples/mobilenetv2-10.onnx"
+    "modelpath": "examples/bvlcalexnet-12/bvlcalexnet-12.onnx"
 }

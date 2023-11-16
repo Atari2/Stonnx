@@ -9,3 +9,5 @@ pub mod unsqueeze;
 pub mod concat;
 pub mod reshape;
 pub mod gemm;
+pub mod relu;
+pub mod lrn;

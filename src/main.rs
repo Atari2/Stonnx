@@ -16,6 +16,8 @@ use operators::unsqueeze::unsqueeze;
 use operators::concat::concat;
 use operators::reshape::reshape;
 use operators::gemm::gemm;
+use operators::relu::relu;
+use operators::lrn::lrn;
 use std::path::Path;
 
 use clap::Parser;
@@ -65,6 +67,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut node_inputs = make_external_inputs(graph, &fileinputs)?;
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
         let mut graph_outputs = make_graph_outputs(graph)?;
+        for node in graph.node.iter() {
+            println!("Node {:?}", node.op_type.as_deref());
+        }
         for node in graph.node.iter() {
             let mut inputs = vec![];
             let mut outputs = vec![];
@@ -192,6 +197,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let reshape = gemm(&inputs, node, opset_version)?;
                     let output_name = outputs[0];
                     node_inputs.insert(output_name.to_string(), reshape);
+                }
+                Some("Relu") => {
+                    println!(
+                        "Running relu operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let relu = relu(&inputs, node, opset_version)?;
+                    let output_name = outputs[0];
+                    node_inputs.insert(output_name.to_string(), relu);
+                }
+                Some("lrn") => {
+                    println!(
+                        "Running lrn operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let lrn = lrn(&inputs, node, opset_version)?;
+                    let output_name = outputs[0];
+                    node_inputs.insert(output_name.to_string(), lrn);
                 }
                 Some(n) => {
                     todo!("Op type {:?}", n)

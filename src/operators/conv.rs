@@ -5,6 +5,7 @@ use ndarray::Order;
 use crate::onnx::AttributeProto;
 use crate::onnx::NodeProto;
 use crate::utils::ArrayType;
+use crate::utils::shape_safe_product;
 
 // Defined but never used because even thought Conv has 2 versions, they both act the same
 const _OPSET_VERSIONS: [i64; 2] = [1, 11];
@@ -262,12 +263,12 @@ fn _conv_impl(
                             if img.shape() != w_.shape() {
                                 return Err("Shape unexpected".into());
                             }
-                            let imgs = img.into_shape((1, img.shape().iter().product()))?;
-                            let w_s = w_.into_shape((w_.shape().iter().product(), 1))?;
+                            let imgs = img.into_shape((1, shape_safe_product(img.shape())))?;
+                            let w_s = w_.into_shape((shape_safe_product(w_.shape()), 1))?;
                             ndarray::ArrayView2::dot(&imgs, &w_s)[[0, 0]]
                         } else {
-                            let imgs = img.into_shape((1, img.shape().iter().product()))?;
-                            let ws = w.into_shape((w.shape().iter().product(), 1))?;
+                            let imgs = img.into_shape((1, shape_safe_product(img.shape())))?;
+                            let ws = w.into_shape((shape_safe_product(w.shape()), 1))?;
                             ndarray::ArrayView2::dot(&imgs, &ws)[[0, 0]]
                         };
                         res[[n, nw, hr as usize]] += s;
@@ -351,11 +352,11 @@ fn _conv_impl(
                                     return Err("Shape unexpected".into());
                                 }
                                 let imgs = img.to_shape((
-                                    (1, img.shape().iter().product()),
+                                    (1, shape_safe_product(img.shape())),
                                     Order::RowMajor,
                                 ))?;
                                 let w_s = w_.to_shape((
-                                    (w_.shape().iter().product(), 1),
+                                    (shape_safe_product(w_.shape()), 1),
                                     Order::RowMajor,
                                 ))?;
                                 let imgview = imgs.view();
@@ -368,14 +369,14 @@ fn _conv_impl(
                                 )?;
                                 let imgs = copied_img
                                     .view()
-                                    .into_shape((1, img.shape().iter().product()))?;
+                                    .into_shape((1, shape_safe_product(img.shape())))?;
                                 let copied_w = ndarray::Array::from_shape_vec(
                                     w.raw_dim(),
                                     w.iter().cloned().collect(),
                                 )?;
                                 let ws = copied_w
                                     .view()
-                                    .into_shape((w.shape().iter().product(), 1))?;
+                                    .into_shape((shape_safe_product(w.shape()), 1))?;
                                 ndarray::ArrayView2::dot(&imgs, &ws)[[0, 0]]
                             };
                             res[[n, nw, hr as usize, wr as usize]] += s;

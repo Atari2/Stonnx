@@ -1,7 +1,7 @@
 // TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
-    utils::ArrayType,
+    utils::{ArrayType, shape_safe_product},
 };
 
 use ndarray::IxDyn;
@@ -51,8 +51,8 @@ pub fn reshape(
         let zero_indexes = shape.iter().enumerate().filter_map(|(i, &v)| if v == 0 { Some(i) } else { None }).collect::<Vec<_>>();
         new_shape[zero_indexes.as_slice()] = datashape_array[zero_indexes.as_slice()] as i64;
     }
-    let shape_tot = new_shape.iter().product::<i64>();
-    let data_shape_tot = data.shape().iter().product::<usize>() as i64;
+    let shape_tot = shape_safe_product(&new_shape);
+    let data_shape_tot = shape_safe_product(shape) as i64;
     if shape_tot < 0 {
         let missing_shape = data_shape_tot / -shape_tot;
         if let Some(missing_shape_index) = new_shape.iter().position(|&v| v == -1) {

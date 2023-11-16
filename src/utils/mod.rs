@@ -38,62 +38,39 @@ pub enum ValueType {
     Bool,
 }
 
+pub fn shape_safe_product<'a, B: 'a + std::iter::Product<&'a B> + std::default::Default, A: IntoIterator<Item = &'a B>>(shape: A) -> B {
+    let mut piter = shape.into_iter().peekable();
+    if piter.peek().is_none() {
+        std::default::Default::default()
+    } else {
+        piter.product()
+    }
+}
+
 impl ValueType {
     fn new(proto: onnx::tensor_proto::DataType) -> Result<ValueType, Box<dyn Error>> {
         match proto {
             DataType::UNDEFINED => Err("Undefined data type".into()),
-            DataType::UINT8 => {
-                Ok(ValueType::U8)
-            }
-            DataType::INT8 => {
-                Ok(ValueType::I8)
-            }
-            DataType::UINT16 => {
-                Ok(ValueType::U16)
-            }
-            DataType::INT16 => {
-                Ok(ValueType::I16)
-            }
-            DataType::INT32 => {
-                Ok(ValueType::I32)
-            }
-            DataType::INT64 => {
-                Ok(ValueType::I64)
-            }
-            DataType::STRING => {
-                Ok(ValueType::String)
-            }
-            DataType::BOOL => {
-                Ok(ValueType::Bool)
-            }
-            DataType::FLOAT16 => {
-                Ok(ValueType::F16)
-            }
-            DataType::DOUBLE => {
-                Ok(ValueType::F64)
-            }
-            DataType::UINT32 => {
-                Ok(ValueType::U32)
-            }
-            DataType::UINT64 => {
-                Ok(ValueType::U64)
-            }
-            DataType::COMPLEX64 => {
-                Ok(ValueType::C64)
-            }
-            DataType::COMPLEX128 => {
-                Ok(ValueType::C128)
-            }
-            DataType::BFLOAT16 => {
-                Ok(ValueType::BF16)
-            }
+            DataType::UINT8 => Ok(ValueType::U8),
+            DataType::INT8 => Ok(ValueType::I8),
+            DataType::UINT16 => Ok(ValueType::U16),
+            DataType::INT16 => Ok(ValueType::I16),
+            DataType::INT32 => Ok(ValueType::I32),
+            DataType::INT64 => Ok(ValueType::I64),
+            DataType::STRING => Ok(ValueType::String),
+            DataType::BOOL => Ok(ValueType::Bool),
+            DataType::FLOAT16 => Ok(ValueType::F16),
+            DataType::DOUBLE => Ok(ValueType::F64),
+            DataType::UINT32 => Ok(ValueType::U32),
+            DataType::UINT64 => Ok(ValueType::U64),
+            DataType::COMPLEX64 => Ok(ValueType::C64),
+            DataType::COMPLEX128 => Ok(ValueType::C128),
+            DataType::BFLOAT16 => Ok(ValueType::BF16),
             DataType::FLOAT
             | DataType::FLOAT8E4M3FN
             | DataType::FLOAT8E4M3FNUZ
             | DataType::FLOAT8E5M2
-            | DataType::FLOAT8E5M2FNUZ => {
-                Ok(ValueType::F32)
-            }
+            | DataType::FLOAT8E5M2FNUZ => Ok(ValueType::F32),
         }
     }
 }
@@ -254,14 +231,14 @@ pub struct ValueInfo {
 #[derive(Debug)]
 pub struct OutputInfo {
     pub valueinfo: ValueInfo,
-    pub data: Option<ArrayType>
+    pub data: Option<ArrayType>,
 }
 
 impl OutputInfo {
     fn new(valueinfo: ValueInfo) -> Self {
         Self {
             valueinfo,
-            data: None
+            data: None,
         }
     }
 }
@@ -295,6 +272,7 @@ impl ValueInfo {
 
 pub fn make_tensor_from_proto(proto: &TensorProto) -> Result<ArrayType, Box<dyn Error>> {
     let shape = &proto.dims;
+    println!("  Tensor: {} data location: {:?}", proto.name(), proto.data_location());
     if let Some(DataType::STRING) = DataType::from_i32(proto.data_type()) {
         let bytedata = &proto.string_data;
         make_string_tensor(shape, bytedata)
@@ -330,7 +308,7 @@ pub fn make_tensor(
         DataType::UNDEFINED => Err("Undefined data type".into()),
         DataType::INT8 => match bytemuck::try_cast_slice::<u8, i8>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I8(a))
             }
@@ -338,7 +316,7 @@ pub fn make_tensor(
         },
         DataType::INT16 => match bytemuck::try_cast_slice::<u8, i16>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I16(a))
             }
@@ -346,7 +324,7 @@ pub fn make_tensor(
         },
         DataType::INT32 => match bytemuck::try_cast_slice::<u8, i32>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I32(a))
             }
@@ -354,7 +332,7 @@ pub fn make_tensor(
         },
         DataType::INT64 => match bytemuck::try_cast_slice::<u8, i64>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I64(a))
             }
@@ -362,7 +340,7 @@ pub fn make_tensor(
         },
         DataType::UINT8 => match bytemuck::try_cast_slice::<u8, u8>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<u8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U8(a))
             }
@@ -370,7 +348,7 @@ pub fn make_tensor(
         },
         DataType::UINT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<u16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U16(a))
             }
@@ -378,7 +356,7 @@ pub fn make_tensor(
         },
         DataType::UINT32 => match bytemuck::try_cast_slice::<u8, u32>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<u32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U32(a))
             }
@@ -386,7 +364,7 @@ pub fn make_tensor(
         },
         DataType::UINT64 => match bytemuck::try_cast_slice::<u8, u64>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<u64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U64(a))
             }
@@ -394,7 +372,7 @@ pub fn make_tensor(
         },
         DataType::FLOAT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<f16>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter().map(|x| f16::from_bits(*x)).collect(),
@@ -405,7 +383,7 @@ pub fn make_tensor(
         },
         DataType::BFLOAT16 => match bytemuck::try_cast_slice::<u8, f32>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<bf16>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter().map(|x| bf16::from_f32(*x)).collect(),
@@ -416,7 +394,7 @@ pub fn make_tensor(
         },
         DataType::DOUBLE => match bytemuck::try_cast_slice::<u8, f64>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<f64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::F64(a))
             }
@@ -425,7 +403,7 @@ pub fn make_tensor(
         DataType::STRING => panic!("String data type not supported, use make_string_tensor()"),
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<bool>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter().map(|x| *x != 0).collect(),
@@ -440,15 +418,27 @@ pub fn make_tensor(
         | DataType::FLOAT8E5M2FNUZ
         | DataType::FLOAT8E5M2 => match bytemuck::try_cast_slice::<u8, f32>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
-                let a = ArrayD::<f32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
+                let dlen = data.len();
+                let slen = if !shape.is_empty() {
+                    shape_safe_product(&shape)
+                } else {
+                    0
+                };
+                if dlen != slen {
+                    panic!("Data length {} does not match shape length {}", dlen, slen)
+                }
+                let a = if data.is_empty() {
+                    ArrayD::<f32>::zeros(IxDyn(&shape))
+                } else {
+                    ArrayD::<f32>::from_shape_vec(IxDyn(&shape), data.to_vec())?
+                };
                 Ok(ArrayType::F32(a))
             }
             Err(e) => Err(e.to_string().into()),
         },
         DataType::COMPLEX64 => match bytemuck::try_cast_slice::<u8, Complex64Repr>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<Complex64>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter()
@@ -461,7 +451,7 @@ pub fn make_tensor(
         },
         DataType::COMPLEX128 => match bytemuck::try_cast_slice::<u8, Complex128Repr>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape.iter().product::<usize>());
+                assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<Complex128>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter()
@@ -487,7 +477,7 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> HashMap<String, ArrayType>
                     initializers.insert(tensor_name.to_string(), a);
                 }
                 Err(e) => {
-                    println!(
+                    panic!(
                         "  Tensor: {} has data type {:?} but error: {}",
                         tensor_name,
                         tensor.data_type(),
@@ -543,7 +533,7 @@ fn make_output_tensors_from_files(
                 .name
                 .as_ref()
                 .map_or_else(|| UNKNOWN.to_owned(), |v| v.clone()),
-                ouput_tensor,
+            ouput_tensor,
         );
     }
     for output in graph.output.iter() {
@@ -580,13 +570,15 @@ pub fn make_external_outputs(
     make_output_tensors_from_files(graph, &fileinputs.outputs)
 }
 
-pub fn make_graph_outputs(graph: &onnx::GraphProto) -> Result<HashMap<String, OutputInfo>, Box<dyn Error>> {
+pub fn make_graph_outputs(
+    graph: &onnx::GraphProto,
+) -> Result<HashMap<String, OutputInfo>, Box<dyn Error>> {
     let mut map = HashMap::new();
     for output in graph.output.iter() {
         let output_name = output.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
         map.insert(
             output_name.to_string(),
-            OutputInfo::new(ValueInfo::from_proto(output)?)
+            OutputInfo::new(ValueInfo::from_proto(output)?),
         );
     }
     Ok(map)
