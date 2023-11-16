@@ -1,16 +1,16 @@
-#![allow(unused_variables, dead_code)] // TODO: remove this when operator is implemented
+// TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
-    utils::{ArrayType, pick_opset_version},
+    utils::ArrayType,
 };
 
-use super::shape;
+use ndarray::IxDyn;
 
-const OPSET_VERSIONS: [i64; 5] = [1, 5, 13, 14, 19];
+const _OPSET_VERSIONS: [i64; 5] = [1, 5, 13, 14, 19];
 
 #[derive(Debug)]
 struct ReshapeAttrs {
-    allowzero: Option<i64>
+    allowzero: i64,
 }
 
 impl ReshapeAttrs {
@@ -21,22 +21,9 @@ impl ReshapeAttrs {
                 .attribute
                 .iter()
                 .find(|a| a.name() == "allowzero")
-                .and_then(|a| a.i), }
+                .map_or(0, |a| a.i.unwrap_or(0)),
+        }
     }
-}
-
-fn reshape_5(
-    inputs: &[&ArrayType],
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    todo!("Reshape for type {}", inputs[0])
-}
-
-// NEED TO FIX THIS
-fn reshape_14(
-    inputs: &[&ArrayType],
-    attrs: ReshapeAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    todo!("Reshape for type {}", inputs[0])
 }
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reshape.py
@@ -44,12 +31,43 @@ fn reshape_14(
 pub fn reshape(
     inputs: &[&ArrayType],
     node: &NodeProto,
-    opset_version: i64,
+    _opset_version: i64,
 ) -> Result<ArrayType, Box<dyn std::error::Error>> {
-    let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
-    if target_version >= 14 {
-        todo!("Reshape for type {}", inputs[0])
+    let data = inputs[0];
+    let shape = inputs[1];
+    if shape.shape().len() != 1 {
+        return Err("shape must be 1D".into());
+    }
+    // new_shape = np.copy(shape)
+    let shape = if let ArrayType::I64(shape) = shape {
+        shape
     } else {
-        todo!("Reshape for type {}", inputs[0])
+        return Err("shape must be I64".into());
+    };
+    let mut new_shape = shape.clone();
+    let attrs = ReshapeAttrs::new(node);
+    let datashape_array = ndarray::ArrayD::from_shape_vec(IxDyn(&[data.shape().len()]), data.shape().iter().copied().collect())?.into_dyn();
+    if attrs.allowzero == 0 {
+        let zero_indexes = shape.iter().enumerate().filter_map(|(i, &v)| if v == 0 { Some(i) } else { None }).collect::<Vec<_>>();
+        new_shape[zero_indexes.as_slice()] = datashape_array[zero_indexes.as_slice()] as i64;
+    }
+    let shape_tot = new_shape.iter().fold(1, |acc, &v| acc * v);
+    let data_shape_tot = data.shape().iter().fold(1, |acc, &v| acc * v) as i64;
+    if shape_tot < 0 {
+        let missing_shape = data_shape_tot / -shape_tot;
+        if let Some(missing_shape_index) = new_shape.iter().position(|&v| v == -1) {
+            new_shape[missing_shape_index] = missing_shape;
+        } else {
+            return Err("Invalid new shape for reshape".into());
+        }
+    }
+    let new_shape = new_shape.iter().map(|&v| v as usize).collect::<Vec<_>>();
+    let new_shape = ndarray::IxDyn(&new_shape);
+    match data {
+        ArrayType::F32(data) => {
+            let data = data.to_shape(new_shape)?.to_owned();
+            Ok(ArrayType::F32(data))
+        }
+        _ => todo!("Reshape for type {} not implemented", data),
     }
 }

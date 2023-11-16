@@ -1,5 +1,5 @@
 #![allow(unused_variables, dead_code)]
-use ndarray::{ArrayD, Ix2};
+use ndarray::{ArrayD, ArrayViewD, Ix2};
 use trait_set::trait_set;
 
 // TODO: remove this when operator is implemented
@@ -26,36 +26,21 @@ trait_set! {
     + std::ops::Mul<Output = A>
     + std::ops::Add
     + std::ops::AddAssign<<A as std::ops::Mul>::Output>
-    + std::ops::MulAssign<<A as std::ops::Mul>::Output>
 }
 
-//// Compute Y = alpha * A’ * B’ + beta * C, 
-/// where input tensor A has shape (M, K) or (K, M), 
-/// input tensor B has shape (K, N) or (N, K), 
-/// input tensor C is broadcastable to shape (M, N), and output tensor Y has shape (M, N). 
+//// Compute Y = alpha * A’ * B’ + beta * C,
+/// where input tensor A has shape (M, K) or (K, M),
+/// input tensor B has shape (K, N) or (N, K),
+/// input tensor C is broadcastable to shape (M, N), and output tensor Y has shape (M, N).
 /// A will be transposed before doing the computation if attribute transA is non-zero, same for B and transB.
-fn dot_product<A: ArrayNumericValueTrait<A>>(
-    lhs: &ArrayD<A>,
-    rhs: &ArrayD<A>,
+fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
+    lhs: ArrayViewD<'a, A>,
+    rhs: ArrayViewD<'a, A>,
 ) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
     let lhs_shape = lhs.shape();
     let rhs_shape = rhs.shape();
     let lhs_shape_len = lhs_shape.len();
     let rhs_shape_len = rhs_shape.len();
-
-    // if lhs_shape_len == 1 && rhs_shape_len == 1 {
-    //     // If both a and b are 1-D arrays, it is inner product of vectors (without complex conjugation).
-    //     let alen = lhs.shape()[0];
-    //     let blen = rhs.shape()[0];
-    //     if alen != blen {
-    //         return Err("Gemm: a and b must have the same length".into());
-    //     }
-    //     let mut res = A::zero();
-    //     for i in 0..lhs.shape()[0] {
-    //         res += lhs[i] * rhs[i];
-    //     }
-    //     return Ok(ArrayD::from_elem(ndarray::IxDyn(&[]), res));
-    // } else 
     if lhs_shape_len == 2 && rhs_shape_len == 2 {
         // If both a and b are 2-D arrays, it is matrix multiplication
         let lhs = lhs.view().into_dimensionality::<Ix2>()?;
@@ -77,56 +62,6 @@ fn dot_product<A: ArrayNumericValueTrait<A>>(
     } else {
         return Err("Gemm: a and b must be 2D matrices".into());
     }
-    // else if lhs_shape_len == 0 || rhs_shape_len == 0 {
-    //     // If either a or b is 0-D (scalar), it is equivalent to multiply
-    //     if lhs_shape_len == 0 {
-    //         // lhs is scalar
-    //         let mut res = rhs.clone();
-    //         let scalar_val = lhs.sum(); // FIXME: find a better way to get scalar value
-    //         for i in res.iter_mut() {
-    //             *i *= scalar_val;
-    //         }
-    //         return Ok(res);
-    //     } else {
-    //         // rhs is scalar
-    //         let mut res = lhs.clone();
-    //         let scalar_val = rhs.sum(); // FIXME: find a better way to get scalar value
-    //         for i in res.iter_mut() {
-    //             *i *= scalar_val;
-    //         }
-    //         return Ok(res);
-    //     }
-    // } else if rhs_shape_len == 1 {
-    //     // If a is an N-D array and b is a 1-D array, it is a sum product over the last axis of a and b.
-    //     let lhs_last_len = lhs_shape[lhs_shape_len - 1];
-    //     let rhs_len = rhs_shape[0];
-    //     if lhs_last_len != rhs_len {
-    //         return Err("Gemm: a and b must have the same length".into());
-    //     }
-    //     let mut res = ArrayD::<A>::zeros(ndarray::IxDyn(&lhs_shape[..lhs_shape_len - 1]));
-    //     // TODO
-    //     return Ok(res);
-    // } else {
-    //     // If a is an N-D array and b is an M-D array (where M>=2), it is a sum product over the last axis of a and the second-to-last axis of b:
-    //     let lhs_last_len = lhs_shape[lhs_shape_len - 1];
-    //     let rhs_second_last_len = rhs_shape[rhs_shape_len - 2];
-    //     if lhs_last_len != rhs_second_last_len {
-    //         return Err("Gemm: a and b must have aligned shapes".into());
-    //     }
-    //     let new_shape = lhs_shape[..lhs_shape_len - 1]
-    //         .iter()
-    //         .copied()
-    //         .chain(
-    //             rhs_shape
-    //                 .iter()
-    //                 .enumerate()
-    //                 .skip_while(|(i, x)| *i == rhs_shape_len - 2)
-    //                 .map(|(i, x)| *x),
-    //         )
-    //         .collect::<Vec<_>>();
-    //     let mut res = ArrayD::<A>::zeros(ndarray::IxDyn(&new_shape));
-    //     return Ok(res);
-    // }
 }
 
 impl GemmAttrs {
@@ -161,19 +96,18 @@ impl GemmAttrs {
     }
 }
 
-fn _gem00<
-    A: ArrayNumericValueTrait<A>,
->(
-    a: &ArrayD<A>,
-    b: &ArrayD<A>,
-    c: Option<&ArrayD<A>>,
-    alpha: f32,
-    beta: f32,
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
-    let o = dot_product(a, b)? * alpha;
+fn _gemm_common_f32(
+    a: &ArrayD<f32>,
+    b: &ArrayD<f32>,
+    c: Option<&ArrayD<f32>>,
+    attrs: GemmAttrs,
+) -> Result<ArrayD<f32>, Box<dyn std::error::Error>> {
+    let at = if attrs.trans_a { a.t() } else { a.view() };
+    let bt = if attrs.trans_b { b.t() } else { b.view() };
+    let o = dot_product(at, bt)? * attrs.alpha;
     if let Some(c) = c {
-        if beta != 0.0 {
-            Ok(o + c * beta)
+        if attrs.beta != 0.0 {
+            Ok(o + c * attrs.beta)
         } else {
             Ok(o)
         }
@@ -182,112 +116,107 @@ fn _gem00<
     }
 }
 
-fn _gem01<
-    A: ArrayNumericValueTrait<A>,
->(
-    a: &ArrayD<A>,
-    b: &ArrayD<A>,
-    c: Option<&ArrayD<A>>,
-    alpha: f32,
-    beta: f32,
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
-
-}
-
-fn _gem10<
-    A: ArrayNumericValueTrait<A>,
->(
-    a: &ArrayD<A>,
-    b: &ArrayD<A>,
-    c: Option<&ArrayD<A>>,
-    alpha: f32,
-    beta: f32,
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
-}
-
-fn _gem11<
-    A: ArrayNumericValueTrait<A>,
->(
-    a: &ArrayD<A>,
-    b: &ArrayD<A>,
-    c: Option<&ArrayD<A>>,
-    alpha: f32,
-    beta: f32,
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
-}
-
-fn gemm_6<
-    A: ArrayNumericValueTrait<A>,
->(
-    a: &ArrayD<A>,
-    b: &ArrayD<A>,
-    c: Option<&ArrayD<A>>,
+fn _gemm_common_i64(
+    a: &ArrayD<i64>,
+    b: &ArrayD<i64>,
+    c: Option<&ArrayD<i64>>,
     attrs: GemmAttrs,
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
-    let _meth = if attrs.trans_a {
-        if attrs.trans_b {
-            _gem11::<A>
+) -> Result<ArrayD<i64>, Box<dyn std::error::Error>> {
+    let at = if attrs.trans_a { a.t() } else { a.view() };
+    let bt = if attrs.trans_b { b.t() } else { b.view() };
+    let o = dot_product(at, bt)?;
+    let oc = o.mapv(|v| v as f32) * attrs.alpha;
+    if let Some(c) = c {
+        let cc = c.mapv(|v| v as f32);
+        if attrs.beta != 0.0 {
+            let res = oc + cc * attrs.beta;
+            Ok(res.mapv(|v| v as i64))
         } else {
-            _gem10::<A>
-        }
-    } else if attrs.trans_b {
-        _gem01::<A>
-    } else {
-        _gem00::<A>
-    };
-    if attrs.broadcast {
-        let res = _meth(a, b, None, attrs.alpha, attrs.beta)?;
-        if let Some(c) = c {
-            if c.shape() != res.shape() {
-                Err("Gemm: c shape does not match result shape".into())
-            } else {
-                Ok(res + c)
-            }
-        } else {
-            Ok(res)
+            Ok(o)
         }
     } else {
-        _meth(a, b, c, attrs.alpha, attrs.beta)
+        Ok(o)
     }
 }
 
-fn gemm_7<
-    A: ArrayNumericValueTrait<A>,
->(
-    a: &ArrayD<A>,
-    b: &ArrayD<A>,
-    c: Option<&ArrayD<A>>,
+fn gemm_6(
+    a: &ArrayType,
+    b: &ArrayType,
+    c: Option<&ArrayType>,
     attrs: GemmAttrs,
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
-    let _meth = if attrs.trans_a {
-        if attrs.trans_b {
-            _gem11::<A>
-        } else {
-            _gem10::<A>
+) -> Result<ArrayType, Box<dyn std::error::Error>> {
+    match (a, b, c) {
+        (ArrayType::F32(a), ArrayType::F32(b), Some(ArrayType::F32(c))) => {
+            if !attrs.broadcast {
+                let res = _gemm_common_f32(a, b, Some(c), attrs)?;
+                if c.shape() != res.shape() {
+                    return Err("Gemm: c and res must have the same shape".into());
+                }
+                Ok(ArrayType::F32(res + c))
+            } else {
+                Ok(ArrayType::F32(_gemm_common_f32(a, b, Some(c), attrs)?))
+            }
         }
-    } else if attrs.trans_b {
-        _gem01::<A>
-    } else {
-        _gem00::<A>
-    };
-    _meth(a, b, c, attrs.alpha, attrs.beta)
+        (ArrayType::F32(a), ArrayType::F32(b), None) => {
+            Ok(ArrayType::F32(_gemm_common_f32(a, b, None, attrs)?))
+        }
+        (ArrayType::I64(a), ArrayType::I64(b), Some(ArrayType::I64(c))) => {
+            if !attrs.broadcast {
+                let res = _gemm_common_i64(a, b, Some(c), attrs)?;
+                if c.shape() != res.shape() {
+                    return Err("Gemm: c and res must have the same shape".into());
+                }
+                Ok(ArrayType::I64(res + c))
+            } else {
+                Ok(ArrayType::I64(_gemm_common_i64(a, b, Some(c), attrs)?))
+            }
+        }
+        (ArrayType::I64(a), ArrayType::I64(b), None) => {
+            Ok(ArrayType::I64(_gemm_common_i64(a, b, None, attrs)?))
+        }
+        _ => {
+            todo!("GEMM: {} {} {:?}", a, b, c)
+        }
+    }
 }
 
-fn _gemm_internal<
-    A: ArrayNumericValueTrait<A>,
->(
-    a: &ArrayD<A>,
-    b: &ArrayD<A>,
-    c: Option<&ArrayD<A>>,
+fn gemm_7(
+    a: &ArrayType,
+    b: &ArrayType,
+    c: Option<&ArrayType>,
+    attrs: GemmAttrs,
+) -> Result<ArrayType, Box<dyn std::error::Error>> {
+    match (a, b, c) {
+        (ArrayType::F32(a), ArrayType::F32(b), Some(ArrayType::F32(c))) => {
+            Ok(ArrayType::F32(_gemm_common_f32(a, b, Some(c), attrs)?))
+        }
+        (ArrayType::F32(a), ArrayType::F32(b), None) => {
+            Ok(ArrayType::F32(_gemm_common_f32(a, b, None, attrs)?))
+        }
+        (ArrayType::I64(a), ArrayType::I64(b), Some(ArrayType::I64(c))) => {
+            Ok(ArrayType::I64(_gemm_common_i64(a, b, Some(c), attrs)?))
+        }
+        (ArrayType::I64(a), ArrayType::I64(b), None) => {
+            Ok(ArrayType::I64(_gemm_common_i64(a, b, None, attrs)?))
+        }
+        (a, b, c) => {
+            todo!("GEMM: {:?} {:?} {:?}", a, b, c)
+        }
+    }
+}
+
+fn _gemm_internal(
+    a: &ArrayType,
+    b: &ArrayType,
+    c: Option<&ArrayType>,
     attrs: GemmAttrs,
     target_version: i64,
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
-    let methver = if target_version >= 7 {
-        gemm_7::<A>
+) -> Result<ArrayType, Box<dyn std::error::Error>> {
+    if target_version >= 7 {
+        gemm_7(a, b, c, attrs)
     } else {
-        gemm_6::<A>
-    };
-    methver(a, b, c, attrs)
+        gemm_6(a, b, c, attrs)
+    }
 }
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py
@@ -301,18 +230,8 @@ pub fn gemm(
     let attrs = GemmAttrs::new(node);
 
     match (inputs.get(0), inputs.get(1), inputs.get(2)) {
-        (Some(ArrayType::F32(a)), Some(ArrayType::F32(b)), Some(ArrayType::F32(c))) => Ok(
-            ArrayType::F32(_gemm_internal(a, b, Some(c), attrs, target_version)?),
-        ),
-        (Some(ArrayType::F32(a)), Some(ArrayType::F32(b)), None) => Ok(ArrayType::F32(
-            _gemm_internal(a, b, None, attrs, target_version)?,
-        )),
-        (Some(ArrayType::I64(a)), Some(ArrayType::I64(b)), Some(ArrayType::I64(c))) => Ok(
-            ArrayType::I64(_gemm_internal(a, b, Some(c), attrs, target_version)?),
-        ),
-        (Some(ArrayType::I64(a)), Some(ArrayType::I64(b)), None) => Ok(ArrayType::I64(
-            _gemm_internal(a, b, None, attrs, target_version)?,
-        )),
-        _ => todo!("Gemm for type {:?}", inputs),
+        (Some(a), Some(b), Some(c)) => Ok(_gemm_internal(a, b, Some(c), attrs, target_version)?),
+        (Some(a), Some(b), None) => Ok(_gemm_internal(a, b, None, attrs, target_version)?),
+        _ => Err("Gemm: invalid inputs".into()),
     }
 }

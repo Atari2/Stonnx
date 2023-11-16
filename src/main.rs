@@ -208,6 +208,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+        for (name, value) in expected_outputs.iter() {
+            if let Some(gout) = graph_outputs.get_mut(name) {
+                if let Some(data) = &gout.data {
+                    if value.shape() != data.shape() {
+                        panic!(
+                            "Expected output {} to have shape {:?} but got {:?}",
+                            name,
+                            value.shape(),
+                            data.shape()
+                        );
+                    }
+                    if value.value_type() != data.value_type() {
+                        panic!(
+                            "Expected output {} to have type {:?} but got {:?}",
+                            name,
+                            value.value_type(),
+                            data.value_type()
+                        );
+                    }
+                    
+                }
+            }
+        }
     }
     Ok(())
 }
