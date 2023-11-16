@@ -5,6 +5,7 @@ use ndarray::Order;
 use crate::onnx::AttributeProto;
 use crate::onnx::NodeProto;
 use crate::utils::ArrayType;
+use crate::utils::BoxResult;
 use crate::utils::shape_safe_product;
 
 // Defined but never used because even thought Conv has 2 versions, they both act the same
@@ -107,7 +108,7 @@ fn _conv_impl(
     w: ndarray::ArrayViewD<f32>,
     b: Option<ndarray::ArrayViewD<f32>>,
     mut attrs: ConvAttributes,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let x_shape = x.shape();
     let w_shape = w.shape();
     let mut w = w.clone().into_owned();
@@ -416,7 +417,7 @@ fn conv_impl(
     w: &ArrayType,
     b: Option<&ArrayType>,
     attrs: ConvAttributes,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     match (x, w, b) {
         (ArrayType::F32(x), ArrayType::F32(w), Some(ArrayType::F32(b))) => {
             return _conv_impl(x.view(), w.view(), Some(b.view()), attrs);
@@ -440,7 +441,7 @@ pub fn conv(
     inputs: &[&ArrayType],
     node: &NodeProto,
     _opset_version: i64, // defined but never used because even thought Conv has 2 versions they both do the same thing
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     match inputs.len() {
         2 => {
             let attributes = ConvAttributes::new(node, inputs[0], inputs[1]);

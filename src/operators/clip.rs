@@ -1,6 +1,6 @@
 use crate::{
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType},
+    utils::{pick_opset_version, ArrayType, BoxResult},
 };
 
 const OPSET_VERSIONS: [i64; 5] = [1, 6, 11, 12, 13];
@@ -31,7 +31,7 @@ impl ClipAttrs {
 fn clip_6(
     inputs: &[&ArrayType],
     attrs: ClipAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     if let ArrayType::F32(a) = &inputs[0] {
         let mut a = a.to_owned();
         a.mapv_inplace(|v| v.max(attrs.min));
@@ -42,7 +42,7 @@ fn clip_6(
     }
 }
 
-fn clip_11(inputs: &[&ArrayType]) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn clip_11(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     let ilen = inputs.len();
     if ilen == 1 {
         return Ok(inputs[0].to_owned());
@@ -91,7 +91,7 @@ pub fn clip(
     inputs: &[&ArrayType],
     node: &NodeProto,
     opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version < 11 {
         // 1, 6

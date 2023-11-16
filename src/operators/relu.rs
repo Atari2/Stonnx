@@ -1,6 +1,6 @@
 use crate::{
     onnx::NodeProto,
-    utils::ArrayType,
+    utils::{ArrayType, BoxResult},
 };
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 6, 13, 14];
@@ -11,7 +11,7 @@ pub fn relu(
     inputs: &[&ArrayType],
     _node: &NodeProto,
     _opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     if inputs.len() != 1 {
         Err("Relu must have 1 input".into())
     } else {

@@ -11,3 +11,4 @@ pub mod reshape;
 pub mod gemm;
 pub mod relu;
 pub mod lrn;
+pub mod maxpool;

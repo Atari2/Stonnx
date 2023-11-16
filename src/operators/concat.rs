@@ -1,6 +1,6 @@
 use ndarray::{ArrayD, Axis, CowArray, IxDyn};
 
-use crate::{onnx::NodeProto, utils::ArrayType, utils::ValueType};
+use crate::{onnx::NodeProto, utils::{ArrayType, BoxResult}, utils::ValueType};
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 4, 11, 13];
 
@@ -24,7 +24,7 @@ impl ConcatAttrs {
 fn _preprocess<A: Clone>(
     a: &ArrayD<A>,
     axis: i64,
-) -> Result<CowArray<'_, A, IxDyn>, Box<dyn std::error::Error>> {
+) -> BoxResult<CowArray<'_, A, IxDyn>> {
     if a.shape().is_empty() {
         return Err("Input must be at least 1D".into());
     }
@@ -45,7 +45,7 @@ fn _preprocess<A: Clone>(
 fn _concat_i64(
     inputs: &[&ArrayType],
     attrs: ConcatAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let mut inputs_i64 = vec![];
     let mut cow_array = vec![];
     for input in inputs.iter() {
@@ -76,7 +76,7 @@ fn _concat_i64(
 fn _concat_f32(
     inputs: &[&ArrayType],
     attrs: ConcatAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let mut inputs_f32 = vec![];
     let mut cow_array = vec![];
     for input in inputs.iter() {
@@ -110,7 +110,7 @@ pub fn concat(
     inputs: &[&ArrayType],
     node: &NodeProto,
     _opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let attrs = ConcatAttrs::new(node);
 
     if inputs.is_empty() {

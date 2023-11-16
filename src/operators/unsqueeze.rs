@@ -3,7 +3,7 @@ use num::Zero;
 
 use crate::{
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType},
+    utils::{pick_opset_version, ArrayType, BoxResult},
 };
 
 const OPSET_VERSIONS: [i64; 3] = [1, 11, 13];
@@ -29,11 +29,11 @@ impl<'a> UnsqueezeAttrs<'a> {
 fn _unsqueeze_generic<A: Clone + Copy + Zero>( 
     data: ArrayViewD<A>,
     new_shape: &[usize],
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayD<A>> {
     Ok(data.to_shape(new_shape)?.to_owned())
 }
 
-fn unsqueeze_11(inputs: &[&ArrayType], attrs: UnsqueezeAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn unsqueeze_11(inputs: &[&ArrayType], attrs: UnsqueezeAttrs) -> BoxResult<ArrayType> {
     let input = inputs[0];
     let mut shape = input.shape().to_vec();
     for axis in attrs.axes.iter() {
@@ -46,7 +46,7 @@ fn unsqueeze_11(inputs: &[&ArrayType], attrs: UnsqueezeAttrs) -> Result<ArrayTyp
     }
 }
 
-fn unsqueeze_13(inputs: &[&ArrayType]) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn unsqueeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     let input = inputs[0];
     let axes = if let ArrayType::I64(a) = inputs[1] {
         a.shape()
@@ -70,7 +70,7 @@ pub fn unsqueeze(
     inputs: &[&ArrayType],
     node: &NodeProto,
     opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version > 11 {
         unsqueeze_13(inputs)

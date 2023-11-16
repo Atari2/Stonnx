@@ -1,5 +1,5 @@
 use crate::onnx::NodeProto;
-use crate::utils::{pick_opset_version, ArrayType};
+use crate::utils::{pick_opset_version, ArrayType, BoxResult};
 
 const OPSET_VERSIONS: [i64; 4] = [1, 13, 15, 19];
 
@@ -26,7 +26,7 @@ impl ShapeAttrs {
     }
 }
 
-fn shape_1(inputs: &[&ArrayType]) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn shape_1(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     let input = inputs[0];
     let shape = input.shape();
     let output_shape = ndarray::IxDyn(&[shape.len()]);
@@ -61,7 +61,7 @@ fn interval(n: i64, start: i64, end: Option<i64>) -> Option<(i64, i64)> {
 fn shape_15(
     inputs: &[&ArrayType],
     attrs: ShapeAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let data = inputs[0];
     let shape = data.shape();
     let absome = interval(data.shape().len() as i64, attrs.start, attrs.end);
@@ -83,7 +83,7 @@ pub fn shape(
     inputs: &[&ArrayType],
     node: &NodeProto,
     opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version < 15 {
         shape_1(inputs)

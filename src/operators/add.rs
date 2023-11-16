@@ -1,5 +1,5 @@
 use crate::onnx::NodeProto;
-use crate::utils::ArrayType;
+use crate::utils::{ArrayType, BoxResult};
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 6, 7, 13, 14];
 
@@ -9,7 +9,7 @@ pub fn add(
     inputs: &[&ArrayType],
     _node: &NodeProto,
     _opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let array_1 = inputs[0];
     let array_2 = inputs[1];
 

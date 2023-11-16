@@ -3,6 +3,7 @@ mod operators;
 mod utils;
 
 pub use onnxparser::onnx;
+use utils::BoxResult;
 pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor};
 
 use operators::add::add;
@@ -18,6 +19,7 @@ use operators::reshape::reshape;
 use operators::gemm::gemm;
 use operators::relu::relu;
 use operators::lrn::lrn;
+use operators::maxpool::maxpool;
 use std::path::Path;
 
 use clap::Parser;
@@ -41,7 +43,7 @@ pub struct FileInputs {
 
 const MAX_OPSET_VERSION: i64 = 20;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> BoxResult<()> {
     let args = Args::parse();
     println!("Inputs file: {}", args.inputs_file);
     let inputs_file = std::fs::File::open(args.inputs_file)?;
@@ -207,7 +209,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let output_name = outputs[0];
                     node_inputs.insert(output_name.to_string(), relu);
                 }
-                Some("lrn") => {
+                Some("LRN") => {
                     println!(
                         "Running lrn operator between {:?} to get {:?}",
                         input_names, output_names
@@ -215,6 +217,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let lrn = lrn(&inputs, node, opset_version)?;
                     let output_name = outputs[0];
                     node_inputs.insert(output_name.to_string(), lrn);
+                }
+                Some("MaxPool") => {
+                    println!(
+                        "Running lrn operator between {:?} to get {:?}",
+                        input_names, output_names
+                    );
+                    let (maxpool, indices) = maxpool(&inputs, node, opset_version)?;
+                    let output_name = outputs[0];
+                    if let Some(indices) = indices {
+                        let indices_name = outputs[1];
+                        node_inputs.insert(indices_name.to_string(), indices);
+                    }
+                    node_inputs.insert(output_name.to_string(), maxpool);
                 }
                 Some(n) => {
                     todo!("Op type {:?}", n)

@@ -1,7 +1,7 @@
 // TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
-    utils::{ArrayType, shape_safe_product},
+    utils::{ArrayType, shape_safe_product, BoxResult},
 };
 
 use ndarray::IxDyn;
@@ -32,7 +32,7 @@ pub fn reshape(
     inputs: &[&ArrayType],
     node: &NodeProto,
     _opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let data = inputs[0];
     let shape = inputs[1];
     if shape.shape().len() != 1 {

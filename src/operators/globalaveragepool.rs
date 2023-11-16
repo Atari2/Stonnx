@@ -1,4 +1,4 @@
-use crate::{onnx::NodeProto, utils::ArrayType};
+use crate::{onnx::NodeProto, utils::{ArrayType, BoxResult}};
 
 const _OPSET_VERSIONS: [i64; 1] = [1];
 
@@ -8,7 +8,7 @@ pub fn global_average_pool(
     inputs: &[&ArrayType],
     _node: &NodeProto,
     _opset_version: i64, // defined but never used because even thought Conv has 2 versions they both do the same thing
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let input = inputs[0];
     match input {
         ArrayType::F32(x) => {

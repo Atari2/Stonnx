@@ -1,7 +1,7 @@
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
     utils::{
-        make_string_tensor, make_tensor, make_tensor_from_proto, pick_opset_version, ArrayType,
+        make_string_tensor, make_tensor, make_tensor_from_proto, pick_opset_version, ArrayType, BoxResult,
     },
 };
 use protobuf::{Enum, MessageField};
@@ -80,18 +80,18 @@ impl ConstantAttrs {
     }
 }
 
-fn constant_1(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn constant_1(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
     let value = attrs
         .value
         .ok_or("Constant_1 operator requires the 'value' attribute")?;
     Ok(value)
 }
 
-fn constant_9(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn constant_9(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
     constant_1(attrs)
 }
 
-fn constant_11(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn constant_11(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
     let value = attrs.value;
     let sparse_value = attrs.sparse_value;
 
@@ -107,7 +107,7 @@ fn constant_11(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Er
     }
 }
 
-fn constant_12(attrs: ConstantAttrs) -> Result<ArrayType, Box<dyn std::error::Error>> {
+fn constant_12(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
     let v = attrs.value;
     let s_v = attrs.sparse_value;
     let v_f = attrs.value_float;
@@ -163,7 +163,7 @@ pub fn constant(
     _inputs: &[&ArrayType],
     node: &NodeProto,
     opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSION);
     if target_version == 1 {
         constant_1(ConstantAttrs::new(node))

@@ -4,7 +4,7 @@ use protobuf::Enum;
 
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
-    utils::{make_tensor, ArrayType},
+    utils::{make_tensor, ArrayType, BoxResult},
 };
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 11, 13];
@@ -113,7 +113,7 @@ pub fn gather(
     inputs: &[&ArrayType],
     node: &NodeProto,
     _opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     if inputs.len() != 2 {
         return Err(format!("Gather expects 2 inputs, got: {}", inputs.len()).into());
     }

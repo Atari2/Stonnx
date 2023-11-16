@@ -5,7 +5,7 @@ use trait_set::trait_set;
 // TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType},
+    utils::{pick_opset_version, ArrayType, BoxResult},
 };
 
 const OPSET_VERSIONS: [i64; 6] = [1, 6, 7, 9, 11, 13];
@@ -36,7 +36,7 @@ trait_set! {
 fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
     lhs: ArrayViewD<'a, A>,
     rhs: ArrayViewD<'a, A>,
-) -> Result<ArrayD<A>, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayD<A>> {
     let lhs_shape = lhs.shape();
     let rhs_shape = rhs.shape();
     let lhs_shape_len = lhs_shape.len();
@@ -102,7 +102,7 @@ fn _gemm_common_f32(
     b: &ArrayD<f32>,
     c: Option<&ArrayD<f32>>,
     attrs: GemmAttrs,
-) -> Result<ArrayD<f32>, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayD<f32>> {
     let at = if attrs.trans_a { a.t() } else { a.view() };
     let bt = if attrs.trans_b { b.t() } else { b.view() };
     let o = dot_product(at, bt)? * attrs.alpha;
@@ -122,7 +122,7 @@ fn _gemm_common_i64(
     b: &ArrayD<i64>,
     c: Option<&ArrayD<i64>>,
     attrs: GemmAttrs,
-) -> Result<ArrayD<i64>, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayD<i64>> {
     let at = if attrs.trans_a { a.t() } else { a.view() };
     let bt = if attrs.trans_b { b.t() } else { b.view() };
     let o = dot_product(at, bt)?;
@@ -145,7 +145,7 @@ fn gemm_6(
     b: &ArrayType,
     c: Option<&ArrayType>,
     attrs: GemmAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     match (a, b, c) {
         (ArrayType::F32(a), ArrayType::F32(b), Some(ArrayType::F32(c))) => {
             if !attrs.broadcast {
@@ -186,7 +186,7 @@ fn gemm_7(
     b: &ArrayType,
     c: Option<&ArrayType>,
     attrs: GemmAttrs,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     match (a, b, c) {
         (ArrayType::F32(a), ArrayType::F32(b), Some(ArrayType::F32(c))) => {
             Ok(ArrayType::F32(_gemm_common_f32(a, b, Some(c), attrs)?))
@@ -212,7 +212,7 @@ fn _gemm_internal(
     c: Option<&ArrayType>,
     attrs: GemmAttrs,
     target_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     if target_version >= 7 {
         gemm_7(a, b, c, attrs)
     } else {
@@ -226,7 +226,7 @@ pub fn gemm(
     inputs: &[&ArrayType],
     node: &NodeProto,
     opset_version: i64,
-) -> Result<ArrayType, Box<dyn std::error::Error>> {
+) -> BoxResult<ArrayType> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     let attrs = GemmAttrs::new(node);
 
