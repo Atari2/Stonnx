@@ -28,7 +28,7 @@ trait_set! {
     + std::ops::AddAssign<<A as std::ops::Mul>::Output>
 }
 
-//// Compute Y = alpha * A’ * B’ + beta * C,
+/// Compute Y = alpha * A’ * B’ + beta * C,
 /// where input tensor A has shape (M, K) or (K, M),
 /// input tensor B has shape (K, N) or (N, K),
 /// input tensor C is broadcastable to shape (M, N), and output tensor Y has shape (M, N).
@@ -48,6 +48,7 @@ fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
         let lhs_shape = lhs.shape();
         let rhs_shape = rhs.shape();
         if lhs_shape[1] != rhs_shape[0] {
+            println!("lhs_shape: {:?}, rhs_shape: {:?}", lhs_shape, rhs_shape);
             return Err("Gemm: a and b must have compatible shapes".into());
         }
         let mut res = ArrayD::zeros(ndarray::IxDyn(&[lhs_shape[0], rhs_shape[1]]));
@@ -58,9 +59,9 @@ fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
                 }
             }
         }
-        return Ok(res);
+        Ok(res)
     } else {
-        return Err("Gemm: a and b must be 2D matrices".into());
+        Err("Gemm: a and b must be 2D matrices".into())
     }
 }
 
@@ -80,12 +81,12 @@ impl GemmAttrs {
             trans_a: node
                 .attribute
                 .iter()
-                .find(|a| a.name() == "trans_a")
+                .find(|a| a.name() == "transA")
                 .map_or(false, |a| a.i.unwrap_or(0) == 1),
             trans_b: node
                 .attribute
                 .iter()
-                .find(|a| a.name() == "trans_b")
+                .find(|a| a.name() == "transB")
                 .map_or(false, |a| a.i.unwrap_or(0) == 1),
             broadcast: node
                 .attribute

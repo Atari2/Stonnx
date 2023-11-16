@@ -21,11 +21,11 @@ impl ConcatAttrs {
     }
 }
 
-fn _preprocess<'a, A: Clone>(
-    a: &'a ArrayD<A>,
+fn _preprocess<A: Clone>(
+    a: &ArrayD<A>,
     axis: i64,
-) -> Result<CowArray<'a, A, IxDyn>, Box<dyn std::error::Error>> {
-    if a.shape().len() == 0 {
+) -> Result<CowArray<'_, A, IxDyn>, Box<dyn std::error::Error>> {
+    if a.shape().is_empty() {
         return Err("Input must be at least 1D".into());
     }
     if axis >= a.shape().len() as i64 {
@@ -50,7 +50,7 @@ fn _concat_i64(
     let mut cow_array = vec![];
     for input in inputs.iter() {
         if let ArrayType::I64(x) = input {
-            cow_array.push(_preprocess(&x, attrs.axis)?);
+            cow_array.push(_preprocess(x, attrs.axis)?);
         } else {
             return Err("Inputs not all of I64".into());
         }
@@ -81,7 +81,7 @@ fn _concat_f32(
     let mut cow_array = vec![];
     for input in inputs.iter() {
         if let ArrayType::F32(x) = input {
-            cow_array.push(_preprocess(&x, attrs.axis)?);
+            cow_array.push(_preprocess(x, attrs.axis)?);
         } else {
             return Err("Inputs not all of F32".into());
         }
@@ -123,7 +123,7 @@ pub fn concat(
         ValueType::I64 => _concat_i64(inputs, attrs),
         ValueType::F32 => _concat_f32(inputs, attrs),
         _ => {
-            return Err("Only f32 and i64 are supported".into());
+            Err("Only f32 and i64 are supported".into())
         }
     }
 }

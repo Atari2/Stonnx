@@ -22,7 +22,7 @@ use clap::Parser;
 
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{make_external_outputs, make_graph_outputs};
+use crate::utils::{make_external_outputs, make_graph_outputs, ArrayType};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -218,6 +218,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             value.shape(),
                             data.shape()
                         );
+                    } else {
+                        println!(
+                            "Output {} has shape {:?} as expected",
+                            name,
+                            value.shape()
+                        );
                     }
                     if value.value_type() != data.value_type() {
                         panic!(
@@ -226,8 +232,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             value.value_type(),
                             data.value_type()
                         );
+                    } else {
+                        println!(
+                            "Output {} has type {:?} as expected",
+                            name,
+                            value.value_type()
+                        );
                     }
-                    
+                    match (value, data) {
+                        (ArrayType::F32(v), ArrayType::F32(d)) => {
+                            let mut diff = vec![];
+                            for (i, (v, d)) in v.iter().zip(d.iter()).enumerate() {
+                                if (v - d).abs() > 0.0001 {
+                                    println!(
+                                        "Compare output {:?} with {:?} failed at index {}",
+                                        v, d, i
+                                    );
+                                }
+                                diff.push((i, v, d, (v - d).abs()));
+                            }
+                        }
+                        _ => todo!("Compare output {:?} with {:?}", value.value_type(), data.value_type()),
+                    }
                 }
             }
         }

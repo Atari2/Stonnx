@@ -46,13 +46,13 @@ pub fn reshape(
     };
     let mut new_shape = shape.clone();
     let attrs = ReshapeAttrs::new(node);
-    let datashape_array = ndarray::ArrayD::from_shape_vec(IxDyn(&[data.shape().len()]), data.shape().iter().copied().collect())?.into_dyn();
+    let datashape_array = ndarray::ArrayD::from_shape_vec(IxDyn(&[data.shape().len()]), data.shape().to_vec())?.into_dyn();
     if attrs.allowzero == 0 {
         let zero_indexes = shape.iter().enumerate().filter_map(|(i, &v)| if v == 0 { Some(i) } else { None }).collect::<Vec<_>>();
         new_shape[zero_indexes.as_slice()] = datashape_array[zero_indexes.as_slice()] as i64;
     }
-    let shape_tot = new_shape.iter().fold(1, |acc, &v| acc * v);
-    let data_shape_tot = data.shape().iter().fold(1, |acc, &v| acc * v) as i64;
+    let shape_tot = new_shape.iter().product::<i64>();
+    let data_shape_tot = data.shape().iter().product::<usize>() as i64;
     if shape_tot < 0 {
         let missing_shape = data_shape_tot / -shape_tot;
         if let Some(missing_shape_index) = new_shape.iter().position(|&v| v == -1) {

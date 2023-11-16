@@ -500,7 +500,7 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> HashMap<String, ArrayType>
     initializers
 }
 
-fn make_tensors_from_files(
+fn make_input_tensors_from_files(
     graph: &onnx::GraphProto,
     files: &[String],
 ) -> Result<HashMap<String, ArrayType>, Box<dyn Error>> {
@@ -524,7 +524,37 @@ fn make_tensors_from_files(
                 make_tensor_from_proto(input_from_file)?,
             );
         } else {
-            return Err(format!("Input {} not found in inputs file", input_name).into());
+            return Err(format!("Output {} not found in inputs file", input_name).into());
+        }
+    }
+    Ok(map)
+}
+
+fn make_output_tensors_from_files(
+    graph: &onnx::GraphProto,
+    files: &[String],
+) -> Result<HashMap<String, ArrayType>, Box<dyn Error>> {
+    let mut map = HashMap::new();
+    let mut external_outputs_map = HashMap::new();
+    for output in files.iter() {
+        let ouput_tensor = read_tensor(path::Path::new(&output))?;
+        external_outputs_map.insert(
+            ouput_tensor
+                .name
+                .as_ref()
+                .map_or_else(|| UNKNOWN.to_owned(), |v| v.clone()),
+                ouput_tensor,
+        );
+    }
+    for output in graph.output.iter() {
+        let output_name = output.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
+        if let Some(output_from_file) = external_outputs_map.get(output_name) {
+            map.insert(
+                output_name.to_string(),
+                make_tensor_from_proto(output_from_file)?,
+            );
+        } else {
+            return Err(format!("Output {} not found in inputs file", output_name).into());
         }
     }
     Ok(map)
@@ -537,7 +567,7 @@ pub fn make_external_inputs(
     if fileinputs.inputs.is_empty() {
         return Ok(HashMap::new());
     }
-    make_tensors_from_files(graph, &fileinputs.inputs)
+    make_input_tensors_from_files(graph, &fileinputs.inputs)
 }
 
 pub fn make_external_outputs(
@@ -547,7 +577,7 @@ pub fn make_external_outputs(
     if fileinputs.outputs.is_empty() {
         return Ok(HashMap::new());
     }
-    make_tensors_from_files(graph, &fileinputs.inputs)
+    make_output_tensors_from_files(graph, &fileinputs.outputs)
 }
 
 pub fn make_graph_outputs(graph: &onnx::GraphProto) -> Result<HashMap<String, OutputInfo>, Box<dyn Error>> {
