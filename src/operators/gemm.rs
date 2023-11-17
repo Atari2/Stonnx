@@ -48,7 +48,6 @@ fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
         let lhs_shape = lhs.shape();
         let rhs_shape = rhs.shape();
         if lhs_shape[1] != rhs_shape[0] {
-            println!("lhs_shape: {:?}, rhs_shape: {:?}", lhs_shape, rhs_shape);
             return Err("Gemm: a and b must have compatible shapes".into());
         }
         let mut res = ArrayD::zeros(ndarray::IxDyn(&[lhs_shape[0], rhs_shape[1]]));

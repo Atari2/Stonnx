@@ -45,7 +45,6 @@ pub fn reshape(
         return Err("shape must be I64".into());
     };
     let mut new_shape = shape.clone();
-    println!("Shape: {:?}", shape);
     let attrs = ReshapeAttrs::new(node);
     let datashape_array =
         ndarray::ArrayD::from_shape_vec(IxDyn(&[data.shape().len()]), data.shape().to_vec())?
@@ -71,7 +70,6 @@ pub fn reshape(
         }
     }
     let new_shape = new_shape.iter().map(|&v| v as usize).collect::<Vec<_>>();
-    println!("From {:?} to {:?}", data.shape(), new_shape);
     let new_shape = ndarray::IxDyn(&new_shape);
     match data {
         ArrayType::F32(data) => {

@@ -13,6 +13,7 @@ use operators::clip::clip;
 use operators::concat::concat;
 use operators::constant::constant;
 use operators::conv::conv;
+use operators::dropout::dropout;
 use operators::gather::gather;
 use operators::gemm::gemm;
 use operators::globalaveragepool::global_average_pool;
@@ -21,6 +22,7 @@ use operators::maxpool::maxpool;
 use operators::relu::relu;
 use operators::reshape::reshape;
 use operators::shape::shape;
+use operators::softmax::softmax;
 use operators::unsqueeze::unsqueeze;
 use std::path::{Path, PathBuf};
 
@@ -47,6 +49,8 @@ lazy_static! {
         m.insert("Relu", relu as OperationFn);
         m.insert("LRN", lrn as OperationFn);
         m.insert("MaxPool", maxpool as OperationFn);
+        m.insert("Softmax", softmax as OperationFn);
+        m.insert("Dropout", dropout as OperationFn);
         m
     };
 }
