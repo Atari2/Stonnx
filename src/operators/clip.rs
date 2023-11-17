@@ -1,6 +1,6 @@
 use crate::{
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType, BoxResult},
+    utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
 };
 
 const OPSET_VERSIONS: [i64; 5] = [1, 6, 11, 12, 13];
@@ -84,13 +84,18 @@ fn clip_11(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_clip.py
 /// https://onnx.ai/onnx/operators/onnx__Clip.html
-pub fn clip(inputs: &[&ArrayType], node: &NodeProto, opset_version: i64) -> BoxResult<ArrayType> {
+pub fn clip(
+    inputs: &[&ArrayType],
+    node: &NodeProto,
+    opset_version: i64,
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version < 11 {
         // 1, 6
-        clip_6(inputs, ClipAttrs::new(node))
+        Ok(clip_6(inputs, ClipAttrs::new(node))?.into())
     } else {
         // 11, 12, 13
-        clip_11(inputs)
+        Ok(clip_11(inputs)?.into())
     }
 }

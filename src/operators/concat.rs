@@ -2,8 +2,8 @@ use ndarray::{ArrayD, Axis, CowArray, IxDyn};
 
 use crate::{
     onnx::NodeProto,
-    utils::ValueType,
     utils::{ArrayType, BoxResult},
+    utils::{OperationResult, ValueType},
 };
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 4, 11, 13];
@@ -105,7 +105,8 @@ pub fn concat(
     inputs: &[&ArrayType],
     node: &NodeProto,
     _opset_version: i64,
-) -> BoxResult<ArrayType> {
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     let attrs = ConcatAttrs::new(node);
 
     if inputs.is_empty() {
@@ -115,8 +116,8 @@ pub fn concat(
     let type_ = inputs[0].value_type();
 
     match type_ {
-        ValueType::I64 => _concat_i64(inputs, attrs),
-        ValueType::F32 => _concat_f32(inputs, attrs),
+        ValueType::I64 => Ok(_concat_i64(inputs, attrs)?.into()),
+        ValueType::F32 => Ok(_concat_f32(inputs, attrs)?.into()),
         _ => Err("Only f32 and i64 are supported".into()),
     }
 }

@@ -3,7 +3,7 @@ use num::Zero;
 
 use crate::{
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType, BoxResult},
+    utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
 };
 
 const OPSET_VERSIONS: [i64; 3] = [1, 11, 13];
@@ -69,11 +69,12 @@ pub fn unsqueeze(
     inputs: &[&ArrayType],
     node: &NodeProto,
     opset_version: i64,
-) -> BoxResult<ArrayType> {
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version > 11 {
-        unsqueeze_13(inputs)
+        Ok(unsqueeze_13(inputs)?.into())
     } else {
-        unsqueeze_11(inputs, UnsqueezeAttrs::new(node))
+        Ok(unsqueeze_11(inputs, UnsqueezeAttrs::new(node))?.into())
     }
 }

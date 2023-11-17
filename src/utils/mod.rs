@@ -6,8 +6,8 @@ use std::{collections::HashMap, error::Error, io, path::Path};
 use ndarray::{ArrayD, IxDyn};
 use protobuf::Enum;
 
-use crate::onnx::tensor_proto::{DataType, self};
-use crate::onnx::{TensorProto, ValueInfoProto};
+use crate::onnx::tensor_proto::DataType;
+use crate::onnx::{NodeProto, TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
 use crate::FileInputs;
 use half::{bf16, f16};
@@ -39,6 +39,47 @@ pub enum ValueType {
     String,
     Bool,
 }
+
+#[derive(Debug)]
+pub enum OperationResult {
+    Single(ArrayType),
+    OptionalDouble((ArrayType, Option<ArrayType>)),
+    Double((ArrayType, ArrayType)),
+    Multiple(Vec<ArrayType>),
+}
+
+impl From<ArrayType> for OperationResult {
+    fn from(r: ArrayType) -> Self {
+        OperationResult::Single(r)
+    }
+}
+
+impl From<(ArrayType, Option<ArrayType>)> for OperationResult {
+    fn from(r: (ArrayType, Option<ArrayType>)) -> Self {
+        OperationResult::OptionalDouble(r)
+    }
+}
+
+impl From<(ArrayType, ArrayType)> for OperationResult {
+    fn from(r: (ArrayType, ArrayType)) -> Self {
+        OperationResult::Double(r)
+    }
+}
+
+impl From<Vec<ArrayType>> for OperationResult {
+    fn from(r: Vec<ArrayType>) -> Self {
+        OperationResult::Multiple(r)
+    }
+}
+
+impl OperationResult {}
+
+pub type OperationFn = for<'a, 'b, 'c> fn(
+    &'a [&'b ArrayType],
+    &'c NodeProto,
+    i64,
+    usize,
+) -> BoxResult<OperationResult>;
 
 pub fn shape_safe_product<
     'a,

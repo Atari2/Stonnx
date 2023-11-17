@@ -4,7 +4,7 @@ use protobuf::Enum;
 
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
-    utils::{make_tensor, ArrayType, BoxResult},
+    utils::{make_tensor, ArrayType, BoxResult, OperationResult},
 };
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 11, 13];
@@ -110,7 +110,8 @@ pub fn gather(
     inputs: &[&ArrayType],
     node: &NodeProto,
     _opset_version: i64,
-) -> BoxResult<ArrayType> {
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     if inputs.len() != 2 {
         return Err(format!("Gather expects 2 inputs, got: {}", inputs.len()).into());
     }
@@ -130,22 +131,24 @@ pub fn gather(
         ArrayType::I32(i) => {
             if i.is_empty() {
                 if let ArrayType::F32(_) = data {
-                    make_tensor(&[1], &[], DataType::FLOAT.value())
+                    Ok(make_tensor(&[1], &[], DataType::FLOAT.value())?.into())
                 } else {
                     todo!("Gather for non-float data {}", data)
                 }
             } else {
                 match data {
-                    ArrayType::F32(f32_data) => Ok(ArrayType::F32(_gather_generic(
-                        f32_data.view(),
-                        i.view(),
-                        &attrs,
-                    ))),
-                    ArrayType::I64(i64_data) => Ok(ArrayType::I64(_gather_generic(
-                        i64_data.view(),
-                        i.view(),
-                        &attrs,
-                    ))),
+                    ArrayType::F32(f32_data) => {
+                        Ok(
+                            ArrayType::F32(_gather_generic(f32_data.view(), i.view(), &attrs))
+                                .into(),
+                        )
+                    }
+                    ArrayType::I64(i64_data) => {
+                        Ok(
+                            ArrayType::I64(_gather_generic(i64_data.view(), i.view(), &attrs))
+                                .into(),
+                        )
+                    }
                     data => todo!("Gather for non-float data {}", data),
                 }
             }
@@ -153,22 +156,24 @@ pub fn gather(
         ArrayType::I64(i) => {
             if i.is_empty() {
                 if let ArrayType::F32(_) = data {
-                    make_tensor(&[1], &[], DataType::FLOAT.value())
+                    Ok(make_tensor(&[1], &[], DataType::FLOAT.value())?.into())
                 } else {
                     todo!("Gather for non-float data {}", data)
                 }
             } else {
                 match data {
-                    ArrayType::F32(f32_data) => Ok(ArrayType::F32(_gather_generic(
-                        f32_data.view(),
-                        i.view(),
-                        &attrs,
-                    ))),
-                    ArrayType::I64(i64_data) => Ok(ArrayType::I64(_gather_generic(
-                        i64_data.view(),
-                        i.view(),
-                        &attrs,
-                    ))),
+                    ArrayType::F32(f32_data) => {
+                        Ok(
+                            ArrayType::F32(_gather_generic(f32_data.view(), i.view(), &attrs))
+                                .into(),
+                        )
+                    }
+                    ArrayType::I64(i64_data) => {
+                        Ok(
+                            ArrayType::I64(_gather_generic(i64_data.view(), i.view(), &attrs))
+                                .into(),
+                        )
+                    }
                     data => todo!("Gather for non-float data {}", data),
                 }
             }

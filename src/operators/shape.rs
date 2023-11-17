@@ -1,5 +1,5 @@
 use crate::onnx::NodeProto;
-use crate::utils::{pick_opset_version, ArrayType, BoxResult};
+use crate::utils::{pick_opset_version, ArrayType, BoxResult, OperationResult};
 
 const OPSET_VERSIONS: [i64; 4] = [1, 13, 15, 19];
 
@@ -76,11 +76,16 @@ fn shape_15(inputs: &[&ArrayType], attrs: ShapeAttrs) -> BoxResult<ArrayType> {
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_shape.py
 /// https://onnx.ai/onnx/operators/onnx__Shape.html
-pub fn shape(inputs: &[&ArrayType], node: &NodeProto, opset_version: i64) -> BoxResult<ArrayType> {
+pub fn shape(
+    inputs: &[&ArrayType],
+    node: &NodeProto,
+    opset_version: i64,
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version < 15 {
-        shape_1(inputs)
+        Ok(shape_1(inputs)?.into())
     } else {
-        shape_15(inputs, ShapeAttrs::new(node))
+        Ok(shape_15(inputs, ShapeAttrs::new(node))?.into())
     }
 }

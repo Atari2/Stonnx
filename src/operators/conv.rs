@@ -7,6 +7,7 @@ use crate::onnx::NodeProto;
 use crate::utils::shape_safe_product;
 use crate::utils::ArrayType;
 use crate::utils::BoxResult;
+use crate::utils::OperationResult;
 
 // Defined but never used because even thought Conv has 2 versions, they both act the same
 const _OPSET_VERSIONS: [i64; 2] = [1, 11];
@@ -441,15 +442,16 @@ pub fn conv(
     inputs: &[&ArrayType],
     node: &NodeProto,
     _opset_version: i64, // defined but never used because even thought Conv has 2 versions they both do the same thing
-) -> BoxResult<ArrayType> {
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     match inputs.len() {
         2 => {
             let attributes = ConvAttributes::new(node, inputs[0], inputs[1]);
-            conv_impl(inputs[0], inputs[1], None, attributes)
+            Ok(conv_impl(inputs[0], inputs[1], None, attributes)?.into())
         }
         3 => {
             let attributes = ConvAttributes::new(node, inputs[0], inputs[1]);
-            conv_impl(inputs[0], inputs[1], Some(inputs[2]), attributes)
+            Ok(conv_impl(inputs[0], inputs[1], Some(inputs[2]), attributes)?.into())
         }
         _ => {
             panic!("Unexpected error: convolution has {} inputs", inputs.len());

@@ -1,6 +1,6 @@
 use crate::{
     onnx::NodeProto,
-    utils::{ArrayType, BoxResult},
+    utils::{ArrayType, BoxResult, OperationResult},
 };
 
 const _OPSET_VERSIONS: [i64; 1] = [1];
@@ -11,7 +11,8 @@ pub fn global_average_pool(
     inputs: &[&ArrayType],
     _node: &NodeProto,
     _opset_version: i64, // defined but never used because even thought Conv has 2 versions they both do the same thing
-) -> BoxResult<ArrayType> {
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     let input = inputs[0];
     match input {
         ArrayType::F32(x) => {
@@ -27,7 +28,7 @@ pub fn global_average_pool(
             for x in axis.iter() {
                 y.insert_axis_inplace(ndarray::Axis(*x));
             }
-            Ok(ArrayType::F32(y))
+            Ok(ArrayType::F32(y).into())
         }
         x => {
             todo!("GlobalAveragePool for type {}", x);

@@ -2,9 +2,11 @@ mod onnxparser;
 mod operators;
 mod utils;
 
+use lazy_static::lazy_static;
 pub use onnxparser::onnx;
+use std::collections::HashMap;
 use utils::BoxResult;
-pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor};
+pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor, OperationFn};
 
 use operators::add::add;
 use operators::clip::clip;
@@ -26,7 +28,28 @@ use clap::Parser;
 
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{make_external_outputs, make_graph_outputs, ArrayType};
+use crate::utils::{make_external_outputs, make_graph_outputs, ArrayType, OperationResult};
+
+lazy_static! {
+    static ref OPERATION_MAP: HashMap<&'static str, OperationFn> = {
+        let mut m = HashMap::new();
+        m.insert("Conv", conv as OperationFn);
+        m.insert("Clip", clip as OperationFn);
+        m.insert("Add", add as OperationFn);
+        m.insert("GlobalAveragePool", global_average_pool as OperationFn);
+        m.insert("Shape", shape as OperationFn);
+        m.insert("Constant", constant as OperationFn);
+        m.insert("Gather", gather as OperationFn);
+        m.insert("Unsqueeze", unsqueeze as OperationFn);
+        m.insert("Concat", concat as OperationFn);
+        m.insert("Reshape", reshape as OperationFn);
+        m.insert("Gemm", gemm as OperationFn);
+        m.insert("Relu", relu as OperationFn);
+        m.insert("LRN", lrn as OperationFn);
+        m.insert("MaxPool", maxpool as OperationFn);
+        m
+    };
+}
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -43,9 +66,19 @@ pub struct FileInputs {
 
 impl FileInputs {
     fn extend_paths(&mut self, modelname: &Path) {
-        self.inputs = self.inputs.iter().map(|s| Path::new("models").join(modelname).join(s)).collect();
-        self.outputs = self.outputs.iter().map(|s| Path::new("models").join(modelname).join(s)).collect();
-        self.modelpath = Path::new("models").join(modelname).join(self.modelpath.clone())
+        self.inputs = self
+            .inputs
+            .iter()
+            .map(|s| Path::new("models").join(modelname).join(s))
+            .collect();
+        self.outputs = self
+            .outputs
+            .iter()
+            .map(|s| Path::new("models").join(modelname).join(s))
+            .collect();
+        self.modelpath = Path::new("models")
+            .join(modelname)
+            .join(self.modelpath.clone())
     }
 }
 
@@ -80,7 +113,11 @@ fn main() -> BoxResult<()> {
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
         let mut graph_outputs = make_graph_outputs(graph)?;
         for node in graph.node.iter() {
-            println!("Node {:?}", node.op_type.as_deref());
+            if let Some(name) = node.op_type.as_deref() {
+                if OPERATION_MAP.get(name).is_none() {
+                    eprintln!("Model uses operator {} which is not implemented yet", name);
+                }
+            }
         }
         for node in graph.node.iter() {
             let mut inputs = vec![];
@@ -107,147 +144,52 @@ fn main() -> BoxResult<()> {
                 .iter()
                 .map(|s| s.as_str())
                 .collect::<Vec<&str>>();
-            match node.op_type.as_deref() {
-                Some("Conv") => {
+            if let Some(op_name) = node.op_type.as_deref() {
+                if let Some(func) = OPERATION_MAP.get(op_name) {
                     println!(
-                        "Running conv operator between {:?} to get {:?}",
-                        input_names, output_names
+                        "Running {} operator between {:?} to get {:?}",
+                        op_name, input_names, output_names
                     );
-                    let conv_result = conv(&inputs, node, opset_version)?;
-                    assert_eq!(outputs.len(), 1);
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), conv_result);
-                }
-                Some("Clip") => {
-                    println!(
-                        "Running clip operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let clip_result = clip(&inputs, node, opset_version)?;
-                    assert_eq!(outputs.len(), 1);
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), clip_result);
-                }
-                Some("Add") => {
-                    println!(
-                        "Running add operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let add_result = add(&inputs, node, opset_version)?;
-                    assert_eq!(outputs.len(), 1);
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), add_result);
-                }
-                Some("GlobalAveragePool") => {
-                    println!(
-                        "Running global average pool operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let gap_result = global_average_pool(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), gap_result);
-                }
-                Some("Shape") => {
-                    println!(
-                        "Running shape operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let shape_result = shape(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), shape_result);
-                }
-                Some("Constant") => {
-                    println!(
-                        "Running constant operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let constant = constant(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), constant);
-                }
-                Some("Gather") => {
-                    println!(
-                        "Running gather operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let gather = gather(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), gather);
-                }
-                Some("Unsqueeze") => {
-                    println!(
-                        "Running unsqueeze operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let unsqueeze = unsqueeze(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), unsqueeze);
-                }
-                Some("Concat") => {
-                    println!(
-                        "Running concat operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let concat = concat(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), concat);
-                }
-                Some("Reshape") => {
-                    println!(
-                        "Running reshape operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let reshape = reshape(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), reshape);
-                }
-                Some("Gemm") => {
-                    println!(
-                        "Running gemm operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let reshape = gemm(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), reshape);
-                }
-                Some("Relu") => {
-                    println!(
-                        "Running relu operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let relu = relu(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), relu);
-                }
-                Some("LRN") => {
-                    println!(
-                        "Running lrn operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let lrn = lrn(&inputs, node, opset_version)?;
-                    let output_name = outputs[0];
-                    node_inputs.insert(output_name.to_string(), lrn);
-                }
-                Some("MaxPool") => {
-                    println!(
-                        "Running lrn operator between {:?} to get {:?}",
-                        input_names, output_names
-                    );
-                    let (maxpool, indices) = maxpool(&inputs, node, opset_version, outputs.len())?;
-                    let output_name = outputs[0];
-                    if let Some(indices) = indices {
-                        let indices_name = outputs[1];
-                        node_inputs.insert(indices_name.to_string(), indices);
+                    let result = func(&inputs, node, opset_version, outputs.len())?;
+                    match result {
+                        OperationResult::Double((a, b)) => {
+                            assert_eq!(outputs.len(), 2);
+                            let output_name = outputs[0];
+                            let output_name2 = outputs[1];
+                            node_inputs.insert(output_name.to_string(), a);
+                            node_inputs.insert(output_name2.to_string(), b);
+                        }
+                        OperationResult::Single(res) => {
+                            assert_eq!(outputs.len(), 1);
+                            let output_name = outputs[0];
+                            node_inputs.insert(output_name.to_string(), res);
+                        }
+                        OperationResult::OptionalDouble((a, Some(b))) => {
+                            assert_eq!(outputs.len(), 2);
+                            let output_name = outputs[0];
+                            let output_name2 = outputs[1];
+                            node_inputs.insert(output_name.to_string(), a);
+                            node_inputs.insert(output_name2.to_string(), b);
+                        }
+                        OperationResult::OptionalDouble((a, None)) => {
+                            assert_eq!(outputs.len(), 1);
+                            let output_name = outputs[0];
+                            node_inputs.insert(output_name.to_string(), a);
+                        }
+                        OperationResult::Multiple(res) => {
+                            assert_eq!(outputs.len(), res.len());
+                            for (i, output_name) in outputs.iter().enumerate() {
+                                node_inputs.insert(output_name.to_string(), res[i].clone());
+                            }
+                        }
                     }
-                    node_inputs.insert(output_name.to_string(), maxpool);
+                } else {
+                    todo!("Op type {:?}", op_name)
                 }
-                Some(n) => {
-                    todo!("Op type {:?}", n)
-                }
-                None => {
-                    panic!("  Node has no op type");
-                }
+            } else {
+                todo!("Node {:?} doesn't have op type", node)
             }
+
             for output_name in outputs.iter() {
                 if let Some(gout) = graph_outputs.get_mut(*output_name) {
                     if let Some(produced) = node_inputs.get(*output_name) {

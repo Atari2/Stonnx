@@ -1,8 +1,9 @@
+#![allow(unused_variables)]
 use ndarray::{s, Array2, ArrayD, Ix1, Ix2, IxDyn};
 
 use crate::{
     onnx::{AttributeProto, NodeProto},
-    utils::{shape_safe_product, ArrayType, BoxResult},
+    utils::{shape_safe_product, ArrayType, BoxResult, OperationResult},
 };
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 8, 10, 11, 12];
@@ -29,7 +30,7 @@ impl MaxPoolAutoPad {
 
 #[derive(Debug)]
 struct MaxPoolAttrs {
-    auto_pad: MaxPoolAutoPad,
+    auto_pad: Option<MaxPoolAutoPad>,
     ceil_mode: bool,
     dilations: Option<Vec<i64>>,
     kernel_shape: Vec<i64>,
@@ -38,13 +39,17 @@ struct MaxPoolAttrs {
     strides: Option<Vec<i64>>,
 }
 impl MaxPoolAttrs {
+    fn replace_dilations_and_strides(&mut self, dilations: Vec<i64>, strides: Vec<i64>) {
+        self.dilations = Some(dilations);
+        self.strides = Some(strides);
+    }
     fn new(node: &NodeProto, x: &ArrayType) -> Self {
         Self {
             auto_pad: node
                 .attribute
                 .iter()
                 .find(|a| a.name() == "auto_pad")
-                .map_or(MaxPoolAutoPad::NotSet, MaxPoolAutoPad::from_attr),
+                .map(MaxPoolAutoPad::from_attr),
             ceil_mode: node
                 .attribute
                 .iter()
@@ -229,7 +234,7 @@ fn _max_pool_f32_3d(
 
 fn _maxpool_internal_f32(
     input: &ArrayD<f32>,
-    attrs: MaxPoolAttrs,
+    mut attrs: MaxPoolAttrs,
     output_len: usize,
 ) -> BoxResult<MaxPoolOutput> {
     let pads = if let Some(ref pads) = attrs.pads {
@@ -266,20 +271,29 @@ fn _maxpool_internal_f32(
         }
     } else {
         for i in 0..input_spatial_shape.len() {
-            output_spatial_shape[i] =
-                (((input_spatial_shape[i] as i64 + new_pads.slice(s![i, ..]).sum() as i64
-                    - ((attrs.kernel_shape[i] - 1) * dilations[i] + 1)) as f64
-                    / strides[i] as f64)
-                    + 1f64)
-                    .floor() as usize;
+            let ossv = ((input_spatial_shape[i] + new_pads.slice(s![i, ..]).sum()
+                - ((attrs.kernel_shape[i] - 1) * dilations[i] + 1) as usize)
+                as f64
+                / strides[i] as f64
+                + 1f64)
+                .floor() as usize;
+            output_spatial_shape[i] = ossv;
         }
     }
-    if attrs.auto_pad != MaxPoolAutoPad::NotSet {
-        if attrs.auto_pad == MaxPoolAutoPad::SameLower
-            || attrs.auto_pad == MaxPoolAutoPad::SameUpper
-        {
+
+    match attrs.auto_pad {
+        Some(MaxPoolAutoPad::Valid) => {
             for i in 0..input_spatial_shape.len() {
-                if attrs.auto_pad == MaxPoolAutoPad::SameUpper {
+                output_spatial_shape[i] = ((input_spatial_shape[i]
+                    - ((attrs.kernel_shape[i] - 1) * dilations[i] + 1) as usize
+                    + 1) as f64
+                    / strides[i] as f64)
+                    .ceil() as usize;
+            }
+        }
+        Some(MaxPoolAutoPad::SameUpper) | Some(MaxPoolAutoPad::SameLower) => {
+            for i in 0..input_spatial_shape.len() {
+                if attrs.auto_pad == Some(MaxPoolAutoPad::SameUpper) {
                     output_spatial_shape[i] =
                         (input_spatial_shape[i] as f64 / strides[i] as f64).ceil() as usize;
                 } else {
@@ -293,15 +307,10 @@ fn _maxpool_internal_f32(
                 new_pads[[i, 1]] = pad_i - new_pads[[i, 0]];
             }
         }
-    } else {
-        for i in 0..input_spatial_shape.len() {
-            output_spatial_shape[i] = ((input_spatial_shape[i]
-                - ((attrs.kernel_shape[i] - 1) * dilations[i] + 1) as usize
-                + 1) as f64
-                / strides[i] as f64)
-                .ceil() as usize;
-        }
+        Some(MaxPoolAutoPad::NotSet) | None => {}
     }
+
+    attrs.replace_dilations_and_strides(dilations, strides);
     match input_spatial_shape.len() {
         1 => _max_pool_f32_1d(input, attrs, new_pads, output_spatial_shape, output_len),
         2 => _max_pool_f32_2d(input, attrs, new_pads, output_spatial_shape, output_len),
@@ -348,7 +357,7 @@ pub fn maxpool(
     node: &NodeProto,
     _opset_version: i64,
     output_len: usize,
-) -> BoxResult<(ArrayType, Option<ArrayType>)> {
+) -> BoxResult<OperationResult> {
     if inputs.is_empty() {
         return Err("No inputs".into());
     }
@@ -356,7 +365,7 @@ pub fn maxpool(
     match inputs[0] {
         ArrayType::F32(x) => {
             let (y, i) = maxpool_f32(x, attrs, output_len)?;
-            Ok((ArrayType::F32(y), i.map(ArrayType::I64)))
+            Ok((ArrayType::F32(y), i.map(ArrayType::I64)).into())
         }
         _ => todo!("MaxPool for type {}", inputs[0]),
     }

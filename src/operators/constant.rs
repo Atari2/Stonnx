@@ -2,7 +2,7 @@ use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
     utils::{
         make_string_tensor, make_tensor, make_tensor_from_proto, pick_opset_version, ArrayType,
-        BoxResult,
+        BoxResult, OperationResult,
     },
 };
 use protobuf::{Enum, MessageField};
@@ -164,15 +164,16 @@ pub fn constant(
     _inputs: &[&ArrayType],
     node: &NodeProto,
     opset_version: i64,
-) -> BoxResult<ArrayType> {
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSION);
     if target_version == 1 {
-        constant_1(ConstantAttrs::new(node))
+        Ok(constant_1(ConstantAttrs::new(node))?.into())
     } else if target_version == 9 {
-        constant_9(ConstantAttrs::new(node))
+        Ok(constant_9(ConstantAttrs::new(node))?.into())
     } else if target_version == 11 {
-        constant_11(ConstantAttrs::new(node))
+        Ok(constant_11(ConstantAttrs::new(node))?.into())
     } else {
-        constant_12(ConstantAttrs::new(node))
+        Ok(constant_12(ConstantAttrs::new(node))?.into())
     }
 }

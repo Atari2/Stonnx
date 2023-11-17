@@ -1,7 +1,7 @@
 // TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
-    utils::{shape_safe_product, ArrayType, BoxResult},
+    utils::{shape_safe_product, ArrayType, BoxResult, OperationResult},
 };
 
 use ndarray::IxDyn;
@@ -31,7 +31,8 @@ pub fn reshape(
     inputs: &[&ArrayType],
     node: &NodeProto,
     _opset_version: i64,
-) -> BoxResult<ArrayType> {
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     let data = inputs[0];
     let shape = inputs[1];
     if shape.shape().len() != 1 {
@@ -44,7 +45,7 @@ pub fn reshape(
         return Err("shape must be I64".into());
     };
     let mut new_shape = shape.clone();
-    println!("new_shape: {:?}", new_shape);
+    println!("Shape: {:?}", shape);
     let attrs = ReshapeAttrs::new(node);
     let datashape_array =
         ndarray::ArrayD::from_shape_vec(IxDyn(&[data.shape().len()]), data.shape().to_vec())?
@@ -56,12 +57,11 @@ pub fn reshape(
             .filter_map(|(i, &v)| if v == 0 { Some(i) } else { None })
             .collect::<Vec<_>>();
         if !zero_indexes.is_empty() {
-            println!("replacing zero indexes at {:?} with {:?}", zero_indexes, datashape_array);
             new_shape[zero_indexes.as_slice()] = datashape_array[zero_indexes.as_slice()] as i64;
         }
     }
     let shape_tot = shape_safe_product(&new_shape);
-    let data_shape_tot = shape_safe_product(shape) as i64;
+    let data_shape_tot = shape_safe_product(data.shape()) as i64;
     if shape_tot < 0 {
         let missing_shape = data_shape_tot / -shape_tot;
         if let Some(missing_shape_index) = new_shape.iter().position(|&v| v == -1) {
@@ -71,16 +71,12 @@ pub fn reshape(
         }
     }
     let new_shape = new_shape.iter().map(|&v| v as usize).collect::<Vec<_>>();
-    println!(
-        "new_shape after normalization: {:?}, original shape: {:?}",
-        new_shape,
-        data.shape()
-    );
+    println!("From {:?} to {:?}", data.shape(), new_shape);
     let new_shape = ndarray::IxDyn(&new_shape);
     match data {
         ArrayType::F32(data) => {
             let data = data.to_shape(new_shape)?.to_owned();
-            Ok(ArrayType::F32(data))
+            Ok(ArrayType::F32(data).into())
         }
         _ => todo!("Reshape for type {} not implemented", data),
     }

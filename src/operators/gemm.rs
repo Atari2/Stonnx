@@ -5,7 +5,7 @@ use trait_set::trait_set;
 // TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType, BoxResult},
+    utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
 };
 
 const OPSET_VERSIONS: [i64; 6] = [1, 6, 7, 9, 11, 13];
@@ -222,13 +222,20 @@ fn _gemm_internal(
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py
 /// https://onnx.ai/onnx/operators/onnx__Gemm.html
-pub fn gemm(inputs: &[&ArrayType], node: &NodeProto, opset_version: i64) -> BoxResult<ArrayType> {
+pub fn gemm(
+    inputs: &[&ArrayType],
+    node: &NodeProto,
+    opset_version: i64,
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     let attrs = GemmAttrs::new(node);
 
     match (inputs.get(0), inputs.get(1), inputs.get(2)) {
-        (Some(a), Some(b), Some(c)) => Ok(_gemm_internal(a, b, Some(c), attrs, target_version)?),
-        (Some(a), Some(b), None) => Ok(_gemm_internal(a, b, None, attrs, target_version)?),
+        (Some(a), Some(b), Some(c)) => {
+            Ok(_gemm_internal(a, b, Some(c), attrs, target_version)?.into())
+        }
+        (Some(a), Some(b), None) => Ok(_gemm_internal(a, b, None, attrs, target_version)?.into()),
         _ => Err("Gemm: invalid inputs".into()),
     }
 }
