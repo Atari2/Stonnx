@@ -253,14 +253,10 @@ fn _conv_impl(
                             continue;
                         }
                         let i = io + kh % 2;
-                        let (ih1, ih2) =
-                            (std::cmp::max(0, i + oh), std::cmp::min(i + oh + kh, s_h));
+                        let (ih1, ih2) = (0.max(i + oh), (i + oh + kh).min(s_h));
                         let img = x.slice(s![n..n + 1, c..c + 1, ih1 as usize..ih2 as usize, ..]);
                         let s = if img.shape() != w_shape {
-                            let (jh1, jh2) = (
-                                std::cmp::max(-oh - i, 0),
-                                std::cmp::min(kh, kh + s_h - (i + oh + kh)),
-                            );
+                            let (jh1, jh2) = ((-oh - i).max(0), kh.min(kh + s_h - (i + oh + kh)));
                             let w_ = w.slice(s![..1, ..1, jh1 as usize..jh2 as usize, ..]);
                             if img.shape() != w_.shape() {
                                 return Err("Shape unexpected".into());
@@ -319,16 +315,14 @@ fn _conv_impl(
                             continue;
                         }
                         let i = io + kh % 2;
-                        let (ih1, ih2) =
-                            (std::cmp::max(0, i + oh), std::cmp::min(i + oh + kh, s_h));
+                        let (ih1, ih2) = (0.max(i + oh), (i + oh + kh).min(s_h));
                         for jo in (bw..ew).step_by(stw as usize) {
                             let wr = (jo - bw) / stw;
                             if wr >= w_out {
                                 continue;
                             }
                             let j = jo + kw % 2;
-                            let (jw1, jw2) =
-                                (std::cmp::max(0, j + ow), std::cmp::min(j + ow + kw, s_w));
+                            let (jw1, jw2) = (0.max(j + ow), (j + ow + kw).min(s_w));
                             let img = x.slice(s![
                                 n..n + 1,
                                 c..c + 1,
@@ -336,14 +330,10 @@ fn _conv_impl(
                                 jw1 as usize..jw2 as usize
                             ]);
                             let s = if img.shape() != w_shape {
-                                let (jh1, jh2) = (
-                                    std::cmp::max(-oh - i, 0),
-                                    std::cmp::min(kh, kh + s_h - (i + oh + kh)),
-                                );
-                                let (jw1, jw2) = (
-                                    std::cmp::max(-ow - j, 0),
-                                    std::cmp::min(kw, kw + s_w - (j + ow + kw)),
-                                );
+                                let (jh1, jh2) =
+                                    ((-oh - i).max(0), kh.min(kh + s_h - (i + oh + kh)));
+                                let (jw1, jw2) =
+                                    ((-ow - j).max(0), kw.min(kw + s_w - (j + ow + kw)));
                                 let w_ = w.slice(s![
                                     ..1,
                                     ..1,

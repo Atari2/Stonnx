@@ -2,7 +2,8 @@ use crate::{
     onnx::NodeProto,
     utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
 };
-use rand::Rng;
+use ndarray::{ArrayD, Ix0};
+use rand::{Rng, SeedableRng};
 const OPSET_VERSIONS: [i64; 6] = [1, 6, 7, 10, 12, 13];
 
 #[derive(Debug)]
@@ -58,19 +59,86 @@ impl DropoutAttrs {
     }
 }
 
+fn dropout_common_f32(
+    data: &ArrayD<f32>,
+    training_mode: bool,
+    attrs: DropoutAttrs,
+    output_len: usize,
+) -> BoxResult<(ArrayType, Option<ArrayType>)> {
+    let return_mask = output_len == 2;
+    if attrs.ratio == 0.0 || !training_mode {
+        if !return_mask {
+            Ok((ArrayType::F32(data.clone()), None))
+        } else {
+            Ok((
+                ArrayType::F32(data.clone()),
+                Some(ArrayType::Bool(ArrayD::from_elem(data.shape(), true))),
+            ))
+        }
+    } else {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(attrs.seed as u64);
+        let distribution = rand::distributions::Uniform::new(0.0, 1.0);
+        let mask = ArrayD::from_shape_simple_fn(data.shape(), || rng.sample(distribution))
+            .mapv(|x| x >= attrs.ratio);
+        let scale = 1.0 / (1.0 - attrs.ratio);
+        let btf = |a| if a { 1.0 } else { 0.0 };
+        if !return_mask {
+            Ok((ArrayType::F32(mask.mapv(btf) * data * scale), None))
+        } else {
+            Ok((
+                ArrayType::F32(mask.mapv(btf) * data * scale),
+                Some(ArrayType::Bool(mask)),
+            ))
+        }
+    }
+}
+
+fn dropout_common(
+    data: &ArrayType,
+    training_mode: bool,
+    attrs: DropoutAttrs,
+    output_len: usize,
+) -> BoxResult<(ArrayType, Option<ArrayType>)> {
+    match data {
+        ArrayType::F32(data) => dropout_common_f32(data, training_mode, attrs, output_len),
+        _ => todo!("Dropout for type {}", data),
+    }
+}
+
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_dropout.py
 /// https://onnx.ai/onnx/operators/onnx__Dropout.html
 pub fn dropout(
     inputs: &[&ArrayType],
     node: &NodeProto,
     opset_version: i64,
-    _output_len: usize,
+    output_len: usize,
 ) -> BoxResult<OperationResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
-    let attrs = DropoutAttrs::new(node, target_version);
+    let mut attrs = DropoutAttrs::new(node, target_version);
+    if attrs.is_test && target_version < 7 {
+        return Ok((inputs[0].clone(), None).into());
+    }
     if target_version < 12 {
-        todo!("Dropout for opset < 12");
+        Ok(dropout_common(inputs[0], false, attrs, output_len)?.into())
     } else {
-        todo!("Dropout for opset >= 12");
+        attrs.ratio = if let Some(ratio) = inputs.get(1) {
+            match ratio {
+                ArrayType::F32(ratio) => ratio.clone().into_dimensionality::<Ix0>()?.into_scalar(),
+                _ => return Err("Ratio must be a scalar".into()),
+            }
+        } else {
+            0.5
+        };
+        let training_mode = if let Some(mode) = inputs.get(2) {
+            match mode {
+                ArrayType::I64(mode) => {
+                    mode.clone().into_dimensionality::<Ix0>()?.into_scalar() != 0
+                }
+                _ => return Err("Training mode must be a scalar".into()),
+            }
+        } else {
+            false
+        };
+        Ok(dropout_common(inputs[0], training_mode, attrs, output_len)?.into())
     }
 }

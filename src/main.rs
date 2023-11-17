@@ -231,16 +231,20 @@ fn main() -> BoxResult<()> {
                     }
                     match (value, data) {
                         (ArrayType::F32(v), ArrayType::F32(d)) => {
+                            let mut count = 0;
                             let mut diff = vec![];
                             for (i, (v, d)) in v.iter().zip(d.iter()).enumerate() {
                                 if (v - d).abs() > 0.0001 {
-                                    println!(
-                                        "Compare output {:?} with {:?} failed at index {}",
-                                        v, d, i
-                                    );
+                                    count += 1;
                                 }
                                 diff.push((i, v, d, (v - d).abs()));
                             }
+                            let max = diff
+                                .iter()
+                                .max_by(|(_, _, _, d1), (_, _, _, d2)| d1.partial_cmp(d2).unwrap())
+                                .expect("Failed to get max difference");
+                            println!("Output {} has {} values with absolute difference of more than .0001", name, count);
+                            println!("\tMax difference: {:?}", max);
                         }
                         _ => todo!(
                             "Compare output {:?} with {:?}",

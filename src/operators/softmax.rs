@@ -28,7 +28,7 @@ impl SoftmaxAttrs {
                             -1
                         }
                     },
-                    |a| a.i.unwrap_or_else(|| if version < 13 { 1 } else { -1 }),
+                    |a| a.i.unwrap_or(if version < 13 { 1 } else { -1 }),
                 ),
         }
     }
