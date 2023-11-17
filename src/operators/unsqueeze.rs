@@ -1,4 +1,4 @@
-use ndarray::{ArrayViewD, ArrayD};
+use ndarray::{ArrayD, ArrayViewD};
 use num::Zero;
 
 use crate::{
@@ -7,7 +7,6 @@ use crate::{
 };
 
 const OPSET_VERSIONS: [i64; 3] = [1, 11, 13];
-
 
 #[derive(Debug)]
 struct UnsqueezeAttrs<'a> {
@@ -26,7 +25,7 @@ impl<'a> UnsqueezeAttrs<'a> {
     }
 }
 
-fn _unsqueeze_generic<A: Clone + Copy + Zero>( 
+fn _unsqueeze_generic<A: Clone + Copy + Zero>(
     data: ArrayViewD<A>,
     new_shape: &[usize],
 ) -> BoxResult<ArrayD<A>> {

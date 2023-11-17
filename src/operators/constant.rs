@@ -1,7 +1,8 @@
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
     utils::{
-        make_string_tensor, make_tensor, make_tensor_from_proto, pick_opset_version, ArrayType, BoxResult,
+        make_string_tensor, make_tensor, make_tensor_from_proto, pick_opset_version, ArrayType,
+        BoxResult,
     },
 };
 use protobuf::{Enum, MessageField};

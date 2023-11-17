@@ -69,10 +69,7 @@ impl Iterator for NDIndex<'_> {
     }
 }
 
-fn _gather_generic<
-    A: Clone + Copy + Zero,
-    B: Clone + Zero + AsPrimitive<usize>,
->(
+fn _gather_generic<A: Clone + Copy + Zero, B: Clone + Zero + AsPrimitive<usize>>(
     data: ArrayViewD<A>,
     i: ArrayViewD<B>,
     attrs: &GatherAttrs,

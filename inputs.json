@@ -1,9 +1,0 @@
-{
-    "inputs": [
-        "examples/bvlcalexnet-12/test_data_set_0/input_0.pb"
-    ],
-    "outputs": [
-        "examples/bvlcalexnet-12/test_data_set_0/output_0.pb"
-    ],
-    "modelpath": "examples/bvlcalexnet-12/bvlcalexnet-12.onnx"
-}

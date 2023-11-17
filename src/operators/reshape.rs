@@ -1,7 +1,7 @@
 // TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
-    utils::{ArrayType, shape_safe_product, BoxResult},
+    utils::{shape_safe_product, ArrayType, BoxResult},
 };
 
 use ndarray::IxDyn;
@@ -15,9 +15,8 @@ struct ReshapeAttrs {
 
 impl ReshapeAttrs {
     fn new(node: &NodeProto) -> Self {
-        Self { 
-            allowzero:
-                node
+        Self {
+            allowzero: node
                 .attribute
                 .iter()
                 .find(|a| a.name() == "allowzero")
@@ -45,11 +44,21 @@ pub fn reshape(
         return Err("shape must be I64".into());
     };
     let mut new_shape = shape.clone();
+    println!("new_shape: {:?}", new_shape);
     let attrs = ReshapeAttrs::new(node);
-    let datashape_array = ndarray::ArrayD::from_shape_vec(IxDyn(&[data.shape().len()]), data.shape().to_vec())?.into_dyn();
+    let datashape_array =
+        ndarray::ArrayD::from_shape_vec(IxDyn(&[data.shape().len()]), data.shape().to_vec())?
+            .into_dyn();
     if attrs.allowzero == 0 {
-        let zero_indexes = shape.iter().enumerate().filter_map(|(i, &v)| if v == 0 { Some(i) } else { None }).collect::<Vec<_>>();
-        new_shape[zero_indexes.as_slice()] = datashape_array[zero_indexes.as_slice()] as i64;
+        let zero_indexes = shape
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &v)| if v == 0 { Some(i) } else { None })
+            .collect::<Vec<_>>();
+        if !zero_indexes.is_empty() {
+            println!("replacing zero indexes at {:?} with {:?}", zero_indexes, datashape_array);
+            new_shape[zero_indexes.as_slice()] = datashape_array[zero_indexes.as_slice()] as i64;
+        }
     }
     let shape_tot = shape_safe_product(&new_shape);
     let data_shape_tot = shape_safe_product(shape) as i64;
@@ -62,6 +71,11 @@ pub fn reshape(
         }
     }
     let new_shape = new_shape.iter().map(|&v| v as usize).collect::<Vec<_>>();
+    println!(
+        "new_shape after normalization: {:?}, original shape: {:?}",
+        new_shape,
+        data.shape()
+    );
     let new_shape = ndarray::IxDyn(&new_shape);
     match data {
         ArrayType::F32(data) => {

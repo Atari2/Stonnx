@@ -1,4 +1,7 @@
-use crate::{onnx::NodeProto, utils::{ArrayType, BoxResult}};
+use crate::{
+    onnx::NodeProto,
+    utils::{ArrayType, BoxResult},
+};
 
 const _OPSET_VERSIONS: [i64; 1] = [1];
 

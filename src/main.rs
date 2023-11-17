@@ -8,19 +8,19 @@ pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor
 
 use operators::add::add;
 use operators::clip::clip;
+use operators::concat::concat;
 use operators::constant::constant;
 use operators::conv::conv;
 use operators::gather::gather;
-use operators::globalaveragepool::global_average_pool;
-use operators::shape::shape;
-use operators::unsqueeze::unsqueeze;
-use operators::concat::concat;
-use operators::reshape::reshape;
 use operators::gemm::gemm;
-use operators::relu::relu;
+use operators::globalaveragepool::global_average_pool;
 use operators::lrn::lrn;
 use operators::maxpool::maxpool;
-use std::path::Path;
+use operators::relu::relu;
+use operators::reshape::reshape;
+use operators::shape::shape;
+use operators::unsqueeze::unsqueeze;
+use std::path::{Path, PathBuf};
 
 use clap::Parser;
 
@@ -30,24 +30,34 @@ use crate::utils::{make_external_outputs, make_graph_outputs, ArrayType};
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long, default_value = "inputs.json")]
-    pub inputs_file: String,
+    #[arg(short, long)]
+    pub model: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct FileInputs {
-    pub inputs: Vec<String>,
-    pub outputs: Vec<String>,
-    pub modelpath: String
+    pub inputs: Vec<PathBuf>,
+    pub outputs: Vec<PathBuf>,
+    pub modelpath: PathBuf,
+}
+
+impl FileInputs {
+    fn extend_paths(&mut self, modelname: &Path) {
+        self.inputs = self.inputs.iter().map(|s| Path::new("models").join(modelname).join(s)).collect();
+        self.outputs = self.outputs.iter().map(|s| Path::new("models").join(modelname).join(s)).collect();
+        self.modelpath = Path::new("models").join(modelname).join(self.modelpath.clone())
+    }
 }
 
 const MAX_OPSET_VERSION: i64 = 20;
 
 fn main() -> BoxResult<()> {
     let args = Args::parse();
-    println!("Inputs file: {}", args.inputs_file);
-    let inputs_file = std::fs::File::open(args.inputs_file)?;
-    let fileinputs: FileInputs = serde_json::from_reader(inputs_file)?;
+    println!("Running model: {}", args.model.display());
+    let inputspath = Path::new("models").join(&args.model).join("inputs.json");
+    let inputs_file = std::fs::File::open(&inputspath)?;
+    let mut fileinputs: FileInputs = serde_json::from_reader(inputs_file)?;
+    fileinputs.extend_paths(&args.model);
     let model = read_model(Path::new(&fileinputs.modelpath))?;
     let opset_version = if let Some(v) = model.opset_import.get(0) {
         if let Some(v) = v.version {
@@ -223,7 +233,7 @@ fn main() -> BoxResult<()> {
                         "Running lrn operator between {:?} to get {:?}",
                         input_names, output_names
                     );
-                    let (maxpool, indices) = maxpool(&inputs, node, opset_version)?;
+                    let (maxpool, indices) = maxpool(&inputs, node, opset_version, outputs.len())?;
                     let output_name = outputs[0];
                     if let Some(indices) = indices {
                         let indices_name = outputs[1];
@@ -257,11 +267,7 @@ fn main() -> BoxResult<()> {
                             data.shape()
                         );
                     } else {
-                        println!(
-                            "Output {} has shape {:?} as expected",
-                            name,
-                            value.shape()
-                        );
+                        println!("Output {} has shape {:?} as expected", name, value.shape());
                     }
                     if value.value_type() != data.value_type() {
                         panic!(
@@ -290,7 +296,11 @@ fn main() -> BoxResult<()> {
                                 diff.push((i, v, d, (v - d).abs()));
                             }
                         }
-                        _ => todo!("Compare output {:?} with {:?}", value.value_type(), data.value_type()),
+                        _ => todo!(
+                            "Compare output {:?} with {:?}",
+                            value.value_type(),
+                            data.value_type()
+                        ),
                     }
                 }
             }

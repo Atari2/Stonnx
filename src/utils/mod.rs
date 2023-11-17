@@ -1,12 +1,12 @@
 use std::io::Read;
 use std::os::raw::c_uchar;
-use std::path;
+use std::path::PathBuf;
 use std::{collections::HashMap, error::Error, io, path::Path};
 
 use ndarray::{ArrayD, IxDyn};
 use protobuf::Enum;
 
-use crate::onnx::tensor_proto::DataType;
+use crate::onnx::tensor_proto::{DataType, self};
 use crate::onnx::{TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
 use crate::FileInputs;
@@ -40,7 +40,13 @@ pub enum ValueType {
     Bool,
 }
 
-pub fn shape_safe_product<'a, B: 'a + std::iter::Product<&'a B> + std::default::Default, A: IntoIterator<Item = &'a B>>(shape: A) -> B {
+pub fn shape_safe_product<
+    'a,
+    B: 'a + std::iter::Product<&'a B> + std::default::Default,
+    A: IntoIterator<Item = &'a B>,
+>(
+    shape: A,
+) -> B {
     let mut piter = shape.into_iter().peekable();
     if piter.peek().is_none() {
         std::default::Default::default()
@@ -274,7 +280,9 @@ impl ValueInfo {
 
 pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<ArrayType> {
     let shape = &proto.dims;
-    println!("  Tensor: {} data location: {:?}", proto.name(), proto.data_location());
+    if proto.data_location() != onnx::tensor_proto::DataLocation::DEFAULT {
+        return Err("External data location not supported".into());
+    }
     if let Some(DataType::STRING) = DataType::from_i32(proto.data_type()) {
         let bytedata = &proto.string_data;
         make_string_tensor(shape, bytedata)
@@ -284,10 +292,7 @@ pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<ArrayType> {
     }
 }
 
-pub fn make_string_tensor(
-    shape: &[i64],
-    bytedata: &[impl AsRef<[u8]>],
-) -> BoxResult<ArrayType> {
+pub fn make_string_tensor(shape: &[i64], bytedata: &[impl AsRef<[u8]>]) -> BoxResult<ArrayType> {
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
     let a = ArrayD::<String>::from_shape_vec(
         IxDyn(&shape),
@@ -299,11 +304,7 @@ pub fn make_string_tensor(
     Ok(ArrayType::Str(a))
 }
 
-pub fn make_tensor(
-    shape: &[i64],
-    bytedata: &[u8],
-    data_type: i32,
-) -> BoxResult<ArrayType> {
+pub fn make_tensor(shape: &[i64], bytedata: &[u8], data_type: i32) -> BoxResult<ArrayType> {
     let enum_dt = DataType::from_i32(data_type).unwrap_or_default();
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
     match enum_dt {
@@ -334,8 +335,22 @@ pub fn make_tensor(
         },
         DataType::INT64 => match bytemuck::try_cast_slice::<u8, i64>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
-                let a = ArrayD::<i64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
+                let dlen = data.len();
+                let slen = if !shape.is_empty() {
+                    shape_safe_product(&shape)
+                } else {
+                    0
+                };
+                // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
+                // panic otherwise
+                if dlen != slen && (slen == 0 && dlen != 1) {
+                    panic!("Data length {} does not match shape length {}", dlen, slen)
+                }
+                let a = if data.is_empty() {
+                    ArrayD::<i64>::zeros(IxDyn(&shape))
+                } else {
+                    ArrayD::<i64>::from_shape_vec(IxDyn(&shape), data.to_vec())?
+                };
                 Ok(ArrayType::I64(a))
             }
             Err(e) => Err(e.to_string().into()),
@@ -426,7 +441,9 @@ pub fn make_tensor(
                 } else {
                     0
                 };
-                if dlen != slen {
+                // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
+                // panic otherwise
+                if dlen != slen && (slen == 0 && dlen != 1) {
                     panic!("Data length {} does not match shape length {}", dlen, slen)
                 }
                 let a = if data.is_empty() {
@@ -494,12 +511,12 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> HashMap<String, ArrayType>
 
 fn make_input_tensors_from_files(
     graph: &onnx::GraphProto,
-    files: &[String],
+    files: &[PathBuf],
 ) -> BoxResult<HashMap<String, ArrayType>> {
     let mut map = HashMap::new();
     let mut external_inputs_map = HashMap::new();
     for input in files.iter() {
-        let input_tensor = read_tensor(path::Path::new(&input))?;
+        let input_tensor = read_tensor(input)?;
         external_inputs_map.insert(
             input_tensor
                 .name
@@ -524,12 +541,12 @@ fn make_input_tensors_from_files(
 
 fn make_output_tensors_from_files(
     graph: &onnx::GraphProto,
-    files: &[String],
+    files: &[PathBuf],
 ) -> BoxResult<HashMap<String, ArrayType>> {
     let mut map = HashMap::new();
     let mut external_outputs_map = HashMap::new();
     for output in files.iter() {
-        let ouput_tensor = read_tensor(path::Path::new(&output))?;
+        let ouput_tensor = read_tensor(output)?;
         external_outputs_map.insert(
             ouput_tensor
                 .name
@@ -572,9 +589,7 @@ pub fn make_external_outputs(
     make_output_tensors_from_files(graph, &fileinputs.outputs)
 }
 
-pub fn make_graph_outputs(
-    graph: &onnx::GraphProto,
-) -> BoxResult<HashMap<String, OutputInfo>> {
+pub fn make_graph_outputs(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, OutputInfo>> {
     let mut map = HashMap::new();
     for output in graph.output.iter() {
         let output_name = output.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
@@ -602,6 +617,7 @@ fn read_model_binary(p: &Path) -> BoxResult<onnx::ModelProto> {
 }
 
 pub fn read_model(p: &Path) -> BoxResult<onnx::ModelProto> {
+    println!("Reading model from {}", p.display());
     let merr = read_model_binary(p);
     match merr {
         Ok(m) => Ok(m),

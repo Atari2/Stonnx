@@ -1,6 +1,10 @@
 use ndarray::{ArrayD, Axis, CowArray, IxDyn};
 
-use crate::{onnx::NodeProto, utils::{ArrayType, BoxResult}, utils::ValueType};
+use crate::{
+    onnx::NodeProto,
+    utils::ValueType,
+    utils::{ArrayType, BoxResult},
+};
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 4, 11, 13];
 
@@ -21,10 +25,7 @@ impl ConcatAttrs {
     }
 }
 
-fn _preprocess<A: Clone>(
-    a: &ArrayD<A>,
-    axis: i64,
-) -> BoxResult<CowArray<'_, A, IxDyn>> {
+fn _preprocess<A: Clone>(a: &ArrayD<A>, axis: i64) -> BoxResult<CowArray<'_, A, IxDyn>> {
     if a.shape().is_empty() {
         return Err("Input must be at least 1D".into());
     }
@@ -42,10 +43,7 @@ fn _preprocess<A: Clone>(
     }
 }
 
-fn _concat_i64(
-    inputs: &[&ArrayType],
-    attrs: ConcatAttrs,
-) -> BoxResult<ArrayType> {
+fn _concat_i64(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType> {
     let mut inputs_i64 = vec![];
     let mut cow_array = vec![];
     for input in inputs.iter() {
@@ -73,10 +71,7 @@ fn _concat_i64(
     )?))
 }
 
-fn _concat_f32(
-    inputs: &[&ArrayType],
-    attrs: ConcatAttrs,
-) -> BoxResult<ArrayType> {
+fn _concat_f32(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType> {
     let mut inputs_f32 = vec![];
     let mut cow_array = vec![];
     for input in inputs.iter() {
@@ -122,8 +117,6 @@ pub fn concat(
     match type_ {
         ValueType::I64 => _concat_i64(inputs, attrs),
         ValueType::F32 => _concat_f32(inputs, attrs),
-        _ => {
-            Err("Only f32 and i64 are supported".into())
-        }
+        _ => Err("Only f32 and i64 are supported".into()),
     }
 }

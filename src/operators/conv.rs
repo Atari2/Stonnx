@@ -4,9 +4,9 @@ use ndarray::Order;
 
 use crate::onnx::AttributeProto;
 use crate::onnx::NodeProto;
+use crate::utils::shape_safe_product;
 use crate::utils::ArrayType;
 use crate::utils::BoxResult;
-use crate::utils::shape_safe_product;
 
 // Defined but never used because even thought Conv has 2 versions, they both act the same
 const _OPSET_VERSIONS: [i64; 2] = [1, 11];

@@ -58,10 +58,7 @@ fn interval(n: i64, start: i64, end: Option<i64>) -> Option<(i64, i64)> {
     }
 }
 
-fn shape_15(
-    inputs: &[&ArrayType],
-    attrs: ShapeAttrs,
-) -> BoxResult<ArrayType> {
+fn shape_15(inputs: &[&ArrayType], attrs: ShapeAttrs) -> BoxResult<ArrayType> {
     let data = inputs[0];
     let shape = data.shape();
     let absome = interval(data.shape().len() as i64, attrs.start, attrs.end);
@@ -79,11 +76,7 @@ fn shape_15(
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_shape.py
 /// https://onnx.ai/onnx/operators/onnx__Shape.html
-pub fn shape(
-    inputs: &[&ArrayType],
-    node: &NodeProto,
-    opset_version: i64,
-) -> BoxResult<ArrayType> {
+pub fn shape(inputs: &[&ArrayType], node: &NodeProto, opset_version: i64) -> BoxResult<ArrayType> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version < 15 {
         shape_1(inputs)

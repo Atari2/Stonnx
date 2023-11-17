@@ -222,11 +222,7 @@ fn _gemm_internal(
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py
 /// https://onnx.ai/onnx/operators/onnx__Gemm.html
-pub fn gemm(
-    inputs: &[&ArrayType],
-    node: &NodeProto,
-    opset_version: i64,
-) -> BoxResult<ArrayType> {
+pub fn gemm(inputs: &[&ArrayType], node: &NodeProto, opset_version: i64) -> BoxResult<ArrayType> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     let attrs = GemmAttrs::new(node);
 
