@@ -4,7 +4,7 @@ use protobuf::Enum;
 
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
-    utils::{make_tensor, ArrayType, BoxResult, OperationResult},
+    utils::{make_tensor, ArrayType, BoxResult, NDIndex, OperationResult},
 };
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 11, 13];
@@ -23,49 +23,6 @@ impl GatherAttrs {
                 .find(|a| a.name() == "axis")
                 .map_or(0, |a| a.i()),
         }
-    }
-}
-
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gather.py
-/// https://onnx.ai/onnx/operators/onnx__Gather.html
-
-struct NDIndex<'a> {
-    indices: &'a [usize],
-    current_index: Vec<usize>,
-}
-
-impl<'a> NDIndex<'a> {
-    fn new(shape: &'a [usize]) -> Self {
-        Self {
-            indices: shape,
-            current_index: vec![0; shape.len()],
-        }
-    }
-}
-
-impl Iterator for NDIndex<'_> {
-    type Item = Vec<usize>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current_index.is_empty() {
-            return None;
-        }
-        let result = self.current_index.clone();
-        let mut i = self.current_index.len() - 1;
-        loop {
-            if self.current_index[i] < self.indices[i] - 1 {
-                self.current_index[i] += 1;
-                break;
-            } else {
-                self.current_index[i] = 0;
-                if i == 0 {
-                    self.current_index = vec![];
-                    break;
-                }
-                i -= 1;
-            }
-        }
-        Some(result)
     }
 }
 
@@ -106,6 +63,8 @@ fn _gather_generic<A: Clone + Copy + Zero, B: Clone + Zero + AsPrimitive<usize>>
     output
 }
 
+/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gather.py
+/// https://onnx.ai/onnx/operators/onnx__Gather.html
 pub fn gather(
     inputs: &[&ArrayType],
     node: &NodeProto,

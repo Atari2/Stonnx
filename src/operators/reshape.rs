@@ -76,6 +76,10 @@ pub fn reshape(
             let data = data.to_shape(new_shape)?.to_owned();
             Ok(ArrayType::F32(data).into())
         }
+        ArrayType::I64(data) => {
+            let data = data.to_shape(new_shape)?.to_owned();
+            Ok(ArrayType::I64(data).into())
+        }
         _ => todo!("Reshape for type {} not implemented", data),
     }
 }

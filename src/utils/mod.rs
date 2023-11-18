@@ -20,6 +20,50 @@ static UNKNOWN: &str = "<unknown>";
 
 pub type BoxResult<A> = Result<A, Box<dyn Error>>;
 
+pub struct NDIndex<'a> {
+    indices: &'a [usize],
+    current_index: Vec<usize>,
+}
+
+impl<'a> NDIndex<'a> {
+    pub fn new(shape: &'a [usize]) -> Self {
+        Self {
+            indices: shape,
+            current_index: if shape.iter().all(|v| *v != 0) {
+                vec![0; shape.len()]
+            } else {
+                vec![]
+            },
+        }
+    }
+}
+
+impl Iterator for NDIndex<'_> {
+    type Item = Vec<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_index.is_empty() {
+            return None;
+        }
+        let result = self.current_index.clone();
+        let mut i = self.current_index.len() - 1;
+        loop {
+            if self.current_index[i] < self.indices[i] - 1 {
+                self.current_index[i] += 1;
+                break;
+            } else {
+                self.current_index[i] = 0;
+                if i == 0 {
+                    self.current_index = vec![];
+                    break;
+                }
+                i -= 1;
+            }
+        }
+        Some(result)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ValueType {
     I8,
@@ -568,13 +612,17 @@ fn make_input_tensors_from_files(
     }
     for input in graph.input.iter() {
         let input_name = input.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
+        println!("Input: {}", input_name);
+    }
+    for input in graph.input.iter() {
+        let input_name = input.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
         if let Some(input_from_file) = external_inputs_map.get(input_name) {
             map.insert(
                 input_name.to_string(),
                 make_tensor_from_proto(input_from_file)?,
             );
         } else {
-            return Err(format!("Output {} not found in inputs file", input_name).into());
+            return Err(format!("Input {} not found in inputs file", input_name).into());
         }
     }
     Ok(map)

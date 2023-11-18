@@ -4,7 +4,7 @@ mod utils;
 
 use lazy_static::lazy_static;
 pub use onnxparser::onnx;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use utils::BoxResult;
 pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor, OperationFn};
 
@@ -12,17 +12,21 @@ use operators::add::add;
 use operators::clip::clip;
 use operators::concat::concat;
 use operators::constant::constant;
+use operators::constantofshape::constantofshape;
 use operators::conv::conv;
+use operators::div::div;
 use operators::dropout::dropout;
 use operators::gather::gather;
 use operators::gemm::gemm;
 use operators::globalaveragepool::global_average_pool;
 use operators::lrn::lrn;
 use operators::maxpool::maxpool;
+use operators::nonzero::nonzero;
 use operators::relu::relu;
 use operators::reshape::reshape;
 use operators::shape::shape;
 use operators::softmax::softmax;
+use operators::sub::sub;
 use operators::unsqueeze::unsqueeze;
 use std::path::{Path, PathBuf};
 
@@ -51,6 +55,10 @@ lazy_static! {
         m.insert("MaxPool", maxpool as OperationFn);
         m.insert("Softmax", softmax as OperationFn);
         m.insert("Dropout", dropout as OperationFn);
+        m.insert("Sub", sub as OperationFn);
+        m.insert("Div", div as OperationFn);
+        m.insert("ConstantOfShape", constantofshape as OperationFn);
+        m.insert("NonZero", nonzero as OperationFn);
         m
     };
 }
@@ -96,6 +104,7 @@ fn main() -> BoxResult<()> {
     let mut fileinputs: FileInputs = serde_json::from_reader(inputs_file)?;
     fileinputs.extend_paths(&args.model);
     let model = read_model(Path::new(&fileinputs.modelpath))?;
+
     let opset_version = if let Some(v) = model.opset_import.get(0) {
         if let Some(v) = v.version {
             v
@@ -116,12 +125,20 @@ fn main() -> BoxResult<()> {
         let mut node_inputs = make_external_inputs(graph, &fileinputs)?;
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
         let mut graph_outputs = make_graph_outputs(graph)?;
+        let mut not_implemented = HashSet::new();
         for node in graph.node.iter() {
             if let Some(name) = node.op_type.as_deref() {
                 if OPERATION_MAP.get(name).is_none() {
-                    eprintln!("Model uses operator {} which is not implemented yet", name);
+                    not_implemented.insert(name);
                 }
             }
+        }
+        eprintln!(
+            "Number of not implemented operators: {}",
+            not_implemented.len()
+        );
+        for name in not_implemented.iter() {
+            eprintln!("Model uses operator {} which is not implemented yet", name);
         }
         for node in graph.node.iter() {
             let mut inputs = vec![];
