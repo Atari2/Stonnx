@@ -9,6 +9,7 @@ use utils::BoxResult;
 pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor, OperationFn};
 
 use operators::add::add;
+use operators::averagepool::averagepool;
 use operators::clip::clip;
 use operators::concat::concat;
 use operators::constant::constant;
@@ -59,6 +60,7 @@ lazy_static! {
         m.insert("Div", div as OperationFn);
         m.insert("ConstantOfShape", constantofshape as OperationFn);
         m.insert("NonZero", nonzero as OperationFn);
+        m.insert("AveragePool", averagepool as OperationFn);
         m
     };
 }

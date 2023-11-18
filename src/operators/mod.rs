@@ -1,4 +1,6 @@
+mod _commonpool;
 pub mod add;
+pub mod averagepool;
 pub mod clip;
 pub mod concat;
 pub mod constant;

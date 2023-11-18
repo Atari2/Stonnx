@@ -2,35 +2,17 @@
 use ndarray::{s, Array2, ArrayD, Ix1, Ix2, IxDyn};
 
 use crate::{
-    onnx::{AttributeProto, NodeProto},
+    onnx::NodeProto,
     utils::{shape_safe_product, ArrayType, BoxResult, OperationResult},
 };
 
+use super::_commonpool::{CommonPoolAttrs, PoolAutoPad, PoolOutput, PoolingType, _common_pool_f32};
+
 const _OPSET_VERSIONS: [i64; 5] = [1, 8, 10, 11, 12];
-
-#[derive(Debug, PartialEq)]
-enum MaxPoolAutoPad {
-    NotSet,
-    SameUpper,
-    SameLower,
-    Valid,
-}
-
-impl MaxPoolAutoPad {
-    fn from_attr(s: &AttributeProto) -> Self {
-        match std::str::from_utf8(s.s()) {
-            Ok("NOTSET") => Self::NotSet,
-            Ok("SAME_UPPER") => Self::SameUpper,
-            Ok("SAME_LOWER") => Self::SameLower,
-            Ok("VALID") => Self::Valid,
-            _ => Self::NotSet,
-        }
-    }
-}
 
 #[derive(Debug)]
 struct MaxPoolAttrs {
-    auto_pad: Option<MaxPoolAutoPad>,
+    auto_pad: Option<PoolAutoPad>,
     ceil_mode: bool,
     dilations: Option<Vec<i64>>,
     kernel_shape: Vec<i64>,
@@ -49,7 +31,7 @@ impl MaxPoolAttrs {
                 .attribute
                 .iter()
                 .find(|a| a.name() == "auto_pad")
-                .map(MaxPoolAutoPad::from_attr),
+                .map(PoolAutoPad::from_attr),
             ceil_mode: node
                 .attribute
                 .iter()
@@ -87,7 +69,19 @@ impl MaxPoolAttrs {
     }
 }
 
-type MaxPoolOutput = (ArrayD<f32>, Option<ArrayD<i64>>);
+impl From<MaxPoolAttrs> for CommonPoolAttrs {
+    fn from(attrs: MaxPoolAttrs) -> Self {
+        Self {
+            auto_pad: attrs.auto_pad,
+            ceil_mode: attrs.ceil_mode,
+            dilations: attrs.dilations,
+            kernel_shape: attrs.kernel_shape,
+            pads: attrs.pads,
+            storage_order: attrs.storage_order,
+            strides: attrs.strides,
+        }
+    }
+}
 
 fn _max_pool_f32_1d(
     input: &ArrayD<f32>,
@@ -95,7 +89,7 @@ fn _max_pool_f32_1d(
     new_pads: Array2<usize>,
     output_spatial_shape: Vec<usize>,
     output_len: usize,
-) -> BoxResult<MaxPoolOutput> {
+) -> BoxResult<PoolOutput> {
     todo!()
 }
 
@@ -105,7 +99,7 @@ fn _max_pool_f32_2d(
     new_pads: Array2<usize>,
     mut output_spatial_shape: Vec<usize>,
     output_len: usize,
-) -> BoxResult<MaxPoolOutput> {
+) -> BoxResult<PoolOutput> {
     let global_pooling = false;
     let mut y_dims = input.shape()[..2].to_vec();
     y_dims.append(&mut output_spatial_shape);
@@ -228,7 +222,7 @@ fn _max_pool_f32_3d(
     new_pads: Array2<usize>,
     output_spatial_shape: Vec<usize>,
     output_len: usize,
-) -> BoxResult<MaxPoolOutput> {
+) -> BoxResult<PoolOutput> {
     todo!()
 }
 
@@ -236,7 +230,7 @@ fn _maxpool_internal_f32(
     input: &ArrayD<f32>,
     mut attrs: MaxPoolAttrs,
     output_len: usize,
-) -> BoxResult<MaxPoolOutput> {
+) -> BoxResult<PoolOutput> {
     let pads = if let Some(ref pads) = attrs.pads {
         pads.clone()
     } else {
@@ -282,7 +276,7 @@ fn _maxpool_internal_f32(
     }
 
     match attrs.auto_pad {
-        Some(MaxPoolAutoPad::Valid) => {
+        Some(PoolAutoPad::Valid) => {
             for i in 0..input_spatial_shape.len() {
                 output_spatial_shape[i] = ((input_spatial_shape[i]
                     - ((attrs.kernel_shape[i] - 1) * dilations[i] + 1) as usize
@@ -291,9 +285,9 @@ fn _maxpool_internal_f32(
                     .ceil() as usize;
             }
         }
-        Some(MaxPoolAutoPad::SameUpper) | Some(MaxPoolAutoPad::SameLower) => {
+        Some(PoolAutoPad::SameUpper) | Some(PoolAutoPad::SameLower) => {
             for i in 0..input_spatial_shape.len() {
-                if attrs.auto_pad == Some(MaxPoolAutoPad::SameUpper) {
+                if attrs.auto_pad == Some(PoolAutoPad::SameUpper) {
                     output_spatial_shape[i] =
                         (input_spatial_shape[i] as f64 / strides[i] as f64).ceil() as usize;
                 } else {
@@ -307,7 +301,7 @@ fn _maxpool_internal_f32(
                 new_pads[[i, 1]] = pad_i - new_pads[[i, 0]];
             }
         }
-        Some(MaxPoolAutoPad::NotSet) | None => {}
+        Some(PoolAutoPad::NotSet) | None => {}
     }
 
     attrs.replace_dilations_and_strides(dilations, strides);
@@ -319,15 +313,11 @@ fn _maxpool_internal_f32(
     }
 }
 
-fn _common_pool_f32(input: &ArrayD<f32>, attrs: MaxPoolAttrs) -> BoxResult<MaxPoolOutput> {
-    todo!("Common pool f32")
-}
-
 fn maxpool_f32(
     input: &ArrayD<f32>,
     attrs: MaxPoolAttrs,
     output_len: usize,
-) -> BoxResult<MaxPoolOutput> {
+) -> BoxResult<PoolOutput> {
     let b1 = if let Some(ref dilations) = attrs.dilations {
         let mindilation = dilations.iter().min().copied().unwrap_or(1);
         let maxdilation = dilations.iter().max().copied().unwrap_or(1);
@@ -345,11 +335,10 @@ fn maxpool_f32(
     if b1 || b2 {
         _maxpool_internal_f32(input, attrs, output_len)
     } else {
-        _common_pool_f32(input, attrs)
+        _common_pool_f32(input, PoolingType::Max, 0, attrs.into(), output_len)
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/_op_common_pool.py
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_max_pool.py
 /// https://onnx.ai/onnx/operators/onnx__MaxPool.html
 pub fn maxpool(
