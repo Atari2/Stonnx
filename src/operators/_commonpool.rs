@@ -176,7 +176,7 @@ fn _pool_f32(
 ) -> BoxResult<PoolOutput> {
     let fpool: fn(ArrayView1<f32>) -> Array0<f32> = match pooling_type {
         PoolingType::Max => |a: ArrayView1<f32>| -> Array0<f32> {
-            Array0::from_elem(Ix0(), a.iter().copied().fold(f32::MAX, f32::max))
+            Array0::from_elem(Ix0(), a.iter().copied().fold(f32::MIN, f32::max))
         },
         PoolingType::Average => |a: ArrayView1<f32>| -> Array0<f32> {
             Array0::from_elem(Ix0(), a.iter().copied().sum::<f32>() / a.len() as f32)
