@@ -23,6 +23,7 @@ pub type BoxResult<A> = Result<A, Box<dyn Error>>;
 pub struct NDIndex<'a> {
     indices: &'a [usize],
     current_index: Vec<usize>,
+    indices_empty_flag: bool,
 }
 
 impl<'a> NDIndex<'a> {
@@ -34,6 +35,7 @@ impl<'a> NDIndex<'a> {
             } else {
                 vec![]
             },
+            indices_empty_flag: shape.is_empty()
         }
     }
 }
@@ -42,6 +44,10 @@ impl Iterator for NDIndex<'_> {
     type Item = Vec<usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.indices_empty_flag {
+            self.indices_empty_flag = false;
+            return Some(vec![]);
+        }
         if self.current_index.is_empty() {
             return None;
         }

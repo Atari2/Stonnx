@@ -15,7 +15,7 @@ fn nonzero_generic<A: Default + std::cmp::PartialEq>(input: &ArrayD<A>) -> BoxRe
         }
     }
     let internal_dim = input.ndim();
-    let result = ArrayD::from_shape_vec(vec![result.len() / internal_dim, internal_dim], result)?;
+    let result = ArrayD::from_shape_vec(vec![internal_dim, result.len() / internal_dim], result)?;
     Ok(result)
 }
 

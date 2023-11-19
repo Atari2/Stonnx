@@ -1,4 +1,4 @@
-use ndarray::{ArrayD, ArrayViewD};
+use ndarray::{ArrayD, ArrayViewD, Ix1};
 use num::Zero;
 
 use crate::{
@@ -36,7 +36,12 @@ fn unsqueeze_11(inputs: &[&ArrayType], attrs: UnsqueezeAttrs) -> BoxResult<Array
     let input = inputs[0];
     let mut shape = input.shape().to_vec();
     for axis in attrs.axes.iter() {
-        shape.insert(*axis as usize, 1);
+        let axis = if *axis < 0 {
+            shape.len() as i64 + axis
+        } else {
+            *axis
+        } as usize;
+        shape.insert(axis, 1);
     }
     match input {
         ArrayType::F32(a) => Ok(ArrayType::F32(_unsqueeze_generic(a.view(), &shape)?)),
@@ -48,13 +53,18 @@ fn unsqueeze_11(inputs: &[&ArrayType], attrs: UnsqueezeAttrs) -> BoxResult<Array
 fn unsqueeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     let input = inputs[0];
     let axes = if let ArrayType::I64(a) = inputs[1] {
-        a.shape()
+        a.clone().into_dimensionality::<Ix1>()?.to_vec()
     } else {
         return Err("Axes must be an int64".into());
     };
     let mut shape = input.shape().to_vec();
     for axis in axes.iter() {
-        shape.insert(*axis, 1);
+        let axis = if *axis < 0 {
+            shape.len() as i64 + axis
+        } else {
+            *axis
+        } as usize;
+        shape.insert(axis, 1);
     }
     match input {
         ArrayType::F32(a) => Ok(ArrayType::F32(_unsqueeze_generic(a.view(), &shape)?)),

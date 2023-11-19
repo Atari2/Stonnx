@@ -4,7 +4,7 @@ use crate::{
     utils::{shape_safe_product, ArrayType, BoxResult, OperationResult},
 };
 
-use ndarray::IxDyn;
+use ndarray::Ix1;
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 5, 13, 14, 19];
 
@@ -39,24 +39,23 @@ pub fn reshape(
         return Err("shape must be 1D".into());
     }
     // new_shape = np.copy(shape)
-    let shape = if let ArrayType::I64(shape) = shape {
-        shape
+    let mut new_shape = if let ArrayType::I64(shape) = shape {
+        shape.view().into_dimensionality::<Ix1>()?.to_vec()
     } else {
         return Err("shape must be I64".into());
     };
-    let mut new_shape = shape.clone();
     let attrs = ReshapeAttrs::new(node);
-    let datashape_array =
-        ndarray::ArrayD::from_shape_vec(IxDyn(&[data.shape().len()]), data.shape().to_vec())?
-            .into_dyn();
+    let datashape_array = data.shape();
     if attrs.allowzero == 0 {
-        let zero_indexes = shape
+        let zero_indexes = new_shape
             .iter()
             .enumerate()
             .filter_map(|(i, &v)| if v == 0 { Some(i) } else { None })
             .collect::<Vec<_>>();
         if !zero_indexes.is_empty() {
-            new_shape[zero_indexes.as_slice()] = datashape_array[zero_indexes.as_slice()] as i64;
+            for i in zero_indexes {
+                new_shape[i] = datashape_array[i] as i64;
+            }
         }
     }
     let shape_tot = shape_safe_product(&new_shape);

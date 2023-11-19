@@ -15,21 +15,19 @@ pub fn pow(
 ) -> BoxResult<OperationResult> {
     let data = inputs[0].to_owned();
     let power = inputs[1].to_owned();
-    
+
     let pow = match power {
-        ArrayType::I64(power) => power.clone().into_dimensionality::<Ix0>()?.into_scalar() as f32,
+        ArrayType::I64(power) => power.clone().into_dimensionality::<Ix0>()?.into_scalar(),
         x => {
             todo!("Pow for type {}", x);
         }
     };
 
     match data {
-        ArrayType::F32(x) => Ok(ArrayType::F32(x.mapv(|v| v.powf( pow ))).into()),
-        ArrayType::I64(x) => Ok(ArrayType::F32(x.mapv(|v| v as f32).mapv(|v| v.powi(pow as i32))).into()),
+        ArrayType::F32(x) => Ok(ArrayType::F32(x.mapv(|v| v.powf(pow as f32))).into()),
+        ArrayType::I64(x) => Ok(ArrayType::I64(x.mapv(|v| v.pow(pow as u32))).into()),
         x => {
             todo!("Sqrt for type {}", x);
         }
-        
     }
-
 }

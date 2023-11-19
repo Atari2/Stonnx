@@ -1,5 +1,3 @@
-use ndarray::IxDyn;
-
 use crate::{
     onnx::NodeProto,
     utils::{ArrayType, BoxResult, OperationResult},
@@ -24,8 +22,6 @@ impl TransposeAttrs {
     }
 }
 
-
-
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_transpose.py
 /// https://onnx.ai/onnx/operators/onnx__Transpose.html
 pub fn transpose(
@@ -40,24 +36,20 @@ pub fn transpose(
     match data {
         ArrayType::F32(data) => {
             let transposed = if attrs.perm.is_empty() {
-                data.clone().reversed_axes()
-            }
-            else {
-                let new_shape = attrs.perm.iter().map(|&i| data.shape()[i]).collect::<Vec<_>>();
-                data.clone().permuted_axes(IxDyn(&new_shape))
+                data.t().to_owned()
+            } else {
+                data.clone().permuted_axes(attrs.perm)
             };
             Ok(ArrayType::F32(transposed).into())
-        },
+        }
         ArrayType::I64(data) => {
             let transposed = if attrs.perm.is_empty() {
-                data.clone().reversed_axes()
-            }
-            else {
-                let new_shape = attrs.perm.iter().map(|&i| data.shape()[i]).collect::<Vec<_>>();
-                data.clone().permuted_axes(IxDyn(&new_shape))
+                data.t().to_owned()
+            } else {
+                data.clone().permuted_axes(attrs.perm)
             };
             Ok(ArrayType::I64(transposed).into())
-        },
-        _=> todo!("Transpose for type {}", data),
+        }
+        _ => todo!("Transpose for type {}", data),
     }
 }

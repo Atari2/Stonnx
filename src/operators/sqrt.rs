@@ -12,14 +12,11 @@ pub fn sqrt(
     _output_len: usize,
 ) -> BoxResult<OperationResult> {
     let data = inputs[0].to_owned();
-    
+
     match data {
         ArrayType::F32(x) => Ok(ArrayType::F32(x.mapv(|v| v.sqrt())).into()),
-        ArrayType::I64(x) => Ok(ArrayType::F32(x.mapv(|v| v as f32).mapv(|v| v.sqrt())).into()),
         x => {
             todo!("Sqrt for type {}", x);
         }
-        
     }
-
 }

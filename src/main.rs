@@ -22,17 +22,18 @@ use operators::gemm::gemm;
 use operators::globalaveragepool::global_average_pool;
 use operators::lrn::lrn;
 use operators::maxpool::maxpool;
+use operators::mul::mul;
 use operators::nonzero::nonzero;
+use operators::pow::pow;
 use operators::relu::relu;
 use operators::reshape::reshape;
 use operators::shape::shape;
 use operators::softmax::softmax;
-use operators::sub::sub;
-use operators::unsqueeze::unsqueeze;
-use operators::transpose::transpose;
 use operators::sqrt::sqrt;
-use operators::mul::mul;
-use operators::pow::pow;
+use operators::squeeze::squeeze;
+use operators::sub::sub;
+use operators::transpose::transpose;
+use operators::unsqueeze::unsqueeze;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
@@ -69,6 +70,7 @@ lazy_static! {
         m.insert("Sqrt", sqrt as OperationFn);
         m.insert("Mul", mul as OperationFn);
         m.insert("Pow", pow as OperationFn);
+        m.insert("Squeeze", squeeze as OperationFn);
         m
     };
 }
@@ -187,29 +189,40 @@ fn main() -> BoxResult<()> {
                             assert_eq!(outputs.len(), 2);
                             let output_name = outputs[0];
                             let output_name2 = outputs[1];
+                            println!("\tOutput {} has shape {:?}", output_name, a.shape());
+                            println!("\tOutput {} has shape {:?}", output_name2, b.shape());
                             node_inputs.insert(output_name.to_string(), a);
                             node_inputs.insert(output_name2.to_string(), b);
                         }
                         OperationResult::Single(res) => {
                             assert_eq!(outputs.len(), 1);
                             let output_name = outputs[0];
+                            println!("\tOutput {} has shape {:?}", output_name, res.shape());
                             node_inputs.insert(output_name.to_string(), res);
                         }
                         OperationResult::OptionalDouble((a, Some(b))) => {
                             assert_eq!(outputs.len(), 2);
                             let output_name = outputs[0];
                             let output_name2 = outputs[1];
+                            println!("\tOutput {} has shape {:?}", output_name, a.shape());
+                            println!("\tOutput {} has shape {:?}", output_name2, b.shape());
                             node_inputs.insert(output_name.to_string(), a);
                             node_inputs.insert(output_name2.to_string(), b);
                         }
                         OperationResult::OptionalDouble((a, None)) => {
                             assert_eq!(outputs.len(), 1);
                             let output_name = outputs[0];
+                            println!("\tOutput {} has shape {:?}", output_name, a.shape());
                             node_inputs.insert(output_name.to_string(), a);
                         }
                         OperationResult::Multiple(res) => {
                             assert_eq!(outputs.len(), res.len());
                             for (i, output_name) in outputs.iter().enumerate() {
+                                println!(
+                                    "\tOutput {} has shape {:?}",
+                                    output_name,
+                                    res[i].shape()
+                                );
                                 node_inputs.insert(output_name.to_string(), res[i].clone());
                             }
                         }
