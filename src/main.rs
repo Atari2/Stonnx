@@ -34,6 +34,8 @@ use operators::squeeze::squeeze;
 use operators::sub::sub;
 use operators::transpose::transpose;
 use operators::unsqueeze::unsqueeze;
+use operators::exp::exp;
+use operators::tanh::tanh;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
@@ -71,6 +73,8 @@ lazy_static! {
         m.insert("Mul", mul as OperationFn);
         m.insert("Pow", pow as OperationFn);
         m.insert("Squeeze", squeeze as OperationFn);
+        m.insert("Exp", exp as OperationFn);
+        m.insert("Tanh", tanh as OperationFn);
         m
     };
 }

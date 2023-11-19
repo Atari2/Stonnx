@@ -25,3 +25,5 @@ pub mod squeeze;
 pub mod sub;
 pub mod transpose;
 pub mod unsqueeze;
+pub mod exp;
+pub mod tanh;
