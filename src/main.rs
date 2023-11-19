@@ -29,6 +29,10 @@ use operators::shape::shape;
 use operators::softmax::softmax;
 use operators::sub::sub;
 use operators::unsqueeze::unsqueeze;
+use operators::transpose::transpose;
+use operators::sqrt::sqrt;
+use operators::mul::mul;
+use operators::pow::pow;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
@@ -61,6 +65,10 @@ lazy_static! {
         m.insert("ConstantOfShape", constantofshape as OperationFn);
         m.insert("NonZero", nonzero as OperationFn);
         m.insert("AveragePool", averagepool as OperationFn);
+        m.insert("Transpose", transpose as OperationFn);
+        m.insert("Sqrt", sqrt as OperationFn);
+        m.insert("Mul", mul as OperationFn);
+        m.insert("Pow", pow as OperationFn);
         m
     };
 }

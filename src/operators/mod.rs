@@ -20,3 +20,7 @@ pub mod shape;
 pub mod softmax;
 pub mod sub;
 pub mod unsqueeze;
+pub mod transpose;
+pub mod sqrt;
+pub mod mul;
+pub mod pow;
