@@ -134,7 +134,7 @@ fn main() -> BoxResult<()> {
     }
     for graph in model.graph.iter() {
         let initializers = make_initializers(graph);
-        let mut node_inputs = make_external_inputs(graph, &fileinputs)?;
+        let mut node_inputs = make_external_inputs(graph, &fileinputs, &initializers)?;
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
         let mut graph_outputs = make_graph_outputs(graph)?;
         let mut not_implemented = HashSet::new();
@@ -218,11 +218,7 @@ fn main() -> BoxResult<()> {
                         OperationResult::Multiple(res) => {
                             assert_eq!(outputs.len(), res.len());
                             for (i, output_name) in outputs.iter().enumerate() {
-                                println!(
-                                    "\tOutput {} has shape {:?}",
-                                    output_name,
-                                    res[i].shape()
-                                );
+                                println!("\tOutput {} has shape {:?}", output_name, res[i].shape());
                                 node_inputs.insert(output_name.to_string(), res[i].clone());
                             }
                         }

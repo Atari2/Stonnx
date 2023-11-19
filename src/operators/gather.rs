@@ -4,7 +4,7 @@ use protobuf::Enum;
 
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
-    utils::{make_tensor, ArrayType, BoxResult, NDIndex, OperationResult},
+    utils::{make_tensor_from_raw, ArrayType, BoxResult, NDIndex, OperationResult},
 };
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 11, 13];
@@ -90,7 +90,7 @@ pub fn gather(
         ArrayType::I32(i) => {
             if i.is_empty() {
                 if let ArrayType::F32(_) = data {
-                    Ok(make_tensor(&[1], &[], DataType::FLOAT.value())?.into())
+                    Ok(make_tensor_from_raw(&[1], &[], DataType::FLOAT.value())?.into())
                 } else {
                     todo!("Gather for non-float data {}", data)
                 }
@@ -115,7 +115,7 @@ pub fn gather(
         ArrayType::I64(i) => {
             if i.is_empty() {
                 if let ArrayType::F32(_) = data {
-                    Ok(make_tensor(&[1], &[], DataType::FLOAT.value())?.into())
+                    Ok(make_tensor_from_raw(&[1], &[], DataType::FLOAT.value())?.into())
                 } else {
                     todo!("Gather for non-float data {}", data)
                 }

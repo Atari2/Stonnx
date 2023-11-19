@@ -20,7 +20,13 @@ impl<'a> SqueezeAttrs<'a> {
                 .attribute
                 .iter()
                 .find(|a| a.name() == "axes")
-                .map_or(None, |a| if a.ints.is_empty() { None } else { Some(a.ints.as_slice()) }),
+                .and_then(|a| {
+                    if a.ints.is_empty() {
+                        None
+                    } else {
+                        Some(a.ints.as_slice())
+                    }
+                }),
         }
     }
 }
@@ -38,7 +44,11 @@ fn squeeze_11(inputs: &[&ArrayType], attrs: SqueezeAttrs) -> BoxResult<ArrayType
     let shape = if let Some(axes) = attrs.axes {
         let mut shape = input_shape.to_vec();
         for axis in axes.iter() {
-            let axis = if *axis < 0 { *axis + shape.len() as i64 } else { *axis } as usize;
+            let axis = if *axis < 0 {
+                *axis + shape.len() as i64
+            } else {
+                *axis
+            } as usize;
             shape.remove(axis);
         }
         shape
@@ -58,11 +68,20 @@ fn squeeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     let axes = if let Some(ArrayType::I64(a)) = inputs.get(1) {
         a.clone().into_dimensionality::<Ix1>()?.to_vec()
     } else {
-        input.shape().iter().enumerate().filter_map(|(i, &v)| if v == 1 { Some(i as i64) } else { None }).collect::<Vec<_>>()
+        input
+            .shape()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &v)| if v == 1 { Some(i as i64) } else { None })
+            .collect::<Vec<_>>()
     };
     let mut shape = input.shape().to_vec();
     for axis in axes.iter() {
-        let axis = if *axis < 0 { *axis + shape.len() as i64 } else { *axis } as usize;
+        let axis = if *axis < 0 {
+            *axis + shape.len() as i64
+        } else {
+            *axis
+        } as usize;
         shape.remove(axis);
     }
     match input {

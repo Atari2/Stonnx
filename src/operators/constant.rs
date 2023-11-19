@@ -1,8 +1,8 @@
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
     utils::{
-        make_string_tensor, make_tensor, make_tensor_from_proto, pick_opset_version, ArrayType,
-        BoxResult, OperationResult,
+        make_string_tensor, make_tensor_from_proto, make_tensor_from_raw, pick_opset_version,
+        ArrayType, BoxResult, OperationResult,
     },
 };
 use protobuf::{Enum, MessageField};
@@ -124,11 +124,15 @@ fn constant_12(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
         (None, Some(_), None, None, None, None, None, None) => todo!(),
         (None, None, Some(v_f), None, None, None, None, None) => {
             let float_value = v_f.to_le_bytes();
-            Ok(make_tensor(&[], &float_value, DataType::FLOAT.value())?)
+            Ok(make_tensor_from_raw(
+                &[],
+                &float_value,
+                DataType::FLOAT.value(),
+            )?)
         }
         (None, None, None, Some(v_fs), None, None, None, None) => {
             let float_value: Vec<u8> = v_fs.iter().flat_map(|v| v.to_le_bytes().to_vec()).collect();
-            Ok(make_tensor(
+            Ok(make_tensor_from_raw(
                 &[v_fs.len() as i64],
                 &float_value,
                 DataType::FLOAT.value(),
@@ -136,11 +140,15 @@ fn constant_12(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
         }
         (None, None, None, None, Some(v_i), None, None, None) => {
             let int_value = v_i.to_le_bytes();
-            Ok(make_tensor(&[], &int_value, DataType::INT64.value())?)
+            Ok(make_tensor_from_raw(
+                &[],
+                &int_value,
+                DataType::INT64.value(),
+            )?)
         }
         (None, None, None, None, None, Some(v_is), None, None) => {
             let int_value: Vec<u8> = v_is.iter().flat_map(|v| v.to_le_bytes().to_vec()).collect();
-            Ok(make_tensor(
+            Ok(make_tensor_from_raw(
                 &[v_is.len() as i64],
                 &int_value,
                 DataType::INT64.value(),
