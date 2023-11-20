@@ -16,7 +16,7 @@ pub fn tanh(
     match data {
         ArrayType::F32(x) => Ok(ArrayType::F32(x.mapv(|v| v.tanh())).into()),
         x => {
-            todo!("Sqrt for type {}", x);
+            todo!("Tanh for type {}", x);
         }
     }
 }

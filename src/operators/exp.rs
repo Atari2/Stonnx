@@ -16,7 +16,7 @@ pub fn exp(
     match data {
         ArrayType::F32(x) => Ok(ArrayType::F32(x.mapv(|v| v.exp())).into()),
         x => {
-            todo!("Sqrt for type {}", x);
+            todo!("Exp for type {}", x);
         }
     }
 }

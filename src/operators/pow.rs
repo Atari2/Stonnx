@@ -27,7 +27,7 @@ pub fn pow(
         ArrayType::F32(x) => Ok(ArrayType::F32(x.mapv(|v| v.powf(pow as f32))).into()),
         ArrayType::I64(x) => Ok(ArrayType::I64(x.mapv(|v| v.pow(pow as u32))).into()),
         x => {
-            todo!("Sqrt for type {}", x);
+            todo!("Pow for type {}", x);
         }
     }
 }
