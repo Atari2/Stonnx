@@ -1,13 +1,13 @@
 use itertools::iproduct;
+use ndarray::s;
 use ndarray::Array1;
 use ndarray::Array2;
 use ndarray::ArrayD;
 use ndarray::Axis;
 use ndarray::Ix1;
-use ndarray::SliceInfoElem;
-use ndarray::s;
-use ndarray::{IxDyn, Ix2};
 use ndarray::Order;
+use ndarray::SliceInfoElem;
+use ndarray::{Ix2, IxDyn};
 
 use crate::onnx::AttributeProto;
 use crate::onnx::NodeProto;
@@ -92,11 +92,7 @@ impl ConvAttributes {
                 .iter()
                 .find(|a| a.name() == "pads")
                 .map_or_else(
-                    || {
-                        std::iter::repeat(0_i64)
-                            .take((x.ndim() - 2) * 2)
-                            .collect()
-                    },
+                    || std::iter::repeat(0_i64).take((x.ndim() - 2) * 2).collect(),
                     |a| a.ints.to_vec(),
                 ),
             strides: node
@@ -146,8 +142,8 @@ fn _conv_impl(
             for g in 0..group {
                 let gx = x.slice(s![b..b + 1, g * dw..(g + 1) * dw, .., ..]);
                 let gw = w.slice(s![g * mg..(g + 1) * mg, .., .., ..]);
-                let agx = gx.into_dimensionality::<IxDyn>()?;
-                let agw = gw.into_dimensionality::<IxDyn>()?;
+                let agx = gx.into_dimensionality::<IxDyn>().unwrap();
+                let agw = gw.into_dimensionality::<IxDyn>().unwrap();
                 let cv = match _conv_impl(agx, agw, None, ConvAttributes::new_for_recursion(&attrs))
                 {
                     Ok(ArrayType::F32(v)) => v,
@@ -176,10 +172,10 @@ fn _conv_impl(
             }
         }
         if let Some(b) = b {
-            let b = b.clone().into_dimensionality::<ndarray::Ix1>()?;
+            let b = b.clone().into_dimensionality::<ndarray::Ix1>().unwrap();
             new_shape = std::iter::repeat(1).take(final_.shape().len()).collect();
             new_shape[1] = b.shape()[0];
-            let sb = b.into_shape(IxDyn(&new_shape))?;
+            let sb = b.into_shape(IxDyn(&new_shape)).unwrap();
             final_ += &sb;
             return Ok(ArrayType::F32(final_));
         }
@@ -244,8 +240,8 @@ fn _conv_impl(
             || 0_f32,
         );
         if let Some(b) = b {
-            let b = b.clone().into_dimensionality::<ndarray::Ix1>()?;
-            let sb = b.into_shape((1, b.shape()[0], 1))?;
+            let b = b.clone().into_dimensionality::<ndarray::Ix1>().unwrap();
+            let sb = b.into_shape((1, b.shape()[0], 1)).unwrap();
             let mut mutview = res.slice_mut(s![.., .., ..]);
             mutview += &sb;
         }
@@ -268,12 +264,12 @@ fn _conv_impl(
                             if img.shape() != w_.shape() {
                                 return Err("Shape unexpected".into());
                             }
-                            let imgs = img.into_shape((1, shape_safe_product(img.shape())))?;
-                            let w_s = w_.into_shape((shape_safe_product(w_.shape()), 1))?;
+                            let imgs = img.into_shape((1, shape_safe_product(img.shape()))).unwrap();
+                            let w_s = w_.into_shape((shape_safe_product(w_.shape()), 1)).unwrap();
                             ndarray::ArrayView2::dot(&imgs, &w_s)[[0, 0]]
                         } else {
-                            let imgs = img.into_shape((1, shape_safe_product(img.shape())))?;
-                            let ws = w.into_shape((shape_safe_product(w.shape()), 1))?;
+                            let imgs = img.into_shape((1, shape_safe_product(img.shape()))).unwrap();
+                            let ws = w.into_shape((shape_safe_product(w.shape()), 1)).unwrap();
                             ndarray::ArrayView2::dot(&imgs, &ws)[[0, 0]]
                         };
                         res[[n, nw, hr as usize]] += s;
@@ -306,8 +302,8 @@ fn _conv_impl(
             || 0_f32,
         );
         if let Some(b) = b {
-            let b = b.clone().into_dimensionality::<ndarray::Ix1>()?;
-            let sb = b.into_shape((1, b.shape()[0], 1, 1))?;
+            let b = b.clone().into_dimensionality::<ndarray::Ix1>().unwrap();
+            let sb = b.into_shape((1, b.shape()[0], 1, 1)).unwrap();
             let mut mutview = res.slice_mut(s![.., .., .., ..]);
             mutview += &sb;
         }
@@ -353,11 +349,11 @@ fn _conv_impl(
                                 let imgs = img.to_shape((
                                     (1, shape_safe_product(img.shape())),
                                     Order::RowMajor,
-                                ))?;
+                                )).unwrap();
                                 let w_s = w_.to_shape((
                                     (shape_safe_product(w_.shape()), 1),
                                     Order::RowMajor,
-                                ))?;
+                                )).unwrap();
                                 let imgview = imgs.view();
                                 let wview = w_s.view();
                                 ndarray::ArrayView2::dot(&imgview, &wview)[[0, 0]]
@@ -365,17 +361,17 @@ fn _conv_impl(
                                 let copied_img = ndarray::Array::from_shape_vec(
                                     img.raw_dim(),
                                     img.iter().cloned().collect(),
-                                )?;
+                                ).unwrap();
                                 let imgs = copied_img
                                     .view()
-                                    .into_shape((1, shape_safe_product(img.shape())))?;
+                                    .into_shape((1, shape_safe_product(img.shape()))).unwrap();
                                 let copied_w = ndarray::Array::from_shape_vec(
                                     w.raw_dim(),
                                     w.iter().cloned().collect(),
-                                )?;
+                                ).unwrap();
                                 let ws = copied_w
                                     .view()
-                                    .into_shape((shape_safe_product(w.shape()), 1))?;
+                                    .into_shape((shape_safe_product(w.shape()), 1)).unwrap();
                                 ndarray::ArrayView2::dot(&imgs, &ws)[[0, 0]]
                             };
                             res[[n, nw, hr as usize, wr as usize]] += s;
@@ -433,19 +429,20 @@ fn conv_impl(
     }
 }
 
-fn matmul(
-    a: ndarray::ArrayViewD<f32>,
-    b: ndarray::ArrayViewD<f32>,
-) -> BoxResult<ArrayD<f32>> {
+fn matmul(a: ndarray::ArrayViewD<f32>, b: ndarray::ArrayViewD<f32>) -> BoxResult<ArrayD<f32>> {
     use ndarray::linalg::general_mat_mul;
     if a.ndim() == 2 && b.ndim() == 2 {
-        let a = a.into_dimensionality::<Ix2>()?;
-        let b = b.into_dimensionality::<Ix2>()?;
+        let a = a.into_dimensionality::<Ix2>().unwrap();
+        let b = b.into_dimensionality::<Ix2>().unwrap();
         let mut c = Array2::<f32>::zeros((a.shape()[0], b.shape()[1]));
         general_mat_mul(1.0, &a, &b, 1.0, &mut c);
         Ok(c.into_dyn())
     } else {
-        todo!("Matmul not implemented for ndim {} and {}", a.ndim(), b.ndim());
+        todo!(
+            "Matmul not implemented for ndim {} and {}",
+            a.ndim(),
+            b.ndim()
+        );
     }
 }
 
@@ -463,7 +460,6 @@ fn _conv_fast_impl(
     let w_shape = w.shape();
     let group = attrs.group as usize;
     let mut w = w.to_owned();
-
 
     if x_shape[1] != w_shape[1] * group || w_shape[0] % group != 0 {
         return Err(format!(
@@ -487,23 +483,43 @@ fn _conv_fast_impl(
                 let mut wslicevec = vec![];
                 for i in 0..x.ndim() {
                     if i == 0 {
-                        xslicevec.push(SliceInfoElem::Slice { start: b as isize, end: Some((b + 1) as isize), step: 1 });
+                        xslicevec.push(SliceInfoElem::Slice {
+                            start: b as isize,
+                            end: Some((b + 1) as isize),
+                            step: 1,
+                        });
                     } else if i == 1 {
-                        xslicevec.push(SliceInfoElem::Slice { start: (g * dw) as isize, end: Some(((g + 1) * dw) as isize), step: 1 });
+                        xslicevec.push(SliceInfoElem::Slice {
+                            start: (g * dw) as isize,
+                            end: Some(((g + 1) * dw) as isize),
+                            step: 1,
+                        });
                     } else {
-                        xslicevec.push(SliceInfoElem::Slice { start: 0, end: None, step: 1 });
+                        xslicevec.push(SliceInfoElem::Slice {
+                            start: 0,
+                            end: None,
+                            step: 1,
+                        });
                     }
                 }
                 for i in 0..w.ndim() {
                     if i == 0 {
-                        wslicevec.push(SliceInfoElem::Slice { start: (g * mg) as isize, end: Some(((g + 1) * mg) as isize), step: 1 });
+                        wslicevec.push(SliceInfoElem::Slice {
+                            start: (g * mg) as isize,
+                            end: Some(((g + 1) * mg) as isize),
+                            step: 1,
+                        });
                     } else {
-                        wslicevec.push(SliceInfoElem::Slice { start: 0, end: None, step: 1 });
+                        wslicevec.push(SliceInfoElem::Slice {
+                            start: 0,
+                            end: None,
+                            step: 1,
+                        });
                     }
                 }
                 let gx = x.slice(xslicevec.as_slice());
                 let gw = w.slice(wslicevec.as_slice());
-                let cv = _conv_fast_impl(gx, gw, None, ConvAttributes::new_for_recursion(&attrs))?;
+                let cv = _conv_fast_impl(gx, gw, None, ConvAttributes::new_for_recursion(&attrs)).unwrap();
                 if b == 0 {
                     td += cv.shape()[1];
                 }
@@ -519,11 +535,23 @@ fn _conv_fast_impl(
             let mut fslicevec = vec![];
             for i in 0..final_.ndim() {
                 if i == 0 {
-                    fslicevec.push(SliceInfoElem::Slice { start: b as isize, end: Some((b + 1) as isize), step: 1});
+                    fslicevec.push(SliceInfoElem::Slice {
+                        start: b as isize,
+                        end: Some((b + 1) as isize),
+                        step: 1,
+                    });
                 } else if i == 1 {
-                    fslicevec.push(SliceInfoElem::Slice { start: p as isize, end: Some((p + cv.shape()[1]) as isize), step: 1});
+                    fslicevec.push(SliceInfoElem::Slice {
+                        start: p as isize,
+                        end: Some((p + cv.shape()[1]) as isize),
+                        step: 1,
+                    });
                 } else {
-                    fslicevec.push(SliceInfoElem::Slice { start: 0, end: None, step: 1});
+                    fslicevec.push(SliceInfoElem::Slice {
+                        start: 0,
+                        end: None,
+                        step: 1,
+                    });
                 }
             }
             let cv = if let ArrayType::F32(c) = cv {
@@ -540,7 +568,7 @@ fn _conv_fast_impl(
         if let Some(b) = b {
             let mut new_shape = vec![1; final_.ndim()];
             new_shape[1] = b.shape()[0];
-            let b = b.to_shape(IxDyn(&new_shape))?;
+            let b = b.to_shape(IxDyn(&new_shape)).unwrap();
             final_ += &b;
         }
         return Ok(ArrayType::F32(final_));
@@ -555,13 +583,26 @@ fn _conv_fast_impl(
             new_kernel_shape.push(kernel_shape[i] + (kernel_shape[i] - 1) * (d - 1));
         }
         let mut new_w = ArrayD::<f32>::zeros(new_shape);
-        let mut indices = vec![SliceInfoElem::Slice { start: 0, end: Some(new_w.shape()[0] as isize), step: 1 },
-            SliceInfoElem::Slice { start: 0, end: Some(new_w.shape()[1] as isize), step: 1 }
+        let mut indices = vec![
+            SliceInfoElem::Slice {
+                start: 0,
+                end: Some(new_w.shape()[0] as isize),
+                step: 1,
+            },
+            SliceInfoElem::Slice {
+                start: 0,
+                end: Some(new_w.shape()[1] as isize),
+                step: 1,
+            },
         ];
         for (i, d) in dilations.iter().enumerate() {
             let di = w_shape.len() - nd + i;
             let slice_idx = new_w.shape()[di];
-            indices.push(SliceInfoElem::Slice { start: 0, end: Some(slice_idx as isize), step: *d as isize });
+            indices.push(SliceInfoElem::Slice {
+                start: 0,
+                end: Some(slice_idx as isize),
+                step: *d as isize,
+            });
         }
         new_w.slice_mut(indices.as_slice()).assign(&w);
         w = new_w;
@@ -582,15 +623,22 @@ fn _conv_fast_impl(
             };
             let pad_tail = pad_needed - pad_head;
             head.push(pad_head);
-            tail.push(pad_tail); 
+            tail.push(pad_tail);
         }
         pads = head.into_iter().chain(tail).map(|v| v as i64).collect();
     }
-    let (c2, out_shape) = im2col_fast(&x, &kernel_shape, &pads, strides)?;
-    let w_reshaped = w.to_shape(vec![w.shape()[0], x_shape[0]].into_iter().chain(out_shape.iter().copied()).collect::<Vec<_>>())?;
-    let mut mul = matmul(w_reshaped.view(), c2.view())?;
-    mul = mul.into_shape(out_shape)?;
-    let perm: Vec<usize> = vec![1, 0].into_iter().chain((0..x_shape.len() - 2).map(|x| x + 2)).collect();
+    let (c2, mut out_shape) = im2col_fast(&x, &kernel_shape, &pads, strides).unwrap();
+    let w_reshaped = w.to_shape(
+        vec![w.shape().iter().product::<usize>() / c2.shape()[0],c2.shape()[0]]
+    ).unwrap();
+    let mut mul = matmul(w_reshaped.view(), c2.view()).unwrap();
+    out_shape.insert(0, w.shape()[0]);
+    out_shape.insert(1, x.shape()[0]);
+    mul = mul.into_shape(out_shape).unwrap();
+    let perm: Vec<usize> = vec![1, 0]
+        .into_iter()
+        .chain((0..x_shape.len() - 2).map(|x| x + 2))
+        .collect();
     mul = mul.permuted_axes(perm);
 
     if let Some(b) = b {
@@ -599,7 +647,7 @@ fn _conv_fast_impl(
         } else {
             let mut new_shape = vec![1; mul.ndim()];
             new_shape[1] = b.shape()[0];
-            let b = b.to_shape(IxDyn(&new_shape))?;
+            let b = b.to_shape(IxDyn(&new_shape)).unwrap();
             Ok(ArrayType::F32(mul + b))
         }
     } else {
@@ -611,16 +659,19 @@ fn _make_ind(dim: usize, shape: &[i64]) -> BoxResult<ArrayD<i64>> {
     let mut res = ArrayD::<i64>::zeros(shape.iter().map(|x| *x as usize).collect::<Vec<_>>());
     let mut indices = vec![];
     for end in shape.iter() {
-        indices.push(SliceInfoElem::Slice { start: 0, end: Some(*end as isize), step: 1 });
+        indices.push(SliceInfoElem::Slice {
+            start: 0,
+            end: Some(*end as isize),
+            step: 1,
+        });
     }
     let mut new_shape = vec![1_usize; shape.len()];
     new_shape[dim] = shape[dim] as usize;
     let a = Array1::<f32>::range(0.0, shape[dim] as f32, 1.0).mapv(|v| v as i64);
-    let first = a.to_shape(IxDyn(&new_shape))?;
+    let first = a.to_shape(IxDyn(&new_shape)).unwrap();
     res.slice_mut(indices.as_slice()).assign(&first.view());
     Ok(res)
 }
-
 
 fn im2col_fast(
     x: &ndarray::ArrayViewD<f32>,
@@ -639,39 +690,73 @@ fn im2col_fast(
     let mut indices = vec![];
     #[allow(clippy::needless_range_loop)]
     for i in 0..shape_out.len() {
-        let kind = _make_ind(i, kernel_shape)?;
-        let iind = _make_ind(i, &shape_out)? * strides[i];
+        let kind = _make_ind(i, kernel_shape).unwrap();
+        let iind = _make_ind(i, &shape_out).unwrap() * strides[i];
         // index = np.tile(kind.ravel(), n_C).reshape(-1, 1) + iind.reshape(1, -1)
-        let kindravel = kind.to_shape(Ix1(kind.len()))?.to_owned();
-        let res = std::iter::repeat(kindravel).take(n_c).flatten().collect::<Vec<_>>();
-        let index = Array2::<i64>::from_shape_vec((res.len(), 1), res)? + iind.to_shape(Ix2(1, iind.len()))?.to_owned();
+        let kindravel = kind.to_shape(Ix1(kind.len())).unwrap().to_owned();
+        let res = std::iter::repeat(kindravel)
+            .take(n_c)
+            .flatten()
+            .collect::<Vec<_>>();
+        let index = Array2::<i64>::from_shape_vec((res.len(), 1), res).unwrap()
+            + iind.to_shape(Ix2(1, iind.len())).unwrap().to_owned();
         indices.push(index);
     }
-    let d = Array2::<i64>::from_shape_vec((n_c * kernel_size, 1), std::iter::repeat((0..n_c).map(|i| i as i64)).take(kernel_size).flatten().collect::<Vec<_>>())?;
+    let d = Array2::<i64>::from_shape_vec(
+        (n_c * kernel_size, 1),
+        std::iter::repeat((0..n_c).map(|i| i as i64))
+            .take(kernel_size)
+            .flatten()
+            .collect::<Vec<_>>(),
+    ).unwrap();
     let nc = [[0, 0], [0, 0]];
-    let padding = nc.iter().copied().chain((0..n_dims).map(|i| [pads[i] as usize, pads[i + n_dims] as usize])).collect::<Vec<_>>();
-    let x_padded = ndarray_ndimage::pad(x, padding.as_slice(), ndarray_ndimage::PadMode::Constant(0.0));
-    let mut getitem = vec![SliceInfoElem::Slice{ start: 0, end: Some(m as isize), step: 1}];
+    let padding = nc
+        .iter()
+        .copied()
+        .chain((0..n_dims).map(|i| [pads[i] as usize, pads[i + n_dims] as usize]))
+        .collect::<Vec<_>>();
+    let x_padded = ndarray_ndimage::pad(
+        x,
+        padding.as_slice(),
+        ndarray_ndimage::PadMode::Constant(0.0),
+    );
+
+    let rows = indices[0].shape()[0];
+    let cols = indices[0].shape()[1];
+
+    let getitem = iproduct!(0..rows, 0..cols).map(|(r, c)| {
+        [d[[r, 0]] as usize].into_iter()
+            .chain(indices.iter().map(move |x| x[[r, c]] as usize))
+    });
     /*
     getitem = (slice(0, m), d, *indices)
     cols = X_padded[getitem]  # type: ignore[index]
      */
-    let cols: ArrayD<f32> = todo!();
+    let mut cols: ArrayD<f32> = ArrayD::<f32>::zeros(IxDyn(&[m, rows, cols]));
+    for index in getitem {
+        let mut cols_index = index.collect::<Vec<_>>();
+        cols_index[0] = 0;
+        let index = [m - 1].into_iter().chain(cols_index.iter().copied()).collect::<Vec<_>>();
+        cols[cols_index.as_slice()] = x_padded[index.as_slice()];
+    }
     let first_dim_len = cols.shape()[0];
     let mut concat_shape = cols.shape()[1..].to_vec();
     let last_dim_len = concat_shape[concat_shape.len() - 1];
     if let Some(last) = concat_shape.last_mut() {
         *last = first_dim_len * last_dim_len;
     }
-    let conc_cols = cols.to_shape(concat_shape)?.to_owned().into_dyn();
-    Ok((conc_cols, shape_out.iter().map(|v| *v as usize).collect::<Vec<_>>()))
+    let conc_cols = cols.to_shape(concat_shape).unwrap().to_owned().into_dyn();
+    Ok((
+        conc_cols,
+        shape_out.iter().map(|v| *v as usize).collect::<Vec<_>>(),
+    ))
 }
 
 fn conv_fast_impl(
     x: &ArrayType,
     w: &ArrayType,
     b: Option<&ArrayType>,
-    attrs: ConvAttributes
+    attrs: ConvAttributes,
 ) -> BoxResult<ArrayType> {
     if x.ndim() < 3 {
         return Err("X must have at least 3 dimensions".into());
@@ -704,11 +789,11 @@ pub fn conv(
     match inputs.len() {
         2 => {
             let attributes = ConvAttributes::new(node, inputs[0], inputs[1]);
-            Ok(conv_fast_impl(inputs[0], inputs[1], None, attributes)?.into())
+            Ok(conv_fast_impl(inputs[0], inputs[1], None, attributes).unwrap().into())
         }
         3 => {
             let attributes = ConvAttributes::new(node, inputs[0], inputs[1]);
-            Ok(conv_fast_impl(inputs[0], inputs[1], Some(inputs[2]), attributes)?.into())
+            Ok(conv_fast_impl(inputs[0], inputs[1], Some(inputs[2]), attributes).unwrap().into())
         }
         _ => {
             panic!("Unexpected error: convolution has {} inputs", inputs.len());
