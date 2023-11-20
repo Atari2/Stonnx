@@ -1,5 +1,4 @@
 from onnx.reference.reference_evaluator import ReferenceEvaluator
-from onnx.reference.ops_optimized.op_conv_optimized import _conv_implementation_im2col
 import onnx
 import numpy as np
 import argparse
@@ -30,7 +29,7 @@ for input in tensor_inputs:
     inputs[input.name] = numpy_helper.to_array(input)
 
 
-sess = ReferenceEvaluator(model, verbose=args.verbose, optimized=True)
+sess = ReferenceEvaluator(model, verbose=args.verbose)
 results = sess.run(None, inputs)
 if len(results) != len(tensor_outputs):
     raise Exception("Number of outputs do not match")
