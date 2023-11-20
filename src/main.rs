@@ -36,6 +36,12 @@ use operators::transpose::transpose;
 use operators::unsqueeze::unsqueeze;
 use operators::exp::exp;
 use operators::tanh::tanh;
+use operators::batchnormalization::batchnormalization;
+use operators::slice::slice;
+use operators::matmul::matmul;
+use operators::cast::cast;
+use operators::reducemean::reducemean;
+use operators::split::split;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
@@ -75,6 +81,12 @@ lazy_static! {
         m.insert("Squeeze", squeeze as OperationFn);
         m.insert("Exp", exp as OperationFn);
         m.insert("Tanh", tanh as OperationFn);
+        m.insert("Split", split as OperationFn);
+        m.insert("MatMul", matmul as OperationFn);
+        m.insert("ReduceMean", reducemean as OperationFn);
+        m.insert("Slice", slice as OperationFn);
+        m.insert("BatchNormalization", batchnormalization as OperationFn);
+        m.insert("Cast", cast as OperationFn);
         m
     };
 }
