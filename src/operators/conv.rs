@@ -721,9 +721,27 @@ fn im2col_fast(
         ndarray_ndimage::PadMode::Constant(0.0),
     );
 
+    if !indices.is_empty() {
+        let indices_shapes_equal = indices.iter().all(|x| x.shape() == indices[0].shape());
+        if !indices_shapes_equal {
+            return Err("Indices shapes are not similar".into());
+        }
+        if indices[0].shape()[0] != d.shape()[0] {
+            return Err("Indices and d shapes are not broadcastable".into());
+        }
+    }
+
+    // d is always (x, 0)
+    // indices are all (x, y)
+    // m is x_shape[0] before padding, always first dimension of result
+    // result seems to have shape (m, x, y, x_padded.shape()[indices.len() + 1:])
+
     let rows = indices[0].shape()[0];
     let cols = indices[0].shape()[1];
-
+    let mut cols_shape = vec![m, rows, cols];
+    if (indices.len() + 1) < x_padded.ndim() {
+        cols_shape.extend(x_padded.shape()[(indices.len() + 2)..].iter());
+    }
     let getitem = iproduct!(0..rows, 0..cols).map(|(r, c)| {
         [d[[r, 0]] as usize].into_iter()
             .chain(indices.iter().map(move |x| x[[r, c]] as usize))
@@ -732,7 +750,8 @@ fn im2col_fast(
     getitem = (slice(0, m), d, *indices)
     cols = X_padded[getitem]  # type: ignore[index]
      */
-    let mut cols: ArrayD<f32> = ArrayD::<f32>::zeros(IxDyn(&[m, rows, cols]));
+    
+    let mut cols = ArrayD::<f32>::zeros(cols_shape.as_slice());
     for index in getitem {
         let mut cols_index = index.collect::<Vec<_>>();
         cols_index[0] = 0;
