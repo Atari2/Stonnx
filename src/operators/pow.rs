@@ -17,17 +17,18 @@ pub fn pow(
     let power = inputs[1].to_owned();
 
     let pow = match power {
-        ArrayType::I64(power) => power.clone().into_dimensionality::<Ix0>()?.into_scalar(),
+        ArrayType::F32(power) => power.clone().into_dimensionality::<Ix0>()?.into_scalar() as f32,
+        ArrayType::I64(power) => power.clone().into_dimensionality::<Ix0>()?.into_scalar() as f32,
         x => {
             todo!("Pow for type {}", x);
         }
     };
 
     match data {
-        ArrayType::F32(x) => Ok(ArrayType::F32(x.mapv(|v| v.powf(pow as f32))).into()),
+        ArrayType::F32(x) => Ok(ArrayType::F32(x.mapv(|v| v.powf(pow))).into()),
         ArrayType::I64(x) => Ok(ArrayType::I64(x.mapv(|v| v.pow(pow as u32))).into()),
         x => {
-            todo!("Pow for type {}", x);
+            todo!("Pow for type {:?}", x);
         }
     }
 }
