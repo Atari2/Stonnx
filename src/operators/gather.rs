@@ -51,8 +51,6 @@ fn _gather_generic<A: Clone + Copy + Zero, B: Clone + Zero + AsPrimitive<usize>>
                     .copied()
                     .collect::<Vec<_>>();
                 let jjindex = [i[jj.as_slice()].as_()];
-                //              ^^^^^^^^^^^^^^^
-                // FIXME: Model GPT-2 crashes with index [0] being out of bounds for array of shape [1, 8] here
                 let a_slice_index = ii
                     .iter()
                     .chain(jjindex.iter().chain(kk.iter()))
