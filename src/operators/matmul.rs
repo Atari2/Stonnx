@@ -31,7 +31,6 @@ pub fn matmul(
     let a = inputs[0];
     let b = inputs[1];
 
-    // FIXME: This needs to be checked at the graph level
     match (a, b) {
         (ArrayType::F32(a), ArrayType::F32(b)) => {
             Ok(ArrayType::F32(matmul_impl(a.view(), b.view())?).into())
