@@ -318,6 +318,28 @@ impl ArrayType {
             ArrayType::Bool(_) => ValueType::Bool,
         }
     }
+    pub fn data_type(&self) -> onnx::tensor_proto::DataType {
+        // FIXME: types such as FLOAT8E4M3FN all map to FLOAT right now
+        //        need to handle them properly
+        match self {
+            ArrayType::I64(_) => DataType::INT64,
+            ArrayType::F32(_) => DataType::FLOAT,
+            ArrayType::I8(_) => DataType::INT8,
+            ArrayType::I16(_) => DataType::INT16,
+            ArrayType::I32(_) => DataType::INT32,
+            ArrayType::U8(_) => DataType::UINT8,
+            ArrayType::U16(_) => DataType::UINT16,
+            ArrayType::U32(_) => DataType::UINT32,
+            ArrayType::U64(_) => DataType::UINT64,
+            ArrayType::F16(_) => DataType::FLOAT16,
+            ArrayType::BF16(_) => DataType::BFLOAT16,
+            ArrayType::F64(_) => DataType::DOUBLE,
+            ArrayType::C64(_) => DataType::COMPLEX64,
+            ArrayType::C128(_) => DataType::COMPLEX128,
+            ArrayType::Str(_) => DataType::STRING,
+            ArrayType::Bool(_) => DataType::BOOL,
+        }
+    }
 }
 
 #[derive(Debug)]
