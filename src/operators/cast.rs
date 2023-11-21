@@ -1,3 +1,5 @@
+use ndarray::ArrayD;
+use num::traits::AsPrimitive;
 use protobuf::Enum;
 
 use crate::onnx::{NodeProto, self};
@@ -30,6 +32,58 @@ impl CastAttrs {
     }
 }
 
+type CastFn<'a, Out, In> = fn(In) -> Out;
+
+fn cast_generic<Out: Clone + num::Zero + AsPrimitive<In>, In: Clone + num::Zero + AsPrimitive<Out>>(input: &ArrayD<In>, tfunc: Option<CastFn<Out, In>>) -> BoxResult<ArrayD<Out>> {
+    if let Some(cfn) = tfunc {
+        Ok(input.mapv(cfn))
+    } else {
+        Ok(input.mapv(|v| v.as_()))
+    }
+}
+
+macro_rules! cast_impl {
+    ($from:ty, $tgt:ident, $input:ident) => {
+        match $input.data_type() {
+            DataType::UNDEFINED => Err("Cast to undefined type".into()),
+            DataType::FLOAT => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, f32>($input.try_into()?, None)?).into())
+            },
+            DataType::UINT8 => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, u8>($input.try_into()?, None)?).into())
+            },
+            DataType::INT8 => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, i8>($input.try_into()?, None)?).into())
+            },
+            DataType::UINT16 => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, u16>($input.try_into()?, None)?).into())
+            },
+            DataType::INT16 => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, i16>($input.try_into()?, None)?).into())
+            },
+            DataType::INT32 => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, i32>($input.try_into()?, None)?).into())
+            },
+            DataType::INT64 => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, i64>($input.try_into()?, None)?).into())
+            },
+            DataType::DOUBLE => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, f64>($input.try_into()?, None)?).into())
+            },
+            DataType::UINT32 => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, u32>($input.try_into()?, None)?).into())
+            },
+            DataType::UINT64 => {
+                Ok(ArrayType::$tgt(cast_generic::<$from, u64>($input.try_into()?, None)?).into())
+            },
+            _ => {
+                Err(format!("Cast from {:?} to {} not supported", $input.data_type(), stringify!($ty)).into())
+            }
+            
+        }
+    }
+}
+
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_cast.py
 /// https://onnx.ai/onnx/operators/onnx__Cast.html
 pub fn cast(
@@ -44,5 +98,41 @@ pub fn cast(
         // No-op
         return Ok(input.to_owned().into());
     }
-    todo!("Cast")
+    use onnx::tensor_proto::DataType;
+    match attrs.to {
+        DataType::UNDEFINED => Err("Cast to undefined type".into()),
+        DataType::FLOAT => {
+            cast_impl!(f32, F32, input)
+        },
+        DataType::UINT8 => {
+            cast_impl!(u8, U8, input)
+        },
+        DataType::INT8 => {
+            cast_impl!(i8, I8, input)
+        },
+        DataType::UINT16 => {
+            cast_impl!(u16, U16, input)
+        },
+        DataType::INT16 => {
+            cast_impl!(i16, I16, input)
+        },
+        DataType::INT32 => {
+            cast_impl!(i32, I32, input)
+        },
+        DataType::INT64 => {
+            cast_impl!(i64, I64, input)
+        },
+        DataType::DOUBLE => {
+            cast_impl!(f64, F64, input)
+        },
+        DataType::UINT32 => {
+            cast_impl!(u32, U32, input)
+        },
+        DataType::UINT64 => {
+            cast_impl!(u64, U64, input)
+        },
+        _ => {
+            Err(format!("Cast from {:?} to {:?} not supported", input.data_type(), attrs.to).into())
+        }
+    }
 }
