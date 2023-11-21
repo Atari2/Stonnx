@@ -43,8 +43,8 @@ fn _gather_generic<A: Clone + Copy + Zero, B: Clone + Zero + AsPrimitive<usize>>
     let n_k = &data.shape()[axis + 1..];
     let n_j = i.shape();
     for ii in NDIndex::new(n_i) {
-        for jj in NDIndex::new(n_k) {
-            for kk in NDIndex::new(n_j) {
+        for jj in NDIndex::new(n_j) {
+            for kk in NDIndex::new(n_k) {
                 let slice_index = ii
                     .iter()
                     .chain(jj.iter().chain(kk.iter()))
