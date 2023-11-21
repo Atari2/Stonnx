@@ -194,6 +194,45 @@ pub enum ArrayType {
     Bool(ArrayD<bool>),
 }
 
+macro_rules! impl_into_array_type {
+    ($t:ty, $v:ident) => {
+        impl From<ArrayD<$t>> for ArrayType {
+            fn from(a: ArrayD<$t>) -> Self {
+                ArrayType::$v(a)
+            }
+        }
+        impl<'a> TryFrom<&'a ArrayType> for &'a ArrayD<$t> {
+            type Error = Box<dyn Error>;
+            fn try_from(a: &'a ArrayType) -> BoxResult<&'a ArrayD<$t>> {
+                match a {
+                    ArrayType::$v(a) => Ok(&a),
+                    _ => Err("Wrong type".into()),
+                }
+            }
+        }
+    };
+    () => {
+        compile_error!("impl_into_array_type!() requires a type argument");
+    };
+}
+
+impl_into_array_type!(i8, I8);
+impl_into_array_type!(i16, I16);
+impl_into_array_type!(i32, I32);
+impl_into_array_type!(i64, I64);
+impl_into_array_type!(u8, U8);
+impl_into_array_type!(u16, U16);
+impl_into_array_type!(u32, U32);
+impl_into_array_type!(u64, U64);
+impl_into_array_type!(f16, F16);
+impl_into_array_type!(bf16, BF16);
+impl_into_array_type!(f32, F32);
+impl_into_array_type!(f64, F64);
+impl_into_array_type!(Complex64, C64);
+impl_into_array_type!(Complex128, C128);
+impl_into_array_type!(String, Str);
+impl_into_array_type!(bool, Bool);
+
 /*
 typedef struct
 {
