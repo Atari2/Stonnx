@@ -1,7 +1,8 @@
 use ndarray::Axis;
 
 use crate::onnx::NodeProto;
-use crate::utils::{ArrayType, BoxResult, OperationResult, pick_opset_version};
+use crate::utils::{pick_opset_version, ArrayType, BoxResult, OperationResult};
+use anyhow::anyhow;
 
 const OPSET_VERSIONS: [i64; 4] = [1, 11, 13, 18];
 
@@ -39,7 +40,16 @@ fn reducemean_1(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arra
     let keepdims = attrs.keepdims;
 
     // if axis is < 0, count from the back
-    let axes: Vec<i64> = axes.iter().map(|&axis| if axis < 0 { a.ndim() as i64 + axis } else { axis }).collect();
+    let axes: Vec<i64> = axes
+        .iter()
+        .map(|&axis| {
+            if axis < 0 {
+                a.ndim() as i64 + axis
+            } else {
+                axis
+            }
+        })
+        .collect();
 
     match a {
         ArrayType::F32(a) => {
@@ -52,15 +62,14 @@ fn reducemean_1(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arra
                     a = mean_axis;
                     reduced_dims.push(axis as usize);
                 } else {
-                    return Err("Error computing mean along axis".into());
+                    return Err(anyhow!("Error computing mean along axis"));
                 }
             }
             let new_shape: Vec<usize> = a.shape().iter().filter(|&&dim| dim > 1).cloned().collect();
 
             if keepdims == 0 {
-                a = a.into_shape(new_shape.clone()).expect("Failed to reshape array");
-            }
-            else {
+                a = a.into_shape(new_shape.clone())?;
+            } else {
                 // Add back the dimensions that were reduced
                 for &dim in &reduced_dims {
                     a = a.insert_axis(Axis(dim));
@@ -72,7 +81,6 @@ fn reducemean_1(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arra
         _ => todo!("ReduceMean for type {:?}", a),
     }
 }
-
 
 // FIX ME: This is a copy of reducemean_1, but with noop_with_empty_axes and axes as inputs
 fn reducemean_18(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<ArrayType> {
@@ -90,7 +98,16 @@ fn reducemean_18(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arr
         axes
     };
 
-    let axes: Vec<i64> = axes.iter().map(|&axis| if axis < 0 { a.ndim() as i64 + axis } else { axis }).collect();
+    let axes: Vec<i64> = axes
+        .iter()
+        .map(|&axis| {
+            if axis < 0 {
+                a.ndim() as i64 + axis
+            } else {
+                axis
+            }
+        })
+        .collect();
 
     match a {
         ArrayType::F32(a) => {
@@ -102,15 +119,14 @@ fn reducemean_18(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arr
                     a = mean_axis;
                     reduced_dims.push(axis as usize);
                 } else {
-                    return Err("Error computing mean along axis".into());
+                    return Err(anyhow!("Error computing mean along axis"));
                 }
             }
             let new_shape: Vec<usize> = a.shape().iter().filter(|&&dim| dim > 1).cloned().collect();
 
             if keepdims == 0 {
-                a = a.into_shape(new_shape.clone()).expect("Failed to reshape array");
-            }
-            else {
+                a = a.into_shape(new_shape.clone())?;
+            } else {
                 for &dim in &reduced_dims {
                     a = a.insert_axis(Axis(dim));
                 }

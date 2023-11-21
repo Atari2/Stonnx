@@ -2,6 +2,7 @@ use crate::{
     onnx::NodeProto,
     utils::{ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 const _OPSET_VERSIONS: [i64; 1] = [1];
 
@@ -19,11 +20,11 @@ pub fn global_average_pool(
             let axis = Vec::from_iter(2..x.ndim());
             let mut y = x
                 .mean_axis(ndarray::Axis(axis[0]))
-                .ok_or_else(|| "Error in GlobalAveragePool".to_owned())?;
+                .ok_or_else(|| anyhow!("Error in GlobalAveragePool"))?;
             for (i, ax) in axis.iter().skip(1).enumerate() {
                 y = y
                     .mean_axis(ndarray::Axis(*ax - (i + 1)))
-                    .ok_or_else(|| "Error in GlobalAveragePool".to_owned())?;
+                    .ok_or_else(|| anyhow!("Error in GlobalAveragePool"))?;
             }
             for x in axis.iter() {
                 y.insert_axis_inplace(ndarray::Axis(*x));

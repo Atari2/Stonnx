@@ -5,6 +5,7 @@ use crate::{
     onnx::NodeProto,
     utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 const OPSET_VERSIONS: [i64; 3] = [1, 11, 13];
 
@@ -55,7 +56,7 @@ fn unsqueeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     let axes = if let ArrayType::I64(a) = inputs[1] {
         a.clone().into_dimensionality::<Ix1>()?.to_vec()
     } else {
-        return Err("Axes must be an int64".into());
+        return Err(anyhow!("Axes must be an int64"));
     };
     let mut shape = input.shape().to_vec();
     for axis in axes.iter() {

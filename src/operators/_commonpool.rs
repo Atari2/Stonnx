@@ -1,5 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 use crate::{onnx::AttributeProto, utils::BoxResult};
+use anyhow::anyhow;
 use itertools::Itertools;
 use ndarray::{s, Array0, Array1, Array2, ArrayD, ArrayView1, Ix0, Ix2, SliceInfoElem};
 use ndarray_stats::QuantileExt;
@@ -59,7 +60,7 @@ fn _get_pad_shape(
         }
     }
     if pad_shape.is_empty() {
-        Err("Pad shape cannot be empty".into())
+        Err(anyhow!("Pad shape cannot be empty"))
     } else {
         Ok(pad_shape)
     }
@@ -113,9 +114,9 @@ fn _get_output_shape(
                     ) as usize;
                 }
             } else {
-                return Err(
-                    "pad_shape cannot be none if auto_pad is valid and ceil_mode is 1".into(),
-                );
+                return Err(anyhow!(
+                    "pad_shape cannot be none if auto_pad is valid and ceil_mode is 1"
+                ));
             }
         }
         out_shape
@@ -128,9 +129,9 @@ fn _get_output_shape(
         )
     };
     if out_shape.is_empty() {
-        Err("Output shape cannot be empty".into())
+        Err(anyhow!("Output shape cannot be empty"))
     } else if out_shape.iter().min().copied().unwrap_or(0) == 0 {
-        Err("Output shape cannot be less than or equal to 0".into())
+        Err(anyhow!("Output shape cannot be less than or equal to 0"))
     } else {
         Ok(out_shape)
     }

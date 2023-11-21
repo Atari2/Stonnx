@@ -1,8 +1,9 @@
+use anyhow::anyhow;
 use ndarray::ArrayD;
 use num::traits::AsPrimitive;
 use protobuf::Enum;
 
-use crate::onnx::{NodeProto, self};
+use crate::onnx::{self, NodeProto};
 use crate::utils::{ArrayType, BoxResult, OperationResult};
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 6, 9, 13, 19];
@@ -27,14 +28,24 @@ impl CastAttrs {
                 .attribute
                 .iter()
                 .find(|a| a.name() == "to")
-                .map_or(DT::UNDEFINED, |a| a.i.map_or(DT::UNDEFINED, |v| DT::from_i32(v as i32).unwrap_or(DT::UNDEFINED))),
+                .map_or(DT::UNDEFINED, |a| {
+                    a.i.map_or(DT::UNDEFINED, |v| {
+                        DT::from_i32(v as i32).unwrap_or(DT::UNDEFINED)
+                    })
+                }),
         }
     }
 }
 
 type CastFn<'a, Out, In> = fn(In) -> Out;
 
-fn cast_generic<Out: Clone + num::Zero + AsPrimitive<In>, In: Clone + num::Zero + AsPrimitive<Out>>(input: &ArrayD<In>, tfunc: Option<CastFn<Out, In>>) -> BoxResult<ArrayD<Out>> {
+fn cast_generic<
+    Out: Clone + num::Zero + AsPrimitive<In>,
+    In: Clone + num::Zero + AsPrimitive<Out>,
+>(
+    input: &ArrayD<In>,
+    tfunc: Option<CastFn<Out, In>>,
+) -> BoxResult<ArrayD<Out>> {
     if let Some(cfn) = tfunc {
         Ok(input.mapv(cfn))
     } else {
@@ -45,43 +56,44 @@ fn cast_generic<Out: Clone + num::Zero + AsPrimitive<In>, In: Clone + num::Zero 
 macro_rules! cast_impl {
     ($from:ty, $tgt:ident, $input:ident) => {
         match $input.data_type() {
-            DataType::UNDEFINED => Err("Cast to undefined type".into()),
+            DataType::UNDEFINED => Err(anyhow!("Cast to undefined type")),
             DataType::FLOAT => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, f32>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::UINT8 => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, u8>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::INT8 => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, i8>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::UINT16 => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, u16>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::INT16 => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, i16>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::INT32 => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, i32>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::INT64 => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, i64>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::DOUBLE => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, f64>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::UINT32 => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, u32>($input.try_into()?, None)?).into())
-            },
+            }
             DataType::UINT64 => {
                 Ok(ArrayType::$tgt(cast_generic::<$from, u64>($input.try_into()?, None)?).into())
-            },
-            _ => {
-                Err(format!("Cast from {:?} to {} not supported", $input.data_type(), stringify!($ty)).into())
             }
-            
+            _ => Err(anyhow!(
+                "Cast from {:?} to {} not supported",
+                $input.data_type(),
+                stringify!($ty)
+            )),
         }
-    }
+    };
 }
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_cast.py
@@ -100,39 +112,41 @@ pub fn cast(
     }
     use onnx::tensor_proto::DataType;
     match attrs.to {
-        DataType::UNDEFINED => Err("Cast to undefined type".into()),
+        DataType::UNDEFINED => Err(anyhow!("Cast to undefined type")),
         DataType::FLOAT => {
             cast_impl!(f32, F32, input)
-        },
+        }
         DataType::UINT8 => {
             cast_impl!(u8, U8, input)
-        },
+        }
         DataType::INT8 => {
             cast_impl!(i8, I8, input)
-        },
+        }
         DataType::UINT16 => {
             cast_impl!(u16, U16, input)
-        },
+        }
         DataType::INT16 => {
             cast_impl!(i16, I16, input)
-        },
+        }
         DataType::INT32 => {
             cast_impl!(i32, I32, input)
-        },
+        }
         DataType::INT64 => {
             cast_impl!(i64, I64, input)
-        },
+        }
         DataType::DOUBLE => {
             cast_impl!(f64, F64, input)
-        },
+        }
         DataType::UINT32 => {
             cast_impl!(u32, U32, input)
-        },
+        }
         DataType::UINT64 => {
             cast_impl!(u64, U64, input)
-        },
-        _ => {
-            Err(format!("Cast from {:?} to {:?} not supported", input.data_type(), attrs.to).into())
         }
+        _ => Err(anyhow!(
+            "Cast from {:?} to {:?} not supported",
+            input.data_type(),
+            attrs.to
+        )),
     }
 }

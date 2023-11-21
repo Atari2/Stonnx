@@ -12,6 +12,8 @@ use crate::utils::ArrayType;
 use crate::utils::BoxResult;
 use crate::utils::OperationResult;
 
+use anyhow::anyhow;
+
 // Defined but never used because even thought Conv has 2 versions, they both act the same
 const _OPSET_VERSIONS: [i64; 2] = [1, 11];
 
@@ -133,14 +135,13 @@ fn _conv_fast_impl(
     let mut w = w.to_owned();
 
     if x_shape[1] != w_shape[1] * group || w_shape[0] % group != 0 {
-        return Err(format!(
+        return Err(anyhow!(
             "Shape inconsistency {} != {} || {} % {} != 0",
             x_shape[1],
             w_shape[1] * group,
             w_shape[0],
             attrs.group
-        )
-        .into());
+        ));
     }
     if group > 1 {
         let mut res = vec![];
@@ -190,8 +191,7 @@ fn _conv_fast_impl(
                 }
                 let gx = x.slice(xslicevec.as_slice());
                 let gw = w.slice(wslicevec.as_slice());
-                let cv = _conv_fast_impl(gx, gw, None, ConvAttributes::new_for_recursion(&attrs))
-                    ?;
+                let cv = _conv_fast_impl(gx, gw, None, ConvAttributes::new_for_recursion(&attrs))?;
                 if b == 0 {
                     td += cv.shape()[1];
                 }
@@ -229,7 +229,7 @@ fn _conv_fast_impl(
             let cv = if let ArrayType::F32(c) = cv {
                 c
             } else {
-                return Err("Conv on f32 returned another type".into());
+                return Err(anyhow!("Conv on f32 returned another type"));
             };
             final_.slice_mut(fslicevec.as_slice()).assign(&cv);
             p += cv.shape()[1];
@@ -300,12 +300,10 @@ fn _conv_fast_impl(
         pads = head.into_iter().chain(tail).map(|v| v as i64).collect();
     }
     let (c2, mut out_shape) = im2col_fast(&x, &kernel_shape, &pads, strides)?;
-    let w_reshaped = w
-        .to_shape(vec![
-            w.shape().iter().product::<usize>() / c2.shape()[0],
-            c2.shape()[0],
-        ])
-        ?;
+    let w_reshaped = w.to_shape(vec![
+        w.shape().iter().product::<usize>() / c2.shape()[0],
+        c2.shape()[0],
+    ])?;
     let mut mul = matmul(w_reshaped.view(), c2.view())?;
     out_shape.insert(0, w.shape()[0]);
     out_shape.insert(1, x.shape()[0]);
@@ -382,8 +380,7 @@ fn im2col_fast(
         (0..n_c)
             .flat_map(|x| std::iter::repeat(x as i64).take(kernel_size))
             .collect::<Vec<_>>(),
-    )
-    ?;
+    )?;
     let nc = [[0, 0], [0, 0]];
     let padding = nc
         .iter()
@@ -399,10 +396,10 @@ fn im2col_fast(
     if !indices.is_empty() {
         let indices_shapes_equal = indices.iter().all(|x| x.shape() == indices[0].shape());
         if !indices_shapes_equal {
-            return Err("Indices shapes are not similar".into());
+            return Err(anyhow!("Indices shapes are not similar"));
         }
         if indices[0].shape()[0] != d.shape()[0] {
-            return Err("Indices and d shapes are not broadcastable".into());
+            return Err(anyhow!("Indices and d shapes are not broadcastable"));
         }
     }
 
@@ -456,7 +453,7 @@ fn conv_fast_impl(
     attrs: ConvAttributes,
 ) -> BoxResult<ArrayType> {
     if x.ndim() < 3 {
-        return Err("X must have at least 3 dimensions".into());
+        return Err(anyhow!("X must have at least 3 dimensions"));
     }
     match (x, w, b) {
         (ArrayType::F32(x), ArrayType::F32(w), Some(ArrayType::F32(b))) => {

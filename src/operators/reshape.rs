@@ -1,8 +1,8 @@
-// TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
     utils::{shape_safe_product, ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 use ndarray::Ix1;
 
@@ -36,13 +36,13 @@ pub fn reshape(
     let data = inputs[0];
     let shape = inputs[1];
     if shape.shape().len() != 1 {
-        return Err("shape must be 1D".into());
+        return Err(anyhow!("shape must be 1D"));
     }
     // new_shape = np.copy(shape)
     let mut new_shape = if let ArrayType::I64(shape) = shape {
         shape.view().into_dimensionality::<Ix1>()?.to_vec()
     } else {
-        return Err("shape must be I64".into());
+        return Err(anyhow!("shape must be I64"));
     };
     let attrs = ReshapeAttrs::new(node);
     let datashape_array = data.shape();
@@ -65,7 +65,7 @@ pub fn reshape(
         if let Some(missing_shape_index) = new_shape.iter().position(|&v| v == -1) {
             new_shape[missing_shape_index] = missing_shape;
         } else {
-            return Err("Invalid new shape for reshape".into());
+            return Err(anyhow!("Invalid new shape for reshape"));
         }
     }
     let new_shape = new_shape.iter().map(|&v| v as usize).collect::<Vec<_>>();

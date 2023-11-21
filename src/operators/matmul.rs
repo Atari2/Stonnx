@@ -33,7 +33,9 @@ pub fn matmul(
 
     // FIXME: This needs to be checked at the graph level
     match (a, b) {
-        (ArrayType::F32(a), ArrayType::F32(b)) => Ok(ArrayType::F32(matmul_impl(a.view(), b.view())?).into()),
+        (ArrayType::F32(a), ArrayType::F32(b)) => {
+            Ok(ArrayType::F32(matmul_impl(a.view(), b.view())?).into())
+        }
         _ => todo!("Matmul for types {:?} and {:?}", a, b),
     }
 }

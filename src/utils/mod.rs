@@ -1,7 +1,8 @@
+use anyhow::anyhow;
 use std::io::Read;
 use std::os::raw::c_uchar;
 use std::path::PathBuf;
-use std::{collections::HashMap, error::Error, io, path::Path};
+use std::{collections::HashMap, io, path::Path};
 
 use ndarray::{ArrayD, IxDyn};
 use protobuf::Enum;
@@ -18,7 +19,7 @@ type Complex128 = Complex<f64>;
 
 static UNKNOWN: &str = "<unknown>";
 
-pub type BoxResult<A> = Result<A, Box<dyn Error>>;
+pub type BoxResult<A> = anyhow::Result<A>;
 
 pub struct NDIndex<'a> {
     indices: &'a [usize],
@@ -149,7 +150,7 @@ pub fn shape_safe_product<
 impl ValueType {
     fn new(proto: onnx::tensor_proto::DataType) -> BoxResult<ValueType> {
         match proto {
-            DataType::UNDEFINED => Err("Undefined data type".into()),
+            DataType::UNDEFINED => Err(anyhow!("Undefined data type")),
             DataType::UINT8 => Ok(ValueType::U8),
             DataType::INT8 => Ok(ValueType::I8),
             DataType::UINT16 => Ok(ValueType::U16),
@@ -202,11 +203,11 @@ macro_rules! impl_into_array_type {
             }
         }
         impl<'a> TryFrom<&'a ArrayType> for &'a ArrayD<$t> {
-            type Error = Box<dyn Error>;
+            type Error = anyhow::Error;
             fn try_from(a: &'a ArrayType) -> BoxResult<&'a ArrayD<$t>> {
                 match a {
                     ArrayType::$v(a) => Ok(&a),
-                    _ => Err("Wrong type".into()),
+                    _ => Err(anyhow!("Wrong type")),
                 }
             }
         }
@@ -433,7 +434,7 @@ impl ValueInfo {
 pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<ArrayType> {
     let shape = &proto.dims;
     if proto.data_location() != onnx::tensor_proto::DataLocation::DEFAULT {
-        return Err("External data location not supported".into());
+        return Err(anyhow!("External data location not supported"));
     }
     if let Some(DataType::STRING) = DataType::from_i32(proto.data_type()) {
         let bytedata = &proto.string_data;
@@ -460,14 +461,14 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
     let bytedata = proto.raw_data();
     match enum_dt {
-        DataType::UNDEFINED => Err("Undefined data type".into()),
+        DataType::UNDEFINED => Err(anyhow!("Undefined data type")),
         DataType::INT8 => match bytemuck::try_cast_slice::<u8, i8>(bytedata) {
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I8(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::INT16 => match bytemuck::try_cast_slice::<u8, i16>(bytedata) {
             Ok(data) => {
@@ -475,13 +476,13 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 let a = ArrayD::<i16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I16(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::INT32 => {
             let data = if let Some(data) = &proto.raw_data {
                 match bytemuck::try_cast_slice::<u8, i32>(data) {
                     Ok(data) => data,
-                    Err(e) => return Err(e.to_string().into()),
+                    Err(e) => return Err(anyhow!(e)),
                 }
             } else {
                 proto.int32_data.as_slice()
@@ -508,7 +509,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             let data = if let Some(data) = &proto.raw_data {
                 match bytemuck::try_cast_slice::<u8, i64>(data) {
                     Ok(data) => data,
-                    Err(e) => return Err(e.to_string().into()),
+                    Err(e) => return Err(anyhow!(e)),
                 }
             } else {
                 proto.int64_data.as_slice()
@@ -537,7 +538,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 let a = ArrayD::<u8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U8(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::UINT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
@@ -545,7 +546,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 let a = ArrayD::<u16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U16(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::UINT32 => match bytemuck::try_cast_slice::<u8, u32>(bytedata) {
             Ok(data) => {
@@ -553,7 +554,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 let a = ArrayD::<u32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U32(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::UINT64 => match bytemuck::try_cast_slice::<u8, u64>(bytedata) {
             Ok(data) => {
@@ -561,7 +562,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 let a = ArrayD::<u64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U64(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::FLOAT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
@@ -572,7 +573,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 )?;
                 Ok(ArrayType::F16(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::BFLOAT16 => match bytemuck::try_cast_slice::<u8, f32>(bytedata) {
             Ok(data) => {
@@ -583,7 +584,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 )?;
                 Ok(ArrayType::BF16(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::DOUBLE => match bytemuck::try_cast_slice::<u8, f64>(bytedata) {
             Ok(data) => {
@@ -591,7 +592,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 let a = ArrayD::<f64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::F64(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::STRING => panic!("String data type not supported, use make_string_tensor()"),
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
@@ -603,7 +604,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 )?;
                 Ok(ArrayType::Bool(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::FLOAT
         | DataType::FLOAT8E4M3FN
@@ -613,7 +614,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             let data = if let Some(data) = &proto.raw_data {
                 match bytemuck::try_cast_slice::<u8, f32>(data) {
                     Ok(data) => data,
-                    Err(e) => return Err(e.to_string().into()),
+                    Err(e) => return Err(anyhow!(e)),
                 }
             } else {
                 proto.float_data.as_slice()
@@ -647,7 +648,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 )?;
                 Ok(ArrayType::C64(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::COMPLEX128 => match bytemuck::try_cast_slice::<u8, Complex128Repr>(bytedata) {
             Ok(data) => {
@@ -660,7 +661,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                 )?;
                 Ok(ArrayType::C128(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
     }
 }
@@ -673,14 +674,14 @@ pub fn make_tensor_from_raw(
     let enum_dt = DataType::from_i32(data_type).unwrap_or_default();
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
     match enum_dt {
-        DataType::UNDEFINED => Err("Undefined data type".into()),
+        DataType::UNDEFINED => Err(anyhow!("Undefined data type")),
         DataType::INT8 => match bytemuck::try_cast_slice::<u8, i8>(bytedata) {
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I8(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::INT16 => match bytemuck::try_cast_slice::<u8, i16>(bytedata) {
             Ok(data) => {
@@ -688,7 +689,7 @@ pub fn make_tensor_from_raw(
                 let a = ArrayD::<i16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I16(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::INT32 => match bytemuck::try_cast_slice::<u8, i32>(bytedata) {
             Ok(data) => {
@@ -696,7 +697,7 @@ pub fn make_tensor_from_raw(
                 let a = ArrayD::<i32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I32(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::INT64 => match bytemuck::try_cast_slice::<u8, i64>(bytedata) {
             Ok(data) => {
@@ -718,7 +719,7 @@ pub fn make_tensor_from_raw(
                 };
                 Ok(ArrayType::I64(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::UINT8 => match bytemuck::try_cast_slice::<u8, u8>(bytedata) {
             Ok(data) => {
@@ -726,7 +727,7 @@ pub fn make_tensor_from_raw(
                 let a = ArrayD::<u8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U8(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::UINT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
@@ -734,7 +735,7 @@ pub fn make_tensor_from_raw(
                 let a = ArrayD::<u16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U16(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::UINT32 => match bytemuck::try_cast_slice::<u8, u32>(bytedata) {
             Ok(data) => {
@@ -742,7 +743,7 @@ pub fn make_tensor_from_raw(
                 let a = ArrayD::<u32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U32(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::UINT64 => match bytemuck::try_cast_slice::<u8, u64>(bytedata) {
             Ok(data) => {
@@ -750,7 +751,7 @@ pub fn make_tensor_from_raw(
                 let a = ArrayD::<u64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U64(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::FLOAT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
@@ -761,7 +762,7 @@ pub fn make_tensor_from_raw(
                 )?;
                 Ok(ArrayType::F16(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::BFLOAT16 => match bytemuck::try_cast_slice::<u8, f32>(bytedata) {
             Ok(data) => {
@@ -772,7 +773,7 @@ pub fn make_tensor_from_raw(
                 )?;
                 Ok(ArrayType::BF16(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::DOUBLE => match bytemuck::try_cast_slice::<u8, f64>(bytedata) {
             Ok(data) => {
@@ -780,7 +781,7 @@ pub fn make_tensor_from_raw(
                 let a = ArrayD::<f64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::F64(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::STRING => panic!("String data type not supported, use make_string_tensor()"),
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
@@ -792,7 +793,7 @@ pub fn make_tensor_from_raw(
                 )?;
                 Ok(ArrayType::Bool(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::FLOAT
         | DataType::FLOAT8E4M3FN
@@ -839,7 +840,7 @@ pub fn make_tensor_from_raw(
                 )?;
                 Ok(ArrayType::C64(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e)),
         },
         DataType::COMPLEX128 => match bytemuck::try_cast_slice::<u8, Complex128Repr>(bytedata) {
             Ok(data) => {
@@ -852,7 +853,7 @@ pub fn make_tensor_from_raw(
                 )?;
                 Ok(ArrayType::C128(a))
             }
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(anyhow!(e.to_string())),
         },
     }
 }
@@ -911,11 +912,10 @@ fn make_input_tensors_from_files(
             );
             map.insert(input_name.to_string(), tensor);
         } else if initializers.get(input_name).is_none() {
-            return Err(format!(
+            return Err(anyhow!(
                 "Input {} not found in inputs file or graph initializers",
                 input_name
-            )
-            .into());
+            ));
         }
     }
     Ok(map)
@@ -945,7 +945,7 @@ fn make_output_tensors_from_files(
                 make_tensor_from_proto(output_from_file)?,
             );
         } else {
-            return Err(format!("Output {} not found in inputs file", output_name).into());
+            return Err(anyhow!("Output {} not found in inputs file", output_name));
         }
     }
     Ok(map)

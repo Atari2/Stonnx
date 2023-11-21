@@ -5,6 +5,7 @@ use crate::{
     onnx::NodeProto,
     utils::{shape_safe_product, ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 use super::_commonpool::{CommonPoolAttrs, PoolAutoPad, PoolOutput, PoolingType, _common_pool_f32};
 
@@ -125,26 +126,26 @@ fn _max_pool_f32_2d(
     } else if let Some(ref strides) = attrs.strides {
         strides[0]
     } else {
-        return Err("Stride not set".into());
+        return Err(anyhow!("Stride not set"));
     };
     let stride_w = if global_pooling {
         1
     } else if let Some(ref strides) = attrs.strides {
         strides[1]
     } else {
-        return Err("Stride not set".into());
+        return Err(anyhow!("Stride not set"));
     };
     let x_step = height * width;
     let y_step = pooled_height * pooled_width;
     let dilation_h = if let Some(ref dilations) = attrs.dilations {
         dilations[0]
     } else {
-        return Err("Dilations not set".into());
+        return Err(anyhow!("Dilations not set"));
     };
     let dilation_w = if let Some(ref dilations) = attrs.dilations {
         dilations[1]
     } else {
-        return Err("Dilations not set".into());
+        return Err(anyhow!("Dilations not set"));
     };
     let x_data = input.to_shape(Ix1(shape_safe_product(input.shape())))?;
     let mut y_data = y.to_shape(Ix1(shape_safe_product(y.shape())))?;
@@ -348,7 +349,7 @@ pub fn maxpool(
     output_len: usize,
 ) -> BoxResult<OperationResult> {
     if inputs.is_empty() {
-        return Err("No inputs".into());
+        return Err(anyhow!("No inputs"));
     }
     let attrs = MaxPoolAttrs::new(node, inputs[0]);
     match inputs[0] {

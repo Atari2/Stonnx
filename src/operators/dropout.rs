@@ -2,6 +2,7 @@ use crate::{
     onnx::NodeProto,
     utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 use ndarray::{ArrayD, Ix0};
 use rand::{Rng, SeedableRng};
 const OPSET_VERSIONS: [i64; 6] = [1, 6, 7, 10, 12, 13];
@@ -124,7 +125,7 @@ pub fn dropout(
         attrs.ratio = if let Some(ratio) = inputs.get(1) {
             match ratio {
                 ArrayType::F32(ratio) => ratio.clone().into_dimensionality::<Ix0>()?.into_scalar(),
-                _ => return Err("Ratio must be a scalar".into()),
+                _ => return Err(anyhow!("Ratio must be a scalar")),
             }
         } else {
             0.5
@@ -134,7 +135,7 @@ pub fn dropout(
                 ArrayType::I64(mode) => {
                     mode.clone().into_dimensionality::<Ix0>()?.into_scalar() != 0
                 }
-                _ => return Err("Training mode must be a scalar".into()),
+                _ => return Err(anyhow!("Training mode must be a scalar")),
             }
         } else {
             false

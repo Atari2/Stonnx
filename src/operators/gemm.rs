@@ -2,11 +2,11 @@
 use ndarray::{ArrayD, ArrayViewD, Ix2};
 use trait_set::trait_set;
 
-// TODO: remove this when operator is implemented
 use crate::{
     onnx::NodeProto,
     utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 const OPSET_VERSIONS: [i64; 6] = [1, 6, 7, 9, 11, 13];
 
@@ -48,7 +48,7 @@ fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
         let lhs_shape = lhs.shape();
         let rhs_shape = rhs.shape();
         if lhs_shape[1] != rhs_shape[0] {
-            return Err("Gemm: a and b must have compatible shapes".into());
+            return Err(anyhow!("Gemm: a and b must have compatible shapes"));
         }
         let mut res = ArrayD::zeros(ndarray::IxDyn(&[lhs_shape[0], rhs_shape[1]]));
         for i in 0..lhs_shape[0] {
@@ -60,7 +60,7 @@ fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
         }
         Ok(res)
     } else {
-        Err("Gemm: a and b must be 2D matrices".into())
+        Err(anyhow!("Gemm: a and b must be 2D matrices"))
     }
 }
 
@@ -150,7 +150,7 @@ fn gemm_6(
             if !attrs.broadcast {
                 let res = _gemm_common_f32(a, b, Some(c), attrs)?;
                 if c.shape() != res.shape() {
-                    return Err("Gemm: c and res must have the same shape".into());
+                    return Err(anyhow!("Gemm: c and res must have the same shape"));
                 }
                 Ok(ArrayType::F32(res + c))
             } else {
@@ -164,7 +164,7 @@ fn gemm_6(
             if !attrs.broadcast {
                 let res = _gemm_common_i64(a, b, Some(c), attrs)?;
                 if c.shape() != res.shape() {
-                    return Err("Gemm: c and res must have the same shape".into());
+                    return Err(anyhow!("Gemm: c and res must have the same shape"));
                 }
                 Ok(ArrayType::I64(res + c))
             } else {
@@ -235,6 +235,6 @@ pub fn gemm(
             Ok(_gemm_internal(a, b, Some(c), attrs, target_version)?.into())
         }
         (Some(a), Some(b), None) => Ok(_gemm_internal(a, b, None, attrs, target_version)?.into()),
-        _ => Err("Gemm: invalid inputs".into()),
+        _ => Err(anyhow!("Gemm: invalid inputs")),
     }
 }

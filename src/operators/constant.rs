@@ -5,6 +5,7 @@ use crate::{
         ArrayType, BoxResult, OperationResult,
     },
 };
+use anyhow::anyhow;
 use protobuf::{Enum, MessageField};
 
 const OPSET_VERSION: [i64; 6] = [1, 9, 11, 12, 13, 19];
@@ -82,9 +83,9 @@ impl ConstantAttrs {
 }
 
 fn constant_1(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
-    let value = attrs
-        .value
-        .ok_or("Constant_1 operator requires the 'value' attribute")?;
+    let value = attrs.value.ok_or(anyhow!(
+        "Constant_1 operator requires the 'value' attribute"
+    ))?;
     Ok(value)
 }
 
@@ -101,10 +102,9 @@ fn constant_11(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
             todo!("Constant_11 sparse_value")
         }
         (None, Some(value)) => Ok(value),
-        _ => Err(
+        _ => Err(anyhow!(
             "Constant_11 operator requires either 'sparse_value' or 'value' attribute, not both"
-                .into(),
-        ),
+        )),
     }
 }
 

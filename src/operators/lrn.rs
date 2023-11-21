@@ -4,6 +4,7 @@ use crate::{
     onnx::NodeProto,
     utils::{ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 const _OPSET_VERSIONS: [i64; 2] = [1, 13];
 
@@ -44,7 +45,7 @@ impl LRNAttrs {
 
 fn lrn_f32(input: &ArrayD<f32>, attrs: LRNAttrs) -> BoxResult<ArrayD<f32>> {
     if input.shape().len() != 4 {
-        return Err("Input must be 4D".into());
+        return Err(anyhow!("Input must be 4D"));
     }
     let mut square_sum = ArrayD::<f32>::zeros(input.shape());
     let minc = input.shape()[1];

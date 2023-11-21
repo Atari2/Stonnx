@@ -4,6 +4,7 @@ use crate::{
     onnx::NodeProto,
     utils::{make_tensor_from_proto, ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 const _OPSET_VERSIONS: [i64; 2] = [9, 20];
 
@@ -49,12 +50,14 @@ pub fn constantofshape(
     let shape = if let Some(ArrayType::I64(shape)) = input.get(0) {
         shape.iter().map(|v| *v as usize).collect::<Vec<_>>()
     } else {
-        return Err("ConstantOfShape: shape must be i64".into());
+        return Err(anyhow!("ConstantOfShape: shape must be i64"));
     };
     let attrs = ConstantOfShapeAttrs::new(node);
     match attrs.value {
         ArrayType::F32(v) => Ok(ArrayType::F32(_constanofshape_generic(&shape, v)?).into()),
         ArrayType::I64(v) => Ok(ArrayType::I64(_constanofshape_generic(&shape, v)?).into()),
-        _ => Err("ConstantOfShape: value must be f32, i64, u8 or bool".into()),
+        _ => Err(anyhow!(
+            "ConstantOfShape: value must be f32, i64, u8 or bool"
+        )),
     }
 }

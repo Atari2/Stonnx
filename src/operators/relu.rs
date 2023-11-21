@@ -2,6 +2,7 @@ use crate::{
     onnx::NodeProto,
     utils::{ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 6, 13, 14];
 
@@ -14,12 +15,12 @@ pub fn relu(
     _output_len: usize,
 ) -> BoxResult<OperationResult> {
     if inputs.len() != 1 {
-        Err("Relu must have 1 input".into())
+        Err(anyhow!("Relu must have 1 input"))
     } else {
         match inputs[0] {
             ArrayType::F32(a) => Ok(ArrayType::F32(a.mapv(|v| v.max(0.0))).into()),
             ArrayType::I64(a) => Ok(ArrayType::I64(a.mapv(|v| v.max(0))).into()),
-            _ => Err("Relu: invalid input".into()),
+            _ => Err(anyhow!("Relu: invalid input")),
         }
     }
 }

@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use ndarray::{ArrayD, ArrayViewD};
 use num::{traits::AsPrimitive, Zero};
 use protobuf::Enum;
@@ -72,18 +73,17 @@ pub fn gather(
     _output_len: usize,
 ) -> BoxResult<OperationResult> {
     if inputs.len() != 2 {
-        return Err(format!("Gather expects 2 inputs, got: {}", inputs.len()).into());
+        return Err(anyhow!("Gather expects 2 inputs, got: {}", inputs.len()));
     }
     let data = inputs[0];
     let indices = inputs[1];
     let attrs = GatherAttrs::new(node);
     let rank = data.ndim() as i64;
     if attrs.axis < -rank || attrs.axis > rank {
-        return Err(format!(
+        return Err(anyhow!(
             "Gather axis must be in [-rank, rank-1], got: {}",
             attrs.axis
-        )
-        .into());
+        ));
     }
     match indices {
         // FIXME:  All index values are expected to be within bounds [-s, s-1] along axis of size s
@@ -137,6 +137,9 @@ pub fn gather(
                 }
             }
         }
-        _ => Err(format!("Gather expects indices to be I32 or I64, got: {}", indices).into()),
+        _ => Err(anyhow!(
+            "Gather expects indices to be I32 or I64, got: {}",
+            indices
+        )),
     }
 }

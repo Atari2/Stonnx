@@ -2,6 +2,7 @@ use crate::{
     onnx::NodeProto,
     utils::{ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 use super::_commonpool::{CommonPoolAttrs, PoolAutoPad, PoolingType, _common_pool_f32};
 
@@ -85,7 +86,7 @@ pub fn averagepool(
     output_len: usize,
 ) -> BoxResult<OperationResult> {
     if inputs.is_empty() {
-        return Err("No inputs".into());
+        return Err(anyhow!("No inputs"));
     }
     let attrs = AveragePoolAttrs::new(node, inputs[0]);
     match inputs[0] {

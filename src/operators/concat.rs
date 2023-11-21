@@ -5,6 +5,7 @@ use crate::{
     utils::{ArrayType, BoxResult},
     utils::{OperationResult, ValueType},
 };
+use anyhow::anyhow;
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 4, 11, 13];
 
@@ -27,7 +28,7 @@ impl ConcatAttrs {
 
 fn _preprocess<A: Clone>(a: &ArrayD<A>, axis: i64) -> BoxResult<CowArray<'_, A, IxDyn>> {
     if a.shape().is_empty() {
-        return Err("Input must be at least 1D".into());
+        return Err(anyhow!("Input must be at least 1D"));
     }
     if axis >= a.shape().len() as i64 {
         let axis = axis as usize;
@@ -50,14 +51,14 @@ fn _concat_i64(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType
         if let ArrayType::I64(x) = input {
             cow_array.push(_preprocess(x, attrs.axis)?);
         } else {
-            return Err("Inputs not all of I64".into());
+            return Err(anyhow!("Inputs not all of I64"));
         }
     }
     for array in cow_array.iter() {
         inputs_i64.push(array.view());
     }
     if inputs_i64.is_empty() {
-        return Err("No inputs".into());
+        return Err(anyhow!("No inputs"));
     }
     let shape_i64 = inputs_i64[0].shape();
     let axis = if attrs.axis < 0 {
@@ -78,14 +79,14 @@ fn _concat_f32(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType
         if let ArrayType::F32(x) = input {
             cow_array.push(_preprocess(x, attrs.axis)?);
         } else {
-            return Err("Inputs not all of F32".into());
+            return Err(anyhow!("Inputs not all of F32"));
         }
     }
     for array in cow_array.iter() {
         inputs_f32.push(array.view());
     }
     if inputs_f32.is_empty() {
-        return Err("No inputs".into());
+        return Err(anyhow!("No inputs"));
     }
     let shape_f32 = inputs_f32[0].shape();
     let axis = if attrs.axis < 0 {
@@ -110,7 +111,7 @@ pub fn concat(
     let attrs = ConcatAttrs::new(node);
 
     if inputs.is_empty() {
-        return Err("No inputs".into());
+        return Err(anyhow!("No inputs"));
     }
 
     let type_ = inputs[0].value_type();
@@ -118,6 +119,6 @@ pub fn concat(
     match type_ {
         ValueType::I64 => Ok(_concat_i64(inputs, attrs)?.into()),
         ValueType::F32 => Ok(_concat_f32(inputs, attrs)?.into()),
-        _ => Err("Only f32 and i64 are supported".into()),
+        _ => Err(anyhow!("Only f32 and i64 are supported")),
     }
 }

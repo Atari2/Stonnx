@@ -2,6 +2,7 @@ use crate::{
     onnx::NodeProto,
     utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
 };
+use anyhow::anyhow;
 
 const OPSET_VERSIONS: [i64; 5] = [1, 6, 11, 12, 13];
 
@@ -47,7 +48,7 @@ fn clip_11(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     let amin = match inputs.get(1) {
         Some(a) => {
             if !a.shape().is_empty() {
-                return Err("Amin must be a scalar".into());
+                return Err(anyhow!("Amin must be a scalar"));
             } else if let ArrayType::F32(a) = a {
                 Some(a.sum())
             } else {
@@ -59,7 +60,7 @@ fn clip_11(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     let amax = match inputs.get(2) {
         Some(a) => {
             if !a.shape().is_empty() {
-                return Err("Amax must be a scalar".into());
+                return Err(anyhow!("Amax must be a scalar"));
             } else if let ArrayType::F32(a) = a {
                 Some(a.sum())
             } else {
