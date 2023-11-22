@@ -298,6 +298,53 @@ impl std::fmt::Display for ArrayType {
 pub trait ArrayTypeTrait: Clone + Copy + num::Zero {}
 
 impl ArrayType {
+    pub fn to_file(&self, dir: &Path, name: &str) -> BoxResult<()> {
+        use ndarray_npy::write_npy;
+        match self {
+            ArrayType::I8(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::I16(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::I32(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::I64(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::U8(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::U16(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::U32(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::U64(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::F16(_) => todo!("Half precision data type not supported"),
+            ArrayType::BF16(_) => todo!("BFloat16 data type not supported"),
+            ArrayType::F32(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::F64(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::C64(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::C128(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+            ArrayType::Str(_) => todo!("String data type not supported"),
+            ArrayType::Bool(data) => {
+                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
+            },
+        }
+    }
     pub fn shape(&self) -> &[usize] {
         match self {
             ArrayType::I8(a) => a.shape(),

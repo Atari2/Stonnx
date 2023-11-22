@@ -95,6 +95,8 @@ lazy_static! {
 struct Args {
     #[arg(short, long)]
     pub model: PathBuf,
+    #[arg(short, long, default_value = "0")]
+    pub verbose: u64
 }
 
 #[derive(Serialize, Deserialize)]
@@ -132,6 +134,10 @@ fn main() -> BoxResult<()> {
     let mut fileinputs: FileInputs = serde_json::from_reader(inputs_file)?;
     fileinputs.extend_paths(&args.model);
     let model = read_model(Path::new(&fileinputs.modelpath))?;
+    let outputs_dir = Path::new("outputs").join(&args.model);
+    if args.verbose >= 2 {
+        std::fs::create_dir_all(&outputs_dir)?;
+    }
 
     let opset_version = if let Some(v) = model.opset_import.get(0) {
         if let Some(v) = v.version {
@@ -206,7 +212,11 @@ fn main() -> BoxResult<()> {
                             let output_name = outputs[0];
                             let output_name2 = outputs[1];
                             println!("\tOutput {} has shape {:?}", output_name, a.shape());
-                            println!("\tOutput {} has shape {:?}", output_name2, b.shape());
+                            println!("\tOutput {} has shape {:?}", output_name2, b.shape());                          
+                            if args.verbose >= 2 {
+                                a.to_file(&outputs_dir, output_name)?;
+                                b.to_file(&outputs_dir, output_name2)?;
+                            }
                             node_inputs.insert(output_name.to_string(), a);
                             node_inputs.insert(output_name2.to_string(), b);
                         }
@@ -214,6 +224,9 @@ fn main() -> BoxResult<()> {
                             assert_eq!(outputs.len(), 1);
                             let output_name = outputs[0];
                             println!("\tOutput {} has shape {:?}", output_name, res.shape());
+                            if args.verbose >= 2 {
+                                res.to_file(&outputs_dir, output_name)?;
+                            }
                             node_inputs.insert(output_name.to_string(), res);
                         }
                         OperationResult::OptionalDouble((a, Some(b))) => {
@@ -222,6 +235,10 @@ fn main() -> BoxResult<()> {
                             let output_name2 = outputs[1];
                             println!("\tOutput {} has shape {:?}", output_name, a.shape());
                             println!("\tOutput {} has shape {:?}", output_name2, b.shape());
+                            if args.verbose >= 2 {
+                                a.to_file(&outputs_dir, output_name)?;
+                                b.to_file(&outputs_dir, output_name2)?;
+                            }
                             node_inputs.insert(output_name.to_string(), a);
                             node_inputs.insert(output_name2.to_string(), b);
                         }
@@ -229,13 +246,19 @@ fn main() -> BoxResult<()> {
                             assert_eq!(outputs.len(), 1);
                             let output_name = outputs[0];
                             println!("\tOutput {} has shape {:?}", output_name, a.shape());
+                            if args.verbose >= 2 {
+                                a.to_file(&outputs_dir, output_name)?;
+                            }
                             node_inputs.insert(output_name.to_string(), a);
                         }
                         OperationResult::Multiple(res) => {
                             assert_eq!(outputs.len(), res.len());
-                            for (i, output_name) in outputs.iter().enumerate() {
-                                println!("\tOutput {} has shape {:?}", output_name, res[i].shape());
-                                node_inputs.insert(output_name.to_string(), res[i].clone());
+                            for (output_name, res) in outputs.iter().zip(res.into_iter()) {
+                                println!("\tOutput {} has shape {:?}", output_name, res.shape());
+                                if args.verbose >= 2 {
+                                    res.to_file(&outputs_dir, output_name)?;
+                                }
+                                node_inputs.insert(output_name.to_string(), res);
                             }
                         }
                     }

@@ -42,12 +42,12 @@ fn common_slice_f32(
     ends: &ArrayD<i64>,
     steps: Option<&ArrayD<i64>>,
 ) -> BoxResult<ArrayD<f32>> {
-    let starts = if starts.shape().len() == 0 {
+    let starts = if starts.shape().is_empty() {
         starts.clone().insert_axis(Axis(0))
     } else {
         starts.clone()
     };
-    let ends = if ends.shape().len() == 0 {
+    let ends = if ends.shape().is_empty() {
         ends.clone().insert_axis(Axis(0))
     } else {
         ends.clone()
@@ -75,18 +75,16 @@ fn common_slice_f32(
             }
         }
         slices
+    } else if let Some(steps) = steps {
+        izip!(starts.iter(), ends.iter(), steps.iter()).enumerate().map(|(i, (&s, &e, &d))| {
+            let ee = if e > data.shape()[i] as i64 { None } else { Some(e as isize) };
+            SliceInfoElem::Slice{start: s as isize, end: ee, step: d as isize}
+        }).collect::<Vec<_>>()
     } else {
-        if let Some(steps) = steps {
-            izip!(starts.iter(), ends.iter(), steps.iter()).enumerate().map(|(i, (&s, &e, &d))| {
-                let ee = if e > data.shape()[i] as i64 { None } else { Some(e as isize) };
-                SliceInfoElem::Slice{start: s as isize, end: ee, step: d as isize}
-            }).collect::<Vec<_>>()
-        } else {
-            izip!(starts.iter(), ends.iter()).enumerate().map(|(i, (&s, &e))| {
-                let ee = if e > data.shape()[i] as i64 { None } else { Some(e as isize) };
-                SliceInfoElem::Slice{start: s as isize, end: ee, step: 1}
-            }).collect::<Vec<SliceInfoElem>>()
-        }
+        izip!(starts.iter(), ends.iter()).enumerate().map(|(i, (&s, &e))| {
+            let ee = if e > data.shape()[i] as i64 { None } else { Some(e as isize) };
+            SliceInfoElem::Slice{start: s as isize, end: ee, step: 1}
+        }).collect::<Vec<SliceInfoElem>>()
     };
     Ok(data.slice(slices.as_slice()).to_owned())
 }
