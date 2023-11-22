@@ -17,11 +17,6 @@ for <'a> ndarray::ArrayView2<'a, A>: ndarray::linalg::Dot<ndarray::ArrayView2<'a
         let b_common_shape = &b.shape()[0..bndim - 2];
         let last_2_a = &a.shape()[andim - 2..];
         let last_2_b = &b.shape()[bndim - 2..];
-        if last_2_a[1] != last_2_b[0] || last_2_a[0] != last_2_b[1] {
-            return Err(anyhow::anyhow!(
-                "Matmul: a and b must have compatible shapes"
-            ));
-        }
         if a_common_shape != b_common_shape {
             return Err(anyhow::anyhow!(
                 "Matmul: a and b must have compatible shapes"
