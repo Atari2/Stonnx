@@ -606,11 +606,13 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             }
             Err(e) => Err(anyhow!(e)),
         },
-        DataType::FLOAT
-        | DataType::FLOAT8E4M3FN
+        DataType::FLOAT8E4M3FN
         | DataType::FLOAT8E4M3FNUZ
         | DataType::FLOAT8E5M2FNUZ
         | DataType::FLOAT8E5M2 => {
+            todo!("Data type {:?} not supported", enum_dt);
+        }
+        DataType::FLOAT => {
             let data = if let Some(data) = &proto.raw_data {
                 match bytemuck::try_cast_slice::<u8, f32>(data) {
                     Ok(data) => data,
