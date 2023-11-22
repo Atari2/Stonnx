@@ -11,6 +11,7 @@ use crate::onnx::NodeProto;
 use crate::utils::ArrayType;
 use crate::utils::BoxResult;
 use crate::utils::OperationResult;
+use super::_commonmatmul::matmul_impl;
 
 use anyhow::anyhow;
 
@@ -102,20 +103,6 @@ impl ConvAttributes {
                     |a| a.ints.to_vec(),
                 ),
         }
-    }
-}
-
-fn matmul(a: ndarray::ArrayViewD<f32>, b: ndarray::ArrayViewD<f32>) -> BoxResult<ArrayD<f32>> {
-    if a.ndim() == 2 && b.ndim() == 2 {
-        let a = a.into_dimensionality::<Ix2>()?;
-        let b = b.into_dimensionality::<Ix2>()?;
-        Ok(a.dot(&b).into_dyn())
-    } else {
-        todo!(
-            "Matmul not implemented for ndim {} and {}",
-            a.ndim(),
-            b.ndim()
-        );
     }
 }
 
@@ -304,7 +291,7 @@ fn _conv_fast_impl(
         w.shape().iter().product::<usize>() / c2.shape()[0],
         c2.shape()[0],
     ])?;
-    let mut mul = matmul(w_reshaped.view(), c2.view())?;
+    let mut mul = matmul_impl(w_reshaped.view(), c2.view())?;
     out_shape.insert(0, w.shape()[0]);
     out_shape.insert(1, x.shape()[0]);
     mul = mul.into_shape(out_shape)?;

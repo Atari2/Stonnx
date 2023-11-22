@@ -1,4 +1,5 @@
 mod _commonpool;
+mod _commonmatmul;
 pub mod add;
 pub mod averagepool;
 pub mod batchnormalization;

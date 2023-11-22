@@ -1,24 +1,9 @@
-use ndarray::ArrayD;
-use ndarray::Ix2;
-
 use crate::onnx::NodeProto;
 use crate::utils::{ArrayType, BoxResult, OperationResult};
 
-const _OPSET_VERSIONS: [i64; 3] = [1, 9, 13];
+use super::_commonmatmul::matmul_impl;
 
-fn matmul_impl(a: ndarray::ArrayViewD<f32>, b: ndarray::ArrayViewD<f32>) -> BoxResult<ArrayD<f32>> {
-    if a.ndim() == 2 && b.ndim() == 2 {
-        let a = a.into_dimensionality::<Ix2>()?;
-        let b = b.into_dimensionality::<Ix2>()?;
-        Ok(a.dot(&b).into_dyn())
-    } else {
-        todo!(
-            "Matmul not implemented for ndim {} and {}",
-            a.ndim(),
-            b.ndim()
-        );
-    }
-}
+const _OPSET_VERSIONS: [i64; 3] = [1, 9, 13];
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_matmul.py
 /// https://onnx.ai/onnx/operators/onnx__MatMul.html
