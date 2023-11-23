@@ -1,3 +1,7 @@
+use crate::VERBOSE;
+use crate::create_intermediate_output_dir_for;
+use crate::named_array_to_file;
+use crate::operators::_commonmatmul::matmul_impl;
 use itertools::iproduct;
 use ndarray::Array1;
 use ndarray::Array2;
@@ -11,7 +15,6 @@ use crate::onnx::NodeProto;
 use crate::utils::ArrayType;
 use crate::utils::BoxResult;
 use crate::utils::OperationResult;
-use super::_commonmatmul::matmul_impl;
 
 use anyhow::anyhow;
 
@@ -112,6 +115,7 @@ fn _conv_fast_impl(
     b: Option<ndarray::ArrayViewD<f32>>,
     attrs: ConvAttributes,
 ) -> BoxResult<ArrayType> {
+    create_intermediate_output_dir_for!(conv);
     let dilations = &attrs.dilations;
     let mut kernel_shape = attrs.kernel_shape.clone();
     let strides = &attrs.strides;
@@ -120,6 +124,11 @@ fn _conv_fast_impl(
     let w_shape = w.shape();
     let group = attrs.group as usize;
     let mut w = w.to_owned();
+    named_array_to_file!(conv, w);
+    named_array_to_file!(conv, x);
+    if let Some(ref b) = b {
+        named_array_to_file!(conv, b);
+    }
 
     if x_shape[1] != w_shape[1] * group || w_shape[0] % group != 0 {
         return Err(anyhow!(
@@ -287,11 +296,14 @@ fn _conv_fast_impl(
         pads = head.into_iter().chain(tail).map(|v| v as i64).collect();
     }
     let (c2, mut out_shape) = im2col_fast(&x, &kernel_shape, &pads, strides)?;
+    named_array_to_file!(conv, c2);
     let w_reshaped = w.to_shape(vec![
         w.shape().iter().product::<usize>() / c2.shape()[0],
         c2.shape()[0],
     ])?;
+    named_array_to_file!(conv, w_reshaped);
     let mut mul = matmul_impl(w_reshaped.view(), c2.view())?;
+    named_array_to_file!(conv, mul);
     out_shape.insert(0, w.shape()[0]);
     out_shape.insert(1, x.shape()[0]);
     mul = mul.into_shape(out_shape)?;
@@ -300,6 +312,7 @@ fn _conv_fast_impl(
         .chain((0..x_shape.len() - 2).map(|x| x + 2))
         .collect();
     mul = mul.permuted_axes(perm);
+    named_array_to_file!(conv, mul, "permuted_mul");
 
     if let Some(b) = b {
         if b.len() == 1 {
@@ -308,7 +321,10 @@ fn _conv_fast_impl(
             let mut new_shape = vec![1; mul.ndim()];
             new_shape[1] = b.shape()[0];
             let b = b.to_shape(IxDyn(&new_shape))?;
-            Ok(ArrayType::F32(mul + b))
+            named_array_to_file!(conv, b, "reshaped_b");
+            let output = mul + &b;
+            named_array_to_file!(conv, output);
+            Ok(ArrayType::F32(output))
         }
     } else {
         Ok(ArrayType::F32(mul))
@@ -362,12 +378,16 @@ fn im2col_fast(
             + iind.to_shape(Ix2(1, iind.len()))?.to_owned();
         indices.push(index);
     }
+    for (i, index) in indices.iter().enumerate() {
+        named_array_to_file!(conv, index, format!("index_{}", i));
+    }
     let d = Array2::<i64>::from_shape_vec(
         (n_c * kernel_size, 1),
         (0..n_c)
             .flat_map(|x| std::iter::repeat(x as i64).take(kernel_size))
             .collect::<Vec<_>>(),
     )?;
+    named_array_to_file!(conv, d);
     let nc = [[0, 0], [0, 0]];
     let padding = nc
         .iter()
@@ -379,6 +399,7 @@ fn im2col_fast(
         padding.as_slice(),
         ndarray_ndimage::PadMode::Constant(0.0),
     );
+    named_array_to_file!(conv, x_padded);
 
     if !indices.is_empty() {
         let indices_shapes_equal = indices.iter().all(|x| x.shape() == indices[0].shape());
@@ -420,6 +441,7 @@ fn im2col_fast(
             cols[[i, j, k]] += x_padded[index.as_slice()];
         }
     }
+    named_array_to_file!(conv, cols);
     let first_dim_len = cols.shape()[0];
     let mut concat_shape = cols.shape()[1..].to_vec();
     let last_dim_len = concat_shape[concat_shape.len() - 1];
@@ -427,6 +449,7 @@ fn im2col_fast(
         *last = first_dim_len * last_dim_len;
     }
     let conc_cols = cols.to_shape(concat_shape)?.to_owned().into_dyn();
+    named_array_to_file!(conv, conc_cols);
     Ok((
         conc_cols,
         shape_out.iter().map(|v| *v as usize).collect::<Vec<_>>(),

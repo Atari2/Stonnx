@@ -1,5 +1,5 @@
 use crate::onnx::NodeProto;
-use crate::utils::{ArrayType, BoxResult, OperationResult, pick_opset_version};
+use crate::utils::{pick_opset_version, ArrayType, BoxResult, OperationResult};
 use anyhow::anyhow;
 use ndarray::{ArrayD, SliceInfoElem};
 
@@ -9,7 +9,7 @@ const OPSET_VERSIONS: [i64; 5] = [1, 2, 11, 13, 18];
 struct SplitAttrs<'a> {
     axis: i64,
     split: &'a [i64],
-    num_outputs: Option<i64>
+    num_outputs: Option<i64>,
 }
 
 impl<'a> SplitAttrs<'a> {
@@ -34,8 +34,16 @@ impl<'a> SplitAttrs<'a> {
     }
 }
 
-fn _split_part_generic<A: Copy>(mat: &ArrayD<A>, split: ArrayD<i64>, axis: usize) -> Vec<ArrayD<A>> {
-    let mut sli = mat.shape().iter().map(|s| (0..*s).into()).collect::<Vec<SliceInfoElem>>();
+fn _split_part_generic<A: Copy>(
+    mat: &ArrayD<A>,
+    split: ArrayD<i64>,
+    axis: usize,
+) -> Vec<ArrayD<A>> {
+    let mut sli = mat
+        .shape()
+        .iter()
+        .map(|s| (0..*s).into())
+        .collect::<Vec<SliceInfoElem>>();
     let mut pos = 0;
     let mut res = vec![];
     for spl in split {
@@ -46,7 +54,12 @@ fn _split_part_generic<A: Copy>(mat: &ArrayD<A>, split: ArrayD<i64>, axis: usize
     res
 }
 
-fn split_impl(mat: &ArrayType, split: Option<&ArrayType>, attrs: SplitAttrs, output_len: usize) -> BoxResult<Vec<ArrayType>> {
+fn split_impl(
+    mat: &ArrayType,
+    split: Option<&ArrayType>,
+    attrs: SplitAttrs,
+    output_len: usize,
+) -> BoxResult<Vec<ArrayType>> {
     let n_outputs = attrs.num_outputs.unwrap_or(output_len as i64) as usize;
     let axis = if attrs.axis < 0 {
         mat.ndim() as i64 + attrs.axis
@@ -55,7 +68,10 @@ fn split_impl(mat: &ArrayType, split: Option<&ArrayType>, attrs: SplitAttrs, out
     } as usize;
     let split = match split {
         Some(ArrayType::I64(s)) => Some(s.clone()),
-        None => Some(ArrayD::<i64>::from_shape_vec(vec![attrs.split.len()], attrs.split.to_vec())?),
+        None => Some(ArrayD::<i64>::from_shape_vec(
+            vec![attrs.split.len()],
+            attrs.split.to_vec(),
+        )?),
         _ => return Err(anyhow!("Split must be an array of i64")),
     };
     let split = if let Some(split) = split {
@@ -78,12 +94,14 @@ fn split_impl(mat: &ArrayType, split: Option<&ArrayType>, attrs: SplitAttrs, out
     };
 
     match mat {
-        ArrayType::F32(mat) => {
-            Ok(_split_part_generic(mat, split, axis).into_iter().map(ArrayType::F32).collect())
-        },
-        ArrayType::I64(mat) => {
-            Ok(_split_part_generic(mat, split, axis).into_iter().map(ArrayType::I64).collect())
-        },
+        ArrayType::F32(mat) => Ok(_split_part_generic(mat, split, axis)
+            .into_iter()
+            .map(ArrayType::F32)
+            .collect()),
+        ArrayType::I64(mat) => Ok(_split_part_generic(mat, split, axis)
+            .into_iter()
+            .map(ArrayType::I64)
+            .collect()),
         _ => {
             todo!("Split for type {}", mat)
         }

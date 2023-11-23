@@ -6,7 +6,10 @@ use lazy_static::lazy_static;
 pub use onnxparser::onnx;
 use std::collections::{HashMap, HashSet};
 use utils::BoxResult;
-pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor, OperationFn};
+pub use utils::{
+    make_external_inputs, make_initializers, read_model, read_tensor, OperationFn, VERBOSE,
+};
+use anyhow::anyhow;
 
 use operators::add::add;
 use operators::averagepool::averagepool;
@@ -95,8 +98,13 @@ lazy_static! {
 struct Args {
     #[arg(short, long)]
     pub model: PathBuf,
+
+    // Verbosity levels for now are
+    // 0 - No output except basic logging
+    // 2 - Output all results from operators into .npy files
+    // 4 - Output intermediate results from operators into .npy files (only supported by conv for now)
     #[arg(short, long, default_value = "0")]
-    pub verbose: u64
+    pub verbose: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -128,6 +136,7 @@ const MAX_OPSET_VERSION: i64 = 20;
 
 fn main() -> BoxResult<()> {
     let args = Args::parse();
+    VERBOSE.set(args.verbose as usize).map_err(|_| anyhow!("Failed to set verbosity"))?;
     println!("Running model: {}", args.model.display());
     let inputspath = Path::new("models").join(&args.model).join("inputs.json");
     let inputs_file = std::fs::File::open(&inputspath)?;
@@ -212,7 +221,7 @@ fn main() -> BoxResult<()> {
                             let output_name = outputs[0];
                             let output_name2 = outputs[1];
                             println!("\tOutput {} has shape {:?}", output_name, a.shape());
-                            println!("\tOutput {} has shape {:?}", output_name2, b.shape());                          
+                            println!("\tOutput {} has shape {:?}", output_name2, b.shape());
                             if args.verbose >= 2 {
                                 a.to_file(&outputs_dir, output_name)?;
                                 b.to_file(&outputs_dir, output_name2)?;

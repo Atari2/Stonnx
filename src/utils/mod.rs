@@ -12,6 +12,7 @@ use crate::onnx::{NodeProto, TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
 use crate::FileInputs;
 use half::{bf16, f16};
+use once_cell::sync::OnceCell;
 use num::complex::Complex;
 
 type Complex64 = Complex<f32>;
@@ -20,6 +21,8 @@ type Complex128 = Complex<f64>;
 static UNKNOWN: &str = "<unknown>";
 
 pub type BoxResult<A> = anyhow::Result<A>;
+
+pub static VERBOSE: OnceCell<usize> = OnceCell::new();
 
 pub struct NDIndex<'a> {
     indices: &'a [usize],
@@ -302,48 +305,22 @@ impl ArrayType {
         let name = name.replace('/', "_");
         use ndarray_npy::write_npy;
         match self {
-            ArrayType::I8(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::I16(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::I32(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::I64(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::U8(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::U16(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::U32(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::U64(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
+            ArrayType::I8(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::I16(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::I32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::I64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::U8(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::U16(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::U32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::U64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
             ArrayType::F16(_) => todo!("Half precision data type not supported"),
             ArrayType::BF16(_) => todo!("BFloat16 data type not supported"),
-            ArrayType::F32(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::F64(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::C64(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
-            ArrayType::C128(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
+            ArrayType::F32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::F64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::C64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            ArrayType::C128(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
             ArrayType::Str(_) => todo!("String data type not supported"),
-            ArrayType::Bool(data) => {
-                Ok(write_npy(dir.join(name).with_extension("npy"), data)?)
-            },
+            ArrayType::Bool(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
         }
     }
     pub fn shape(&self) -> &[usize] {
@@ -428,6 +405,53 @@ impl ArrayType {
             ArrayType::Bool(_) => DataType::BOOL,
         }
     }
+}
+
+pub fn log_array_to_file<A: ndarray_npy::WritableElement, D: ndarray::Dimension>(
+    operation: &str,
+    name: &str,
+    a: &ndarray::ArrayBase<ndarray::ViewRepr<&A>, D>,
+) -> BoxResult<()> {
+    let verbose_flag = VERBOSE.get();
+    if let Some(4..) = verbose_flag {
+        static mut COUNTER: usize = 0;
+        unsafe {
+            ndarray_npy::write_npy(format!("{}_intermediate_outputs/{}_{}.npy", operation, COUNTER, name), a)?;
+            COUNTER += 1;
+        }
+    }
+    Ok(())
+}
+
+#[macro_export]
+macro_rules! named_array_to_file {
+    ($op:ident, $name:ident) => {{
+        let $name = $name.view();
+        $crate::utils::log_array_to_file(stringify!($op), stringify!($name), &$name).unwrap();
+    }};
+    ($op:ident, $var:ident, $name:expr) => {{
+        let $var = $var.view();
+        $crate::utils::log_array_to_file(stringify!($op), &$name, &$var).unwrap();
+    }};
+}
+
+#[macro_export]
+macro_rules! create_intermediate_output_dir_for {
+    ($name:ident) => {
+        {
+            let verbose_flag = VERBOSE.get();
+            if let Some(4..) = verbose_flag {
+                match std::fs::create_dir(concat!(stringify!($name), "_intermediate_outputs")) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        if e.kind() != std::io::ErrorKind::AlreadyExists {
+                            return Err(anyhow!("Error creating rust_conv_outputs directory: {}", e));
+                        }
+                    }
+                }
+            }
+        }
+    };
 }
 
 #[derive(Debug)]

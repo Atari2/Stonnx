@@ -1,13 +1,18 @@
-use ndarray::{Ix2, ArrayD, SliceInfoElem};
+use ndarray::{ArrayD, Ix2, SliceInfoElem};
 
 use crate::utils::{BoxResult, NDIndex};
 
-pub fn matmul_impl<'b, A: Clone + num::Zero>(a: ndarray::ArrayViewD<'b, A>, b: ndarray::ArrayViewD<'b, A>) -> BoxResult<ArrayD<A>> where
-for <'a> ndarray::ArrayView2<'a, A>: ndarray::linalg::Dot<ndarray::ArrayView2<'a, A>, Output = ndarray::Array2<A>>
+pub fn matmul_impl<'b, A: Clone + num::Zero>(
+    a: ndarray::ArrayViewD<'b, A>,
+    b: ndarray::ArrayViewD<'b, A>,
+) -> BoxResult<ArrayD<A>>
+where
+    for<'a> ndarray::ArrayView2<'a, A>:
+        ndarray::linalg::Dot<ndarray::ArrayView2<'a, A>, Output = ndarray::Array2<A>>,
 {
     let andim = a.ndim();
     let bndim = b.ndim();
-    
+
     if andim == 2 && bndim == 2 {
         let a = a.into_dimensionality::<Ix2>()?;
         let b = b.into_dimensionality::<Ix2>()?;
@@ -30,16 +35,18 @@ for <'a> ndarray::ArrayView2<'a, A>: ndarray::linalg::Dot<ndarray::ArrayView2<'a
             .collect::<Vec<_>>();
         let mut out = ArrayD::<A>::zeros(out_shape);
         for index in NDIndex::new(a_common_shape) {
-            let asliceindex = index.iter().copied().map(
-                |x| x.into()
-            ).chain(
-                [
-                    (..).into(),
-                    (..).into()
-                ]
-            ).collect::<Vec<SliceInfoElem>>();
-            let aslice = a.slice(asliceindex.as_slice()).into_dimensionality::<Ix2>()?;
-            let bslice = b.slice(asliceindex.as_slice()).into_dimensionality::<Ix2>()?;
+            let asliceindex = index
+                .iter()
+                .copied()
+                .map(|x| x.into())
+                .chain([(..).into(), (..).into()])
+                .collect::<Vec<SliceInfoElem>>();
+            let aslice = a
+                .slice(asliceindex.as_slice())
+                .into_dimensionality::<Ix2>()?;
+            let bslice = b
+                .slice(asliceindex.as_slice())
+                .into_dimensionality::<Ix2>()?;
             let mut outslice = out.slice_mut(asliceindex.as_slice());
             outslice.assign(&aslice.dot(&bslice));
         }

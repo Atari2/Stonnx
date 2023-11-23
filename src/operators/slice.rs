@@ -54,37 +54,79 @@ fn common_slice_f32(
     };
 
     let slices = if let Some(axes) = axes {
-        let mut slices = data.shape().iter().map(|a| (0..*a).into()).collect::<Vec<SliceInfoElem>>(); 
+        let mut slices = data
+            .shape()
+            .iter()
+            .map(|a| (0..*a).into())
+            .collect::<Vec<SliceInfoElem>>();
         if let Some(steps) = steps {
             for (&s, &e, &a, &d) in izip!(starts.iter(), ends.iter(), axes.iter(), steps.iter()) {
                 let a = if a < 0 { a + data.ndim() as i64 } else { a } as usize;
                 if e > data.shape()[a] as i64 {
-                    slices[a] = SliceInfoElem::Slice{start: s as isize, end: None, step: d as isize};
+                    slices[a] = SliceInfoElem::Slice {
+                        start: s as isize,
+                        end: None,
+                        step: d as isize,
+                    };
                 } else {
-                    slices[a] = SliceInfoElem::Slice{start: s as isize, end: Some(e as isize), step: d as isize};
+                    slices[a] = SliceInfoElem::Slice {
+                        start: s as isize,
+                        end: Some(e as isize),
+                        step: d as isize,
+                    };
                 }
             }
         } else {
             for (&s, &e, &a) in izip!(starts.iter(), ends.iter(), axes.iter()) {
                 let a = if a < 0 { a + data.ndim() as i64 } else { a } as usize;
                 if e > data.shape()[a] as i64 {
-                    slices[a] = SliceInfoElem::Slice{start: s as isize, end: None, step: 1};
+                    slices[a] = SliceInfoElem::Slice {
+                        start: s as isize,
+                        end: None,
+                        step: 1,
+                    };
                 } else {
-                    slices[a] = SliceInfoElem::Slice{start: s as isize, end: Some(e as isize), step: 1};
+                    slices[a] = SliceInfoElem::Slice {
+                        start: s as isize,
+                        end: Some(e as isize),
+                        step: 1,
+                    };
                 }
             }
         }
         slices
     } else if let Some(steps) = steps {
-        izip!(starts.iter(), ends.iter(), steps.iter()).enumerate().map(|(i, (&s, &e, &d))| {
-            let ee = if e > data.shape()[i] as i64 { None } else { Some(e as isize) };
-            SliceInfoElem::Slice{start: s as isize, end: ee, step: d as isize}
-        }).collect::<Vec<_>>()
+        izip!(starts.iter(), ends.iter(), steps.iter())
+            .enumerate()
+            .map(|(i, (&s, &e, &d))| {
+                let ee = if e > data.shape()[i] as i64 {
+                    None
+                } else {
+                    Some(e as isize)
+                };
+                SliceInfoElem::Slice {
+                    start: s as isize,
+                    end: ee,
+                    step: d as isize,
+                }
+            })
+            .collect::<Vec<_>>()
     } else {
-        izip!(starts.iter(), ends.iter()).enumerate().map(|(i, (&s, &e))| {
-            let ee = if e > data.shape()[i] as i64 { None } else { Some(e as isize) };
-            SliceInfoElem::Slice{start: s as isize, end: ee, step: 1}
-        }).collect::<Vec<SliceInfoElem>>()
+        izip!(starts.iter(), ends.iter())
+            .enumerate()
+            .map(|(i, (&s, &e))| {
+                let ee = if e > data.shape()[i] as i64 {
+                    None
+                } else {
+                    Some(e as isize)
+                };
+                SliceInfoElem::Slice {
+                    start: s as isize,
+                    end: ee,
+                    step: 1,
+                }
+            })
+            .collect::<Vec<SliceInfoElem>>()
     };
     Ok(data.slice(slices.as_slice()).to_owned())
 }
