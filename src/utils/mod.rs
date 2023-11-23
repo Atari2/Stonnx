@@ -299,6 +299,7 @@ pub trait ArrayTypeTrait: Clone + Copy + num::Zero {}
 
 impl ArrayType {
     pub fn to_file(&self, dir: &Path, name: &str) -> BoxResult<()> {
+        let name = name.replace('/', "_");
         use ndarray_npy::write_npy;
         match self {
             ArrayType::I8(data) => {

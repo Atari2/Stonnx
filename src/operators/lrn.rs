@@ -56,11 +56,11 @@ fn lrn_f32(input: &ArrayD<f32>, attrs: LRNAttrs) -> BoxResult<ArrayD<f32>> {
         let end = (c + c2).min(minc);
         let sumpow = input
             .slice(s![.., begin..end, .., ..])
-            .mapv(|v| v.powf(2.0))
+            .mapv(|v| v.powi(2))
             .sum_axis(Axis(1));
         square_sum.slice_mut(s![.., c, .., ..]).assign(&sumpow);
     }
-    let mut biasarr = attrs.bias + attrs.alpha * square_sum;
+    let mut biasarr = attrs.bias + (attrs.alpha / attrs.size as f32) * square_sum;
     biasarr.mapv_inplace(|v| v.powf(attrs.beta));
     let y = input / biasarr;
     Ok(y)

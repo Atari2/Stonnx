@@ -1,4 +1,4 @@
-use ndarray::ArrayD;
+use ndarray::{ArrayD, SliceInfoElem};
 
 use crate::onnx::NodeProto;
 use crate::utils::{ArrayType, BoxResult, OperationResult, pick_opset_version};
@@ -102,9 +102,14 @@ fn _batchnorm_training_mode(
     for ax in axis.iter().rev() {
         saved_mean = saved_mean.mean_axis(ndarray::Axis(*ax)).ok_or(anyhow::anyhow!("BatchNormalization: mean_axis failed"))?;
     }
-    let mut saved_var = x.clone();
-    for ax in axis.iter().rev() {
-        saved_var = saved_var.var_axis(ndarray::Axis(*ax), 0.);
+    let saved_var_len = x.shape()[1];
+    let mut saved_var = ArrayD::<f32>::zeros(vec![saved_var_len]);
+    for i in 0..saved_var_len {
+        let sliceinfo = [(0..).into(), i.into()].into_iter().chain(
+            std::iter::repeat((0..).into()).take(x.ndim() - 2)
+        ).collect::<Vec<SliceInfoElem>>();
+        let sliced = x.slice(sliceinfo.as_slice()).to_owned();
+        saved_var[i] = sliced.var(0.0);
     }
     let output_mean = mean.mapv(|x| x * momentum) + saved_mean.mapv(|x| x * (1. - momentum));
     let output_var = var.mapv(|x| x * momentum) + saved_var.mapv(|x| x * (1. - momentum));
@@ -133,17 +138,17 @@ fn batchnormalization_7_9(x: &ArrayD<f32>, scale: &ArrayD<f32>, bias: &ArrayD<f3
         for ax in axis.iter().rev() {
             saved_mean = saved_mean.mean_axis(ndarray::Axis(*ax)).ok_or(anyhow::anyhow!("BatchNormalization: mean_axis failed"))?;
         }
-        println!("saved_mean: {:?}", saved_mean);
-        let mut saved_var = x.clone();
-        for ax in axis.iter().rev() {
-            // FIXME: this calculation is NOT correct
-            saved_var = saved_var.var_axis(ndarray::Axis(*ax), 0.);
+        let saved_var_len = x.shape()[1];
+        let mut saved_var = ArrayD::<f32>::zeros(vec![saved_var_len]);
+        for i in 0..saved_var_len {
+            let sliceinfo = [(0..).into(), i.into()].into_iter().chain(
+                std::iter::repeat((0..).into()).take(x.ndim() - 2)
+            ).collect::<Vec<SliceInfoElem>>();
+            let sliced = x.slice(sliceinfo.as_slice()).to_owned();
+            saved_var[i] = sliced.var(0.0);
         }
-        println!("saved_var: {:?}", saved_var);
         let output_mean = mean.mapv(|x| x * momentum) + saved_mean.mapv(|x| x * (1. - momentum));
-        println!("output_mean: {:?}", output_mean);
         let output_var = var.mapv(|x| x * momentum) + saved_var.mapv(|x| x * (1. - momentum));
-        println!("output_var: {:?}", output_var);
         let y = _batchnorm_test_mode(x, scale, bias, &output_mean, &output_var, attrs.epsilon)?;
         Ok(vec![y])
     } else {

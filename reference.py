@@ -7,11 +7,11 @@ from onnx import numpy_helper
 import os
 import functools
 import glob
-from onnx.reference.ops.op_batch_normalization import BatchNormalization_9
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--model', type=str)
 parser.add_argument('-v', '--verbose', type=int, default=4)
+parser.add_argument('-f', '--on-failure', type=str, default='terminate')
 args = parser.parse_args()
 
 jsonfile = f'models/{args.model}/inputs.json'
@@ -38,11 +38,14 @@ os.makedirs(f'outputs\\reference\\{args.model}', exist_ok=True)
 
 output_info = {}
 
+output_exit_order = []
+
 def _run(og_run, *op_args, **kwargs):
     outputs = og_run(*op_args, **kwargs)
-    output_names = [o for o in og_run.__self__.output]
+    output_names = [o.replace("/", "_") for o in og_run.__self__.output]
     for o in output_names:
         output_info[o] = (og_run.__self__.op_type, og_run.__self__.input)
+        output_exit_order.append(o)
     for name, output in zip(output_names, outputs):
         np.save(f'outputs\\reference\\{args.model}\\{name}.npy', output)
     return outputs
@@ -66,13 +69,16 @@ for file in rust_output_files:
     rust_outputs[os.path.basename(file)] = np.load(file)
 
 
-for key in reference_outputs.keys():
+for o in output_exit_order:
+    key = f'{o}.npy'
     exp = reference_outputs[key]
-    act = rust_outputs[key]
-    if not np.allclose(exp, act):
-        output_name = key.split('.')[0]
-        op_type, input = output_info[output_name]
-        print(f'Output {key} does not match for operator {op_type} with input {input}')
-        print(f'Expected: {exp}')
-        print(f'Actual: {act}')
-        raise Exception("Outputs do not match")
+    act = rust_outputs[key]        
+    output_name = key.split('.')[0]
+    op_type, input = output_info[output_name]
+    try:
+        np.testing.assert_almost_equal(exp, act, decimal=5, verbose=True, err_msg=f'Output {key} does not match for operator {op_type} with input {input}')
+        print(f'Output {key} matches for operator {op_type} with input {input}')
+    except AssertionError as e:
+        print(str(e))
+        if args.on_failure == 'terminate':
+            exit(1)
