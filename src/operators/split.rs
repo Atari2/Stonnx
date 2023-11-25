@@ -1,9 +1,9 @@
 use crate::onnx::NodeProto;
-use crate::utils::{pick_opset_version, ArrayType, BoxResult, OperationResult};
+use crate::utils::{ArrayType, BoxResult, OperationResult};
 use anyhow::anyhow;
 use ndarray::{ArrayD, SliceInfoElem};
 
-const OPSET_VERSIONS: [i64; 5] = [1, 2, 11, 13, 18];
+const _OPSET_VERSIONS: [i64; 5] = [1, 2, 11, 13, 18];
 
 #[derive(Debug)]
 struct SplitAttrs<'a> {
@@ -113,16 +113,11 @@ fn split_impl(
 pub fn split(
     inputs: &[&ArrayType],
     node: &NodeProto,
-    opset_version: i64,
+    _opset_version: i64,
     output_len: usize,
 ) -> BoxResult<OperationResult> {
-    let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     let mat = inputs[0];
     let split = inputs.get(1);
     let attrs = SplitAttrs::new(node);
-    if target_version == 18 {
-        Ok(split_impl(mat, split.copied(), attrs, output_len)?.into())
-    } else {
-        Ok(split_impl(mat, split.copied(), attrs, output_len)?.into())
-    }
+    Ok(split_impl(mat, split.copied(), attrs, output_len)?.into())
 }

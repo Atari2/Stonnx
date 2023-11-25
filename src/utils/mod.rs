@@ -508,24 +508,7 @@ pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<ArrayType> {
     if proto.data_location() != onnx::tensor_proto::DataLocation::DEFAULT {
         return Err(anyhow!("External data location not supported"));
     }
-    if let Some(DataType::STRING) = DataType::from_i32(proto.data_type()) {
-        let bytedata = &proto.string_data;
-        make_string_tensor(shape, bytedata)
-    } else {
-        make_tensor(shape, proto, proto.data_type())
-    }
-}
-
-pub fn make_string_tensor(shape: &[i64], bytedata: &[impl AsRef<[u8]>]) -> BoxResult<ArrayType> {
-    let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
-    let a = ArrayD::<String>::from_shape_vec(
-        IxDyn(&shape),
-        bytedata
-            .iter()
-            .map(|v| String::from_utf8_lossy(v.as_ref()).to_string())
-            .collect(),
-    )?;
-    Ok(ArrayType::Str(a))
+    make_tensor(shape, proto, proto.data_type())
 }
 
 pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxResult<ArrayType> {
@@ -666,7 +649,17 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             }
             Err(e) => Err(anyhow!(e)),
         },
-        DataType::STRING => panic!("String data type not supported, use make_string_tensor()"),
+        DataType::STRING => {
+            let bytedata = &proto.string_data;
+            let a = ArrayD::<String>::from_shape_vec(
+                IxDyn(&shape),
+                bytedata
+                    .iter()
+                    .map(|v| String::from_utf8_lossy(v.as_ref()).to_string())
+                    .collect(),
+            )?;
+            Ok(ArrayType::Str(a))
+        },
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));

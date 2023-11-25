@@ -1,11 +1,12 @@
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
     utils::{
-        make_string_tensor, make_tensor_from_proto, make_tensor_from_raw, pick_opset_version,
+        make_tensor_from_proto, make_tensor_from_raw, pick_opset_version,
         ArrayType, BoxResult, OperationResult,
     },
 };
 use anyhow::anyhow;
+use ndarray::{Array0, Array1};
 use protobuf::{Enum, MessageField};
 
 const OPSET_VERSION: [i64; 6] = [1, 9, 11, 12, 13, 19];
@@ -155,12 +156,10 @@ fn constant_12(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
             )?)
         }
         (None, None, None, None, None, None, Some(v_s), None) => {
-            let string_value = v_s.as_bytes();
-            Ok(make_string_tensor(&[], &[string_value])?)
+            Ok(ArrayType::Str(Array0::from_elem([], v_s).into_dyn()))
         }
         (None, None, None, None, None, None, None, Some(v_ss)) => {
-            let string_value: Vec<&[u8]> = v_ss.iter().map(|s| s.as_bytes()).collect();
-            Ok(make_string_tensor(&[v_ss.len() as i64], &string_value)?)
+            Ok(ArrayType::Str(Array1::from_vec(v_ss).into_dyn()))
         }
         _ => todo!(),
     }

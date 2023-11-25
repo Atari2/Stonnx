@@ -139,7 +139,7 @@ fn main() -> BoxResult<()> {
     VERBOSE.set(args.verbose as usize).map_err(|_| anyhow!("Failed to set verbosity"))?;
     println!("Running model: {}", args.model.display());
     let inputspath = Path::new("models").join(&args.model).join("inputs.json");
-    let inputs_file = std::fs::File::open(&inputspath)?;
+    let inputs_file = std::fs::File::open(inputspath)?;
     let mut fileinputs: FileInputs = serde_json::from_reader(inputs_file)?;
     fileinputs.extend_paths(&args.model);
     let model = read_model(Path::new(&fileinputs.modelpath))?;
