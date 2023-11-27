@@ -67,18 +67,18 @@ fn _get_pad_shape(
 }
 
 fn _get_output_shape_no_ceil(
-    auto_pad: PoolAutoPad,
+    auto_pad: Option<PoolAutoPad>,
     input_spatial_shape: &[usize],
     kernel_spatial_shape: &[i64],
     strides_spatial: &[i64],
 ) -> Vec<usize> {
     let mut out_shape = vec![0; input_spatial_shape.len()];
-    if auto_pad == PoolAutoPad::SameUpper || auto_pad == PoolAutoPad::SameLower {
+    if auto_pad == Some(PoolAutoPad::SameUpper) || auto_pad == Some(PoolAutoPad::SameLower) {
         for i in 0..input_spatial_shape.len() {
             out_shape[i] =
                 (input_spatial_shape[i] as f32 / strides_spatial[i] as f32).ceil() as usize;
         }
-    } else if auto_pad == PoolAutoPad::Valid {
+    } else if auto_pad == Some(PoolAutoPad::Valid) {
         for i in 0..input_spatial_shape.len() {
             out_shape[i] = (input_spatial_shape[i] as f32
                 - (kernel_spatial_shape[i] - 1) as f32 / strides_spatial[i] as f32)
@@ -89,7 +89,7 @@ fn _get_output_shape_no_ceil(
 }
 
 fn _get_output_shape(
-    auto_pad: PoolAutoPad,
+    auto_pad: Option<PoolAutoPad>,
     input_spatial_shape: &[usize],
     kernel_spatial_shape: &[i64],
     strides_spatial: &[i64],
@@ -98,12 +98,12 @@ fn _get_output_shape(
 ) -> BoxResult<Vec<usize>> {
     let out_shape = if ceil_mode {
         let mut out_shape = vec![0; input_spatial_shape.len()];
-        if auto_pad == PoolAutoPad::SameLower || auto_pad == PoolAutoPad::SameUpper {
+        if auto_pad == Some(PoolAutoPad::SameLower) || auto_pad == Some(PoolAutoPad::SameUpper) {
             for i in 0..input_spatial_shape.len() {
                 out_shape[i] =
                     f32::ceil(input_spatial_shape[i] as f32 / strides_spatial[i] as f32) as usize;
             }
-        } else if auto_pad == PoolAutoPad::Valid {
+        } else if auto_pad == Some(PoolAutoPad::Valid) {
             if let Some(pad_shape) = pad_shape {
                 for i in 0..input_spatial_shape.len() {
                     out_shape[i] = f32::ceil(
@@ -317,9 +317,12 @@ pub fn _common_pool_f32(
     input: &ArrayD<f32>,
     pooling_type: PoolingType,
     count_include_pad: i64,
-    attrs: CommonPoolAttrs,
+    mut attrs: CommonPoolAttrs,
     output_len: usize,
 ) -> BoxResult<PoolOutput> {
+    if attrs.dilations.is_none() && pooling_type == PoolingType::Max {
+        attrs.dilations = Some(vec![1; attrs.kernel_shape.len()]);
+    }
     let pads = if let Some(ref pads) = attrs.pads {
         pads.clone()
     } else {
@@ -337,12 +340,12 @@ pub fn _common_pool_f32(
     let kernel_shape = attrs.kernel_shape;
     let auto_pad = if let Some(auto_pad) = attrs.auto_pad {
         if auto_pad == PoolAutoPad::NotSet {
-            PoolAutoPad::Valid
+            Some(PoolAutoPad::Valid)
         } else {
-            auto_pad
+            Some(auto_pad)
         }
     } else {
-        PoolAutoPad::Valid
+        None
     };
     let (mut pad_shape, x_shape, mut padded) = if pads.is_empty() {
         (
@@ -383,22 +386,28 @@ pub fn _common_pool_f32(
         )
     };
     let out_shape;
-    if auto_pad == PoolAutoPad::SameLower || auto_pad == PoolAutoPad::SameUpper {
+    if auto_pad == Some(PoolAutoPad::SameLower) || auto_pad == Some(PoolAutoPad::SameUpper) {
         let const_ = if count_include_pad == 0 {
             f32::NAN
         } else {
             0.0
         };
         out_shape = _get_output_shape(
-            auto_pad,
+            auto_pad, // safe to unwrap, verified above
             &x_shape,
             &kernel_shape,
             &strides,
             Some(&pad_shape),
             attrs.ceil_mode,
         )?;
-        pad_shape = _get_pad_shape(auto_pad, &x_shape, &kernel_shape, &strides, &out_shape)?;
-        let (pb, pt, pr, pl) = if auto_pad == PoolAutoPad::SameLower {
+        pad_shape = _get_pad_shape(
+            auto_pad.unwrap(),
+            &x_shape,
+            &kernel_shape,
+            &strides,
+            &out_shape,
+        )?;
+        let (pb, pt, pr, pl) = if auto_pad == Some(PoolAutoPad::SameLower) {
             let pb = pad_shape[0] / 2;
             let pr = pad_shape[1] / 2;
             (pb, pad_shape[0] - pb, pr, pad_shape[1] - pr)

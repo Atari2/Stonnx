@@ -13,7 +13,7 @@ const _OPSET_VERSIONS: [i64; 5] = [1, 8, 10, 11, 12];
 
 #[derive(Debug)]
 struct MaxPoolAttrs {
-    auto_pad: Option<PoolAutoPad>,
+    auto_pad: PoolAutoPad,
     ceil_mode: bool,
     dilations: Option<Vec<i64>>,
     kernel_shape: Vec<i64>,
@@ -32,7 +32,7 @@ impl MaxPoolAttrs {
                 .attribute
                 .iter()
                 .find(|a| a.name() == "auto_pad")
-                .map(PoolAutoPad::from_attr),
+                .map_or(PoolAutoPad::NotSet, PoolAutoPad::from_attr),
             ceil_mode: node
                 .attribute
                 .iter()
@@ -73,7 +73,7 @@ impl MaxPoolAttrs {
 impl From<MaxPoolAttrs> for CommonPoolAttrs {
     fn from(attrs: MaxPoolAttrs) -> Self {
         Self {
-            auto_pad: attrs.auto_pad,
+            auto_pad: Some(attrs.auto_pad),
             ceil_mode: attrs.ceil_mode,
             dilations: attrs.dilations,
             kernel_shape: attrs.kernel_shape,
@@ -277,7 +277,7 @@ fn _maxpool_internal_f32(
     }
 
     match attrs.auto_pad {
-        Some(PoolAutoPad::Valid) => {
+        PoolAutoPad::Valid => {
             for i in 0..input_spatial_shape.len() {
                 output_spatial_shape[i] = ((input_spatial_shape[i]
                     - ((attrs.kernel_shape[i] - 1) * dilations[i] + 1) as usize
@@ -286,9 +286,9 @@ fn _maxpool_internal_f32(
                     .ceil() as usize;
             }
         }
-        Some(PoolAutoPad::SameUpper) | Some(PoolAutoPad::SameLower) => {
+        PoolAutoPad::SameUpper | PoolAutoPad::SameLower => {
             for i in 0..input_spatial_shape.len() {
-                if attrs.auto_pad == Some(PoolAutoPad::SameUpper) {
+                if attrs.auto_pad == PoolAutoPad::SameUpper {
                     output_spatial_shape[i] =
                         (input_spatial_shape[i] as f64 / strides[i] as f64).ceil() as usize;
                 } else {
@@ -302,7 +302,7 @@ fn _maxpool_internal_f32(
                 new_pads[[i, 1]] = pad_i - new_pads[[i, 0]];
             }
         }
-        Some(PoolAutoPad::NotSet) | None => {}
+        PoolAutoPad::NotSet => {}
     }
 
     attrs.replace_dilations_and_strides(dilations, strides);
