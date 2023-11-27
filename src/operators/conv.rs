@@ -1,7 +1,7 @@
-use crate::VERBOSE;
 use crate::create_intermediate_output_dir_for;
 use crate::named_array_to_file;
 use crate::operators::_commonmatmul::matmul_impl;
+use crate::VERBOSE;
 use itertools::iproduct;
 use ndarray::Array1;
 use ndarray::Array2;

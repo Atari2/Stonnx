@@ -1,7 +1,9 @@
 mod onnxparser;
 mod operators;
+mod protograph;
 mod utils;
 
+use anyhow::anyhow;
 use lazy_static::lazy_static;
 pub use onnxparser::onnx;
 use std::collections::{HashMap, HashSet};
@@ -9,7 +11,6 @@ use utils::BoxResult;
 pub use utils::{
     make_external_inputs, make_initializers, read_model, read_tensor, OperationFn, VERBOSE,
 };
-use anyhow::anyhow;
 
 use operators::add::add;
 use operators::averagepool::averagepool;
@@ -45,13 +46,14 @@ use operators::sub::sub;
 use operators::tanh::tanh;
 use operators::transpose::transpose;
 use operators::unsqueeze::unsqueeze;
+use protograph::build_graph_from_proto;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
 
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{make_external_outputs, make_graph_outputs, ArrayType, OperationResult};
+use utils::{make_external_outputs, make_graph_outputs, ArrayType, OperationResult};
 
 lazy_static! {
     static ref OPERATION_MAP: HashMap<&'static str, OperationFn> = {
@@ -105,6 +107,12 @@ struct Args {
     // 4 - Output intermediate results from operators into .npy files (only supported by conv for now)
     #[arg(short, long, default_value = "0")]
     pub verbose: u64,
+
+    #[arg(short, long, default_value = "false")]
+    pub gengraph: bool,
+
+    #[arg(short, long, default_value = "false")]
+    pub failfast: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -119,16 +127,32 @@ impl FileInputs {
         self.inputs = self
             .inputs
             .iter()
-            .map(|s| Path::new("models").join(modelname).join(s))
+            .map(|s| {
+                if s.is_absolute() {
+                    s.clone()
+                } else {
+                    Path::new("models").join(modelname).join(s)
+                }
+            })
             .collect();
         self.outputs = self
             .outputs
             .iter()
-            .map(|s| Path::new("models").join(modelname).join(s))
+            .map(|s| {
+                if s.is_absolute() {
+                    s.clone()
+                } else {
+                    Path::new("models").join(modelname).join(s)
+                }
+            })
             .collect();
-        self.modelpath = Path::new("models")
-            .join(modelname)
-            .join(self.modelpath.clone())
+        self.modelpath = if self.modelpath.is_relative() {
+            Path::new("models")
+                .join(modelname)
+                .join(self.modelpath.clone())
+        } else {
+            self.modelpath.clone()
+        };
     }
 }
 
@@ -136,9 +160,15 @@ const MAX_OPSET_VERSION: i64 = 20;
 
 fn main() -> BoxResult<()> {
     let args = Args::parse();
-    VERBOSE.set(args.verbose as usize).map_err(|_| anyhow!("Failed to set verbosity"))?;
+    VERBOSE
+        .set(args.verbose as usize)
+        .map_err(|_| anyhow!("Failed to set verbosity"))?;
     println!("Running model: {}", args.model.display());
-    let inputspath = Path::new("models").join(&args.model).join("inputs.json");
+    let inputspath = if args.model.is_relative() {
+        Path::new("models").join(&args.model).join("inputs.json")
+    } else {
+        args.model.join("inputs.json")
+    };
     let inputs_file = std::fs::File::open(inputspath)?;
     let mut fileinputs: FileInputs = serde_json::from_reader(inputs_file)?;
     fileinputs.extend_paths(&args.model);
@@ -164,6 +194,9 @@ fn main() -> BoxResult<()> {
         );
     }
     for graph in model.graph.iter() {
+        if args.gengraph {
+            build_graph_from_proto(graph, &fileinputs.modelpath)?;
+        }
         let initializers = make_initializers(graph);
         let mut node_inputs = make_external_inputs(graph, &fileinputs, &initializers)?;
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
@@ -182,6 +215,9 @@ fn main() -> BoxResult<()> {
         );
         for name in not_implemented.iter() {
             eprintln!("Model uses operator {} which is not implemented yet", name);
+        }
+        if !not_implemented.is_empty() && args.failfast {
+            return Err(anyhow!("Not implemented operators found"));
         }
         for node in graph.node.iter() {
             let mut inputs = vec![];
@@ -325,7 +361,9 @@ fn main() -> BoxResult<()> {
                             }
                             let max = diff
                                 .iter()
-                                .max_by(|(_, _, _, d1), (_, _, _, d2)| d1.partial_cmp(d2).unwrap())
+                                .max_by(|(_, _, _, d1), (_, _, _, d2)| {
+                                    d1.partial_cmp(d2).unwrap_or(std::cmp::Ordering::Less)
+                                })
                                 .expect("Failed to get max difference");
                             println!("Output {} has {} values with absolute difference of more than .0001", name, count);
                             println!("\tMax difference: {:?}", max);

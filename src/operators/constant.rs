@@ -1,8 +1,8 @@
 use crate::{
     onnx::{tensor_proto::DataType, NodeProto},
     utils::{
-        make_tensor_from_proto, make_tensor_from_raw, pick_opset_version,
-        ArrayType, BoxResult, OperationResult,
+        make_tensor_from_proto, make_tensor_from_raw, pick_opset_version, ArrayType, BoxResult,
+        OperationResult,
     },
 };
 use anyhow::anyhow;

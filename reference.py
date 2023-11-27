@@ -7,6 +7,9 @@ from onnx import numpy_helper
 import os
 import functools
 import glob
+from pathlib import Path
+from onnx.reference.ops.op_average_pool import AveragePool_11
+from onnx.reference.ops.op_max_pool import MaxPool
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--model', type=str)
@@ -14,15 +17,19 @@ parser.add_argument('-v', '--verbose', type=int, default=4)
 parser.add_argument('-f', '--on-failure', type=str, default='terminate')
 args = parser.parse_args()
 
-jsonfile = f'models/{args.model}/inputs.json'
+pmodel = Path(args.model)
+if not pmodel.is_absolute():
+    jsonfile = f'models/{args.model}/inputs.json'
+else:
+    jsonfile = pmodel.joinpath('inputs.json')
 
 with open(jsonfile, 'r') as f:
     information = json.load(f)
 
-modelpath = f'models/{args.model}/{information["modelpath"]}'
+modelpath = f'models/{args.model}/{information["modelpath"]}' if not os.path.isabs(information['modelpath']) else information['modelpath']
 
-inputpaths = [f'models/{args.model}/{path}' for path in information['inputs']]
-outputpaths = [f'models/{args.model}/{path}' for path in information['outputs']]
+inputpaths = [f'models/{args.model}/{path}' if not os.path.isabs(path) else path for path in information['inputs']]
+outputpaths = [f'models/{args.model}/{path}' if not os.path.isabs(path) else path for path in information['outputs']]
 
 model = onnx.load_model(modelpath)
 tensor_inputs = [onnx.load_tensor(path) for path in inputpaths]
@@ -34,7 +41,9 @@ for input in tensor_inputs:
 
 sess = ReferenceEvaluator(model, verbose=args.verbose)
 
-os.makedirs(f'outputs\\reference\\{args.model}', exist_ok=True)
+modelname = args.model if not pmodel.is_absolute() else pmodel.stem
+
+os.makedirs(f'outputs\\reference\\{modelname}', exist_ok=True)
 
 output_info = {}
 
@@ -47,7 +56,7 @@ def _run(og_run, *op_args, **kwargs):
         output_info[o] = (og_run.__self__.op_type, og_run.__self__.input)
         output_exit_order.append(o)
     for name, output in zip(output_names, outputs):
-        np.save(f'outputs\\reference\\{args.model}\\{name}.npy', output)
+        np.save(f'outputs\\reference\\{modelname}\\{name}.npy', output)
     return outputs
 
 for node in sess.rt_nodes_:
@@ -59,8 +68,8 @@ if len(results) != len(tensor_outputs):
 
 reference_outputs = {}
 rust_outputs = {}
-reference_output_files = glob.glob(f'outputs\\reference\\{args.model}\\*.npy')
-rust_output_files = glob.glob(f'outputs\\{args.model}\\*.npy')
+reference_output_files = glob.glob(f'outputs\\reference\\{modelname}\\*.npy')
+rust_output_files = glob.glob(f'outputs\\{modelname}\\*.npy')
 
 for file in reference_output_files:
     reference_outputs[os.path.basename(file)] = np.load(file)

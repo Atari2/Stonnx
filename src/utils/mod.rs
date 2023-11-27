@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use num::traits::AsPrimitive;
 use std::io::Read;
 use std::os::raw::c_uchar;
 use std::path::PathBuf;
@@ -12,8 +13,8 @@ use crate::onnx::{NodeProto, TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
 use crate::FileInputs;
 use half::{bf16, f16};
-use once_cell::sync::OnceCell;
 use num::complex::Complex;
+use once_cell::sync::OnceCell;
 
 type Complex64 = Complex<f32>;
 type Complex128 = Complex<f64>;
@@ -137,14 +138,17 @@ pub type OperationFn = for<'a, 'b, 'c> fn(
 
 pub fn shape_safe_product<
     'a,
-    B: 'a + std::iter::Product<&'a B> + std::default::Default,
+    B: 'a + std::iter::Product<&'a B> + std::default::Default + Copy + 'static,
     A: IntoIterator<Item = &'a B>,
 >(
     shape: A,
-) -> B {
+) -> B
+where
+    usize: AsPrimitive<B>,
+{
     let mut piter = shape.into_iter().peekable();
     if piter.peek().is_none() {
-        std::default::Default::default()
+        1_usize.as_()
     } else {
         piter.product()
     }
@@ -416,7 +420,13 @@ pub fn log_array_to_file<A: ndarray_npy::WritableElement, D: ndarray::Dimension>
     if let Some(4..) = verbose_flag {
         static mut COUNTER: usize = 0;
         unsafe {
-            ndarray_npy::write_npy(format!("{}_intermediate_outputs/{}_{}.npy", operation, COUNTER, name), a)?;
+            ndarray_npy::write_npy(
+                format!(
+                    "{}_intermediate_outputs/{}_{}.npy",
+                    operation, COUNTER, name
+                ),
+                a,
+            )?;
             COUNTER += 1;
         }
     }
@@ -437,21 +447,19 @@ macro_rules! named_array_to_file {
 
 #[macro_export]
 macro_rules! create_intermediate_output_dir_for {
-    ($name:ident) => {
-        {
-            let verbose_flag = VERBOSE.get();
-            if let Some(4..) = verbose_flag {
-                match std::fs::create_dir(concat!(stringify!($name), "_intermediate_outputs")) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        if e.kind() != std::io::ErrorKind::AlreadyExists {
-                            return Err(anyhow!("Error creating rust_conv_outputs directory: {}", e));
-                        }
+    ($name:ident) => {{
+        let verbose_flag = VERBOSE.get();
+        if let Some(4..) = verbose_flag {
+            match std::fs::create_dir(concat!(stringify!($name), "_intermediate_outputs")) {
+                Ok(_) => {}
+                Err(e) => {
+                    if e.kind() != std::io::ErrorKind::AlreadyExists {
+                        return Err(anyhow!("Error creating rust_conv_outputs directory: {}", e));
                     }
                 }
             }
         }
-    };
+    }};
 }
 
 #[derive(Debug)]
@@ -511,23 +519,63 @@ pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<ArrayType> {
     make_tensor(shape, proto, proto.data_type())
 }
 
+fn get_raw_data(proto: &TensorProto) -> BoxResult<(&[u8], usize)> {
+    if let Some(ref raw_data) = proto.raw_data {
+        Ok((raw_data.as_slice(), 1))
+    } else if !proto.int32_data.is_empty() {
+        Ok((
+            bytemuck::try_cast_slice(proto.int32_data.as_slice()).map_err(|e| anyhow!(e))?,
+            4,
+        ))
+    } else if !proto.int64_data.is_empty() {
+        Ok((
+            bytemuck::try_cast_slice(proto.int64_data.as_slice()).map_err(|e| anyhow!(e))?,
+            8,
+        ))
+    } else if !proto.float_data.is_empty() {
+        Ok((
+            bytemuck::try_cast_slice(proto.float_data.as_slice()).map_err(|e| anyhow!(e))?,
+            4,
+        ))
+    } else if !proto.double_data.is_empty() {
+        Ok((
+            bytemuck::try_cast_slice(proto.double_data.as_slice()).map_err(|e| anyhow!(e))?,
+            8,
+        ))
+    } else if !proto.uint64_data.is_empty() {
+        Ok((
+            bytemuck::try_cast_slice(proto.uint64_data.as_slice()).map_err(|e| anyhow!(e))?,
+            8,
+        ))
+    } else {
+        Ok((&[], 0))
+    }
+}
+
 pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxResult<ArrayType> {
     let enum_dt = DataType::from_i32(data_type).unwrap_or_default();
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
-    let bytedata = proto.raw_data();
+    let (bytedata, origin_elem_size) = get_raw_data(proto)?;
     match enum_dt {
         DataType::UNDEFINED => Err(anyhow!("Undefined data type")),
         DataType::INT8 => match bytemuck::try_cast_slice::<u8, i8>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
-                let a = ArrayD::<i8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
+                let a = if origin_elem_size == std::mem::size_of::<i8>() {
+                    ArrayD::<i8>::from_shape_vec(IxDyn(&shape), data.to_vec())?
+                } else {
+                    ArrayD::<i8>::from_shape_vec(
+                        IxDyn(&shape),
+                        data.iter().step_by(origin_elem_size).copied().collect(),
+                    )?
+                };
                 Ok(ArrayType::I8(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
         DataType::INT16 => match bytemuck::try_cast_slice::<u8, i16>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<i16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::I16(a))
             }
@@ -589,15 +637,22 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         }
         DataType::UINT8 => match bytemuck::try_cast_slice::<u8, u8>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
-                let a = ArrayD::<u8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
+                let a = if origin_elem_size == std::mem::size_of::<u8>() {
+                    ArrayD::<u8>::from_shape_vec(IxDyn(&shape), data.to_vec())?
+                } else {
+                    ArrayD::<u8>::from_shape_vec(
+                        IxDyn(&shape),
+                        data.iter().step_by(origin_elem_size).copied().collect(),
+                    )?
+                };
                 Ok(ArrayType::U8(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
         DataType::UINT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<u16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U16(a))
             }
@@ -605,23 +660,42 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         },
         DataType::UINT32 => match bytemuck::try_cast_slice::<u8, u32>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<u32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
                 Ok(ArrayType::U32(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
-        DataType::UINT64 => match bytemuck::try_cast_slice::<u8, u64>(bytedata) {
-            Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
-                let a = ArrayD::<u64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::U64(a))
+        DataType::UINT64 => {
+            let data = if let Some(data) = &proto.raw_data {
+                match bytemuck::try_cast_slice::<u8, u64>(data) {
+                    Ok(data) => data,
+                    Err(e) => return Err(anyhow!(e)),
+                }
+            } else {
+                proto.uint64_data.as_slice()
+            };
+            let dlen = data.len();
+            let slen = if !shape.is_empty() {
+                shape_safe_product(&shape)
+            } else {
+                0
+            };
+            // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
+            // panic otherwise
+            if dlen != slen && (slen == 0 && dlen != 1) {
+                panic!("Data length {} does not match shape length {}", dlen, slen)
             }
-            Err(e) => Err(anyhow!(e)),
-        },
+            let a = if data.is_empty() {
+                ArrayD::<u64>::zeros(IxDyn(&shape))
+            } else {
+                ArrayD::<u64>::from_shape_vec(IxDyn(&shape), data.to_vec())?
+            };
+            Ok(ArrayType::U64(a))
+        }
         DataType::FLOAT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<f16>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter().map(|x| f16::from_bits(*x)).collect(),
@@ -632,7 +706,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         },
         DataType::BFLOAT16 => match bytemuck::try_cast_slice::<u8, f32>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<bf16>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter().map(|x| bf16::from_f32(*x)).collect(),
@@ -641,14 +715,33 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             }
             Err(e) => Err(anyhow!(e)),
         },
-        DataType::DOUBLE => match bytemuck::try_cast_slice::<u8, f64>(bytedata) {
-            Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
-                let a = ArrayD::<f64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::F64(a))
+        DataType::DOUBLE => {
+            let data = if let Some(data) = &proto.raw_data {
+                match bytemuck::try_cast_slice::<u8, f64>(data) {
+                    Ok(data) => data,
+                    Err(e) => return Err(anyhow!(e)),
+                }
+            } else {
+                proto.double_data.as_slice()
+            };
+            let dlen = data.len();
+            let slen = if !shape.is_empty() {
+                shape_safe_product(&shape)
+            } else {
+                0
+            };
+            // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
+            // panic otherwise
+            if dlen != slen && (slen == 0 && dlen != 1) {
+                panic!("Data length {} does not match shape length {}", dlen, slen)
             }
-            Err(e) => Err(anyhow!(e)),
-        },
+            let a = if data.is_empty() {
+                ArrayD::<f64>::zeros(IxDyn(&shape))
+            } else {
+                ArrayD::<f64>::from_shape_vec(IxDyn(&shape), data.to_vec())?
+            };
+            Ok(ArrayType::F64(a))
+        }
         DataType::STRING => {
             let bytedata = &proto.string_data;
             let a = ArrayD::<String>::from_shape_vec(
@@ -659,10 +752,10 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                     .collect(),
             )?;
             Ok(ArrayType::Str(a))
-        },
+        }
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<bool>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter().map(|x| *x != 0).collect(),
@@ -706,7 +799,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         }
         DataType::COMPLEX64 => match bytemuck::try_cast_slice::<u8, Complex64Repr>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<Complex64>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter()
@@ -719,7 +812,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         },
         DataType::COMPLEX128 => match bytemuck::try_cast_slice::<u8, Complex128Repr>(bytedata) {
             Ok(data) => {
-                assert_eq!(data.len(), shape_safe_product(&shape));
+                assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<Complex128>::from_shape_vec(
                     IxDyn(&shape),
                     data.iter()
