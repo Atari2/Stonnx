@@ -101,20 +101,40 @@ lazy_static! {
 }
 
 #[derive(Parser, Debug)]
+/// Parse and execute inference on pre-trained ONNX models
 struct Args {
+    /// Path to the folder containing the model to run
+    ///
+    /// This folder should contain the model's `inputs.json`
+    ///
+    /// This file should contain a "modelpath" property which indicates the path to the model's `.onnx` file
+    /// if this path is relative, it will be relative to the model's folder
+    ///
+    /// This file should also contain an "inputs" property which is an array of paths to the model's inputs
+    /// if these paths are relative, they will be relative to the model's folder
+    ///
+    /// This file should also contain an "outputs" property which is an array of paths to the model's expected outputs
+    /// if these paths are relative, they will be relative to the model's folder, these outputs will be compared to the outputs of the model
     #[arg(short, long)]
     pub model: PathBuf,
 
-    // Verbosity levels for now are
-    // 0 - No output except basic logging
-    // 2 - Output all results from operators into .npy files
-    // 4 - Output intermediate results from operators into .npy files (only supported by conv for now)
+    /// Set verbosity level
+    ///
+    /// 0 - No output except basic logging
+    ///
+    /// 2 - Output all results from operators into .npy files
+    ///
+    /// 4 - Output intermediate results from operators into .npy files (only supported by conv for now)
     #[arg(short, long, default_value = "0")]
     pub verbose: u64,
 
+    /// Generate json file representing the graph of the model
+    ///
+    /// This JSON file is meant to be parsed and printed by the C# program `ONNXGraphLayout`
     #[arg(short, long, default_value = "false")]
     pub gengraph: bool,
 
+    /// Fail immediately if an operator is not implemented yet, otherwise continue and execute the model until panic
     #[arg(short, long, default_value = "false")]
     pub failfast: bool,
 }
