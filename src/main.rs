@@ -24,6 +24,7 @@ use operators::conv::conv;
 use operators::div::div;
 use operators::dropout::dropout;
 use operators::exp::exp;
+use operators::flatten::flatten;
 use operators::gather::gather;
 use operators::gemm::gemm;
 use operators::globalaveragepool::global_average_pool;
@@ -43,6 +44,7 @@ use operators::split::split;
 use operators::sqrt::sqrt;
 use operators::squeeze::squeeze;
 use operators::sub::sub;
+use operators::sum::sum;
 use operators::tanh::tanh;
 use operators::transpose::transpose;
 use operators::unsqueeze::unsqueeze;
@@ -92,6 +94,8 @@ lazy_static! {
         m.insert("Slice", slice as OperationFn);
         m.insert("BatchNormalization", batchnormalization as OperationFn);
         m.insert("Cast", cast as OperationFn);
+        m.insert("Sum", sum as OperationFn);
+        m.insert("Flatten", flatten as OperationFn);
         m
     };
 }

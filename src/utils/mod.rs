@@ -583,9 +583,13 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         },
         DataType::INT32 => {
             let data = if let Some(data) = &proto.raw_data {
-                match bytemuck::try_cast_slice::<u8, i32>(data) {
-                    Ok(data) => data,
-                    Err(e) => return Err(anyhow!(e)),
+                if data.is_empty() {
+                    &[]
+                } else {
+                    match bytemuck::try_cast_slice::<u8, i32>(data) {
+                        Ok(data) => data,
+                        Err(e) => return Err(anyhow!(e)),
+                    }
                 }
             } else {
                 proto.int32_data.as_slice()
@@ -610,9 +614,13 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         }
         DataType::INT64 => {
             let data = if let Some(data) = &proto.raw_data {
-                match bytemuck::try_cast_slice::<u8, i64>(data) {
-                    Ok(data) => data,
-                    Err(e) => return Err(anyhow!(e)),
+                if data.is_empty() {
+                    &[]
+                } else {
+                    match bytemuck::try_cast_slice::<u8, i64>(data) {
+                        Ok(data) => data,
+                        Err(e) => return Err(anyhow!(e)),
+                    }
                 }
             } else {
                 proto.int64_data.as_slice()
@@ -668,9 +676,13 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         },
         DataType::UINT64 => {
             let data = if let Some(data) = &proto.raw_data {
-                match bytemuck::try_cast_slice::<u8, u64>(data) {
-                    Ok(data) => data,
-                    Err(e) => return Err(anyhow!(e)),
+                if data.is_empty() {
+                    &[]
+                } else {
+                    match bytemuck::try_cast_slice::<u8, u64>(data) {
+                        Ok(data) => data,
+                        Err(e) => return Err(anyhow!(e)),
+                    }
                 }
             } else {
                 proto.uint64_data.as_slice()
@@ -717,9 +729,13 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         },
         DataType::DOUBLE => {
             let data = if let Some(data) = &proto.raw_data {
-                match bytemuck::try_cast_slice::<u8, f64>(data) {
-                    Ok(data) => data,
-                    Err(e) => return Err(anyhow!(e)),
+                if data.is_empty() {
+                    &[]
+                } else {
+                    match bytemuck::try_cast_slice::<u8, f64>(data) {
+                        Ok(data) => data,
+                        Err(e) => return Err(anyhow!(e)),
+                    }
                 }
             } else {
                 proto.double_data.as_slice()
@@ -772,9 +788,13 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
         }
         DataType::FLOAT => {
             let data = if let Some(data) = &proto.raw_data {
-                match bytemuck::try_cast_slice::<u8, f32>(data) {
-                    Ok(data) => data,
-                    Err(e) => return Err(anyhow!(e)),
+                if data.is_empty() {
+                    &[]
+                } else {
+                    match bytemuck::try_cast_slice::<u8, f32>(data) {
+                        Ok(data) => data,
+                        Err(e) => return Err(anyhow!(e)),
+                    }
                 }
             } else {
                 proto.float_data.as_slice()
