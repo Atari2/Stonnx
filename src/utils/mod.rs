@@ -252,6 +252,10 @@ pub trait ArrayElement:
     + PartialOrd
     + AddAssign
     + ScalarOperand
+    + IsNan
+    + MinMax
+    + std::iter::Sum
+    + HasSqrt
     + 'static
 {
 }
@@ -266,12 +270,42 @@ impl<T> ArrayElement for T where
         + PartialOrd
         + AddAssign
         + ScalarOperand
+        + IsNan
+        + MinMax
+        + std::iter::Sum
+        + HasSqrt
         + 'static
 {
 }
 
 pub trait F32IntoType<T> {
     fn as_(self) -> T;
+}
+
+pub trait IsNan {
+    #[allow(clippy::wrong_self_convention)]
+    fn is_nan(self) -> bool;
+}
+
+pub trait MinMax {
+    const MAX: Self;
+    const MIN: Self;
+    fn max(self, rhs: Self) -> Self;
+    fn min(self, lhs: Self) -> Self; 
+}
+pub trait HasSqrt {
+    fn sqrt(self) -> Self;
+}
+
+impl IsNan for f32 {
+    fn is_nan(self) -> bool {
+        self.is_nan()
+    }
+}
+impl IsNan for f64 {
+    fn is_nan(self) -> bool {
+        self.is_nan()
+    }
 }
 
 impl F32IntoType<Complex64> for f32 {
@@ -323,6 +357,59 @@ macro_rules! impl_from_f32 {
     };
 }
 
+macro_rules! impl_is_nan {
+    ($t:ty) => {
+        impl IsNan for $t {
+            fn is_nan(self) -> bool {
+                false
+            }
+        }
+    };
+}
+
+macro_rules! impl_minmax {
+    ($t:ty) => {
+        impl MinMax for $t {
+            const MAX: Self = <$t>::MAX;
+            const MIN: Self = <$t>::MIN;
+            fn min(self, rhs: Self) -> Self {
+                if self < rhs {
+                    self
+                } else {
+                    rhs
+                }
+            }
+            fn max(self, rhs: Self) -> Self {
+                if self > rhs {
+                    self
+                } else {
+                    rhs
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_has_sqrt_i {
+    ($t:ty) => {
+        impl HasSqrt for $t {
+            fn sqrt(self) -> Self {
+                num::integer::Roots::sqrt(&self)
+            }
+        }
+    };
+}
+
+macro_rules! impl_has_sqrt_f {
+    ($t:ty) => {
+        impl HasSqrt for $t {
+            fn sqrt(self) -> Self {
+                num::Float::sqrt(self)
+            }
+        }
+    };
+}
+
 impl_from_f32!(i8);
 impl_from_f32!(i16);
 impl_from_f32!(i32);
@@ -333,6 +420,37 @@ impl_from_f32!(u32);
 impl_from_f32!(u64);
 impl_from_f32!(f32);
 impl_from_f32!(f64);
+
+impl_is_nan!(i8);
+impl_is_nan!(i16);
+impl_is_nan!(i32);
+impl_is_nan!(i64);
+impl_is_nan!(u8);
+impl_is_nan!(u16);
+impl_is_nan!(u32);
+impl_is_nan!(u64);
+
+impl_minmax!(i8);
+impl_minmax!(i16);
+impl_minmax!(i32);
+impl_minmax!(i64);
+impl_minmax!(u8);
+impl_minmax!(u16);
+impl_minmax!(u32);
+impl_minmax!(u64);
+impl_minmax!(f32);
+impl_minmax!(f64);
+
+impl_has_sqrt_i!(i8);
+impl_has_sqrt_i!(i16);
+impl_has_sqrt_i!(i32);
+impl_has_sqrt_i!(i64);
+impl_has_sqrt_i!(u8);
+impl_has_sqrt_i!(u16);
+impl_has_sqrt_i!(u32);
+impl_has_sqrt_i!(u64);
+impl_has_sqrt_f!(f32);
+impl_has_sqrt_f!(f64);
 
 /*
 typedef struct

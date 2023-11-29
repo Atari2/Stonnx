@@ -61,7 +61,7 @@ impl DropoutAttrs {
     }
 }
 
-fn dropout_common_a<A: ArrayElement>(
+fn dropout_common_generic<A: ArrayElement>(
     data: &ArrayD<A>,
     training_mode: bool,
     attrs: DropoutAttrs,
@@ -107,8 +107,8 @@ fn dropout_common(
     output_len: usize,
 ) -> BoxResult<(ArrayType, Option<ArrayType>)> {
     match data {
-        ArrayType::F32(data) => dropout_common_a(data, training_mode, attrs, output_len),
-        ArrayType::I64(data) => dropout_common_a(data, training_mode, attrs, output_len),
+        ArrayType::F32(data) => dropout_common_generic(data, training_mode, attrs, output_len),
+        ArrayType::I64(data) => dropout_common_generic(data, training_mode, attrs, output_len),
         _ => todo!("Dropout for type {}", data),
     }
 }

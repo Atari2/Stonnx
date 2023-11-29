@@ -1,13 +1,14 @@
 #![allow(unused_variables)]
 use ndarray::{s, Array2, ArrayD, Ix1, Ix2, IxDyn};
+use num::traits::AsPrimitive;
 
 use crate::{
     onnx::NodeProto,
-    utils::{shape_safe_product, ArrayType, BoxResult, OperationResult},
+    utils::{shape_safe_product, ArrayType, BoxResult, OperationResult, ArrayElement, F32IntoType},
 };
 use anyhow::anyhow;
 
-use super::_commonpool::{CommonPoolAttrs, PoolAutoPad, PoolOutput, PoolingType, _common_pool_f32};
+use super::_commonpool::{CommonPoolAttrs, PoolAutoPad, PoolOutput, PoolingType, _commn_pool_generic};
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 8, 10, 11, 12];
 
@@ -84,27 +85,27 @@ impl From<MaxPoolAttrs> for CommonPoolAttrs {
     }
 }
 
-fn _max_pool_f32_1d(
-    input: &ArrayD<f32>,
+fn _max_pool_generic_1d<A: ArrayElement>(
+    input: &ArrayD<A>,
     attrs: MaxPoolAttrs,
     new_pads: Array2<usize>,
     output_spatial_shape: Vec<usize>,
     output_len: usize,
-) -> BoxResult<PoolOutput> {
+) -> BoxResult<PoolOutput<A>> {
     todo!()
 }
 
-fn _max_pool_f32_2d(
-    input: &ArrayD<f32>,
+fn _max_pool_generic_2d<A: ArrayElement>(
+    input: &ArrayD<A>,
     attrs: MaxPoolAttrs,
     new_pads: Array2<usize>,
     mut output_spatial_shape: Vec<usize>,
     output_len: usize,
-) -> BoxResult<PoolOutput> {
+) -> BoxResult<PoolOutput<A>> {
     let global_pooling = false;
     let mut y_dims = input.shape()[..2].to_vec();
     y_dims.append(&mut output_spatial_shape);
-    let y = ArrayD::<f32>::zeros(IxDyn(&y_dims));
+    let y = ArrayD::<A>::zeros(IxDyn(&y_dims));
     let indices = ArrayD::<i64>::from_shape_simple_fn(IxDyn(&y_dims), || -1);
     let x_dims = input.shape();
     let channels = x_dims[1];
@@ -217,21 +218,21 @@ fn _max_pool_f32_2d(
     }
 }
 
-fn _max_pool_f32_3d(
-    input: &ArrayD<f32>,
+fn _max_pool_generic_3d<A: ArrayElement>(
+    input: &ArrayD<A>,
     attrs: MaxPoolAttrs,
     new_pads: Array2<usize>,
     output_spatial_shape: Vec<usize>,
     output_len: usize,
-) -> BoxResult<PoolOutput> {
+) -> BoxResult<PoolOutput<A>> {
     todo!()
 }
 
-fn _maxpool_internal_f32(
-    input: &ArrayD<f32>,
+fn _maxpool_internal_generic<A: ArrayElement>(
+    input: &ArrayD<A>,
     mut attrs: MaxPoolAttrs,
     output_len: usize,
-) -> BoxResult<PoolOutput> {
+) -> BoxResult<PoolOutput<A>> {
     let pads = if let Some(ref pads) = attrs.pads {
         pads.clone()
     } else {
@@ -307,18 +308,18 @@ fn _maxpool_internal_f32(
 
     attrs.replace_dilations_and_strides(dilations, strides);
     match input_spatial_shape.len() {
-        1 => _max_pool_f32_1d(input, attrs, new_pads, output_spatial_shape, output_len),
-        2 => _max_pool_f32_2d(input, attrs, new_pads, output_spatial_shape, output_len),
-        3 => _max_pool_f32_3d(input, attrs, new_pads, output_spatial_shape, output_len),
+        1 => _max_pool_generic_1d(input, attrs, new_pads, output_spatial_shape, output_len),
+        2 => _max_pool_generic_2d(input, attrs, new_pads, output_spatial_shape, output_len),
+        3 => _max_pool_generic_3d(input, attrs, new_pads, output_spatial_shape, output_len),
         _ => todo!("MaxPool for {}D", input_spatial_shape.len()),
     }
 }
 
-fn maxpool_f32(
-    input: &ArrayD<f32>,
+fn maxpool_generic<A: ArrayElement>(
+    input: &ArrayD<A>,
     attrs: MaxPoolAttrs,
     output_len: usize,
-) -> BoxResult<PoolOutput> {
+) -> BoxResult<PoolOutput<A>> where f32: F32IntoType<A>, usize: AsPrimitive<A> {
     let b1 = if let Some(ref dilations) = attrs.dilations {
         let mindilation = dilations.iter().min().copied().unwrap_or(1);
         let maxdilation = dilations.iter().max().copied().unwrap_or(1);
@@ -334,9 +335,9 @@ fn maxpool_f32(
         false
     };
     if b1 || b2 {
-        _maxpool_internal_f32(input, attrs, output_len)
+        _maxpool_internal_generic(input, attrs, output_len)
     } else {
-        _common_pool_f32(input, PoolingType::Max, 0, attrs.into(), output_len)
+        _commn_pool_generic(input, PoolingType::Max, 0, attrs.into(), output_len)
     }
 }
 
@@ -354,7 +355,7 @@ pub fn maxpool(
     let attrs = MaxPoolAttrs::new(node, inputs[0]);
     match inputs[0] {
         ArrayType::F32(x) => {
-            let (y, i) = maxpool_f32(x, attrs, output_len)?;
+            let (y, i) = maxpool_generic(x, attrs, output_len)?;
             Ok((ArrayType::F32(y), i.map(ArrayType::I64)).into())
         }
         _ => todo!("MaxPool for type {}", inputs[0]),

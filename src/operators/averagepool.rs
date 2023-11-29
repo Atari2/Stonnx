@@ -1,10 +1,11 @@
 use crate::{
     onnx::NodeProto,
-    utils::{ArrayType, BoxResult, OperationResult},
+    utils::{ArrayType, BoxResult, OperationResult, ArrayElement, F32IntoType},
 };
 use anyhow::anyhow;
 use itertools::Itertools;
 use ndarray::{Array0, Array1, ArrayD, Ix0, SliceInfoElem};
+use num::traits::AsPrimitive;
 
 use super::_commonpool::{CommonPoolAttrs, PoolAutoPad, PoolOutput};
 
@@ -199,8 +200,8 @@ fn get_output_shape_explicit_padding(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn pool(
-    padded: &ArrayD<f32>,
+fn pool<A: ArrayElement>(
+    padded: &ArrayD<A>,
     x_shape: &[usize],
     kernel: &[i64],
     strides: &Option<Vec<i64>>,
@@ -208,13 +209,13 @@ fn pool(
     pads: &Option<Vec<i64>>,
     dilations: &Option<Vec<i64>>,
     count_include_pad: i64,
-) -> BoxResult<PoolOutput> {
+) -> BoxResult<PoolOutput<A>> where usize: AsPrimitive<A> {
     let spatial_size = x_shape.len() - 2;
     let y_shape = [x_shape[0], x_shape[1]]
         .into_iter()
         .chain(out_shape.iter().map(|v| *v as usize))
         .collect::<Vec<_>>();
-    let mut y = ArrayD::<f32>::zeros(y_shape);
+    let mut y = ArrayD::<A>::zeros(y_shape);
     let dilations = dilations
         .clone()
         .map_or_else(|| Array1::ones(spatial_size), Array1::from_vec);
@@ -272,7 +273,7 @@ fn pool(
             .into_iter()
             .chain(window_vals[0].shape().iter().copied())
             .collect::<Vec<_>>();
-        let window_vals = ArrayD::<f32>::from_shape_vec(
+        let window_vals = ArrayD::<A>::from_shape_vec(
             window_vals_shape,
             window_vals
                 .into_iter()
@@ -287,7 +288,7 @@ fn pool(
         if count_include_pad == 1 {
             let avg = Array0::from_elem(
                 Ix0(),
-                window_vals.iter().copied().sum::<f32>() / window_vals.len() as f32,
+                window_vals.iter().copied().sum::<A>() / window_vals.len().as_(),
             );
             y.slice_mut(shape.as_slice()).assign(&avg);
         } else {
@@ -297,7 +298,7 @@ fn pool(
                 .collect::<Vec<_>>();
             let avg = Array0::from_elem(
                 Ix0(),
-                window_vals_no_nan.iter().copied().sum::<f32>() / window_vals_no_nan.len() as f32,
+                window_vals_no_nan.iter().copied().sum::<A>() / window_vals_no_nan.len().as_(),
             );
             y.slice_mut(shape.as_slice()).assign(&avg);
         }
@@ -305,17 +306,17 @@ fn pool(
     Ok((y, None))
 }
 
-fn _average_pool_f32(
-    input: &ArrayD<f32>,
+fn _average_pool_generic<A: ArrayElement>(
+    input: &ArrayD<A>,
     count_include_pad: i64,
     attrs: AveragePoolAttrs,
     _output_len: usize,
-) -> BoxResult<PoolOutput> {
+) -> BoxResult<PoolOutput<A>> where usize: AsPrimitive<A>, f32: F32IntoType<A> {
     let x_shape = input.shape();
     let padding_value = if count_include_pad == 0 {
-        f32::NAN
+        F32IntoType::as_(f32::NAN)
     } else {
-        0.0
+        F32IntoType::as_(0.0)
     };
     match attrs.auto_pad {
         Some(PoolAutoPad::SameUpper) | Some(PoolAutoPad::SameLower) | Some(PoolAutoPad::Valid) => {
@@ -405,7 +406,7 @@ pub fn averagepool(
     let attrs = AveragePoolAttrs::new(node, inputs[0]);
     match inputs[0] {
         ArrayType::F32(x) => {
-            let (y, i) = _average_pool_f32(x, attrs.count_include_pad as i64, attrs, output_len)?;
+            let (y, i) = _average_pool_generic(x, attrs.count_include_pad as i64, attrs, output_len)?;
             Ok((ArrayType::F32(y), i.map(ArrayType::I64)).into())
         }
         _ => todo!("AveragePool for type {:?}", inputs[0]),

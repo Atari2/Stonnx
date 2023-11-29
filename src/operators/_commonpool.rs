@@ -1,9 +1,10 @@
 #![allow(clippy::too_many_arguments)]
-use crate::{onnx::AttributeProto, utils::BoxResult};
+use crate::{onnx::AttributeProto, utils::{BoxResult, ArrayElement, F32IntoType}};
 use anyhow::anyhow;
 use itertools::Itertools;
 use ndarray::{s, Array0, Array1, Array2, ArrayD, ArrayView1, Ix0, Ix2, SliceInfoElem};
 use ndarray_stats::QuantileExt;
+use num::traits::AsPrimitive;
 
 #[derive(Debug, PartialEq)]
 pub enum PoolingType {
@@ -31,7 +32,7 @@ impl PoolAutoPad {
     }
 }
 
-pub type PoolOutput = (ArrayD<f32>, Option<ArrayD<i64>>);
+pub type PoolOutput<A> = (ArrayD<A>, Option<ArrayD<i64>>);
 
 #[derive(Debug)]
 pub struct CommonPoolAttrs {
@@ -162,8 +163,8 @@ fn _get_index(indices: Array1<usize>, shape: &[usize]) -> usize {
     ind
 }
 
-fn _pool_f32(
-    padded: &ArrayD<f32>,
+fn _pool_generic<A: ArrayElement>(
+    padded: &ArrayD<A>,
     x_shape: &[usize],
     kernel_shape: &[i64],
     strides_shape: &[i64],
@@ -174,17 +175,17 @@ fn _pool_f32(
     ceil_mode: Option<bool>,
     indices: bool,
     pads: &Array2<usize>,
-) -> BoxResult<PoolOutput> {
-    let fpool: fn(ArrayView1<f32>) -> Array0<f32> = match pooling_type {
-        PoolingType::Max => |a: ArrayView1<f32>| -> Array0<f32> {
-            Array0::from_elem(Ix0(), a.iter().copied().fold(f32::MIN, f32::max))
+) -> BoxResult<PoolOutput<A>> where usize: AsPrimitive<A> {
+    let fpool: fn(ArrayView1<A>) -> Array0<A> = match pooling_type {
+        PoolingType::Max => |a: ArrayView1<A>| -> Array0<A> {
+            Array0::from_elem(Ix0(), a.iter().copied().fold(A::MIN, A::max))
         },
-        PoolingType::Average => |a: ArrayView1<f32>| -> Array0<f32> {
-            Array0::from_elem(Ix0(), a.iter().copied().sum::<f32>() / a.len() as f32)
+        PoolingType::Average => |a: ArrayView1<A>| -> Array0<A> {
+            Array0::from_elem(Ix0(), a.iter().copied().sum::<A>() / a.len().as_())
         },
     };
     let spatial_size = x_shape.len() - 2;
-    let mut y = ndarray::ArrayD::<f32>::zeros(
+    let mut y = ndarray::ArrayD::<A>::zeros(
         [x_shape[0], x_shape[1]]
             .into_iter()
             .chain(out_shape.iter().copied())
@@ -258,7 +259,7 @@ fn _pool_f32(
             values.push(window.slice(wsi.as_slice()));
         }
         let values = values.iter().flatten().copied().collect::<Vec<_>>();
-        let window_vals = ndarray::Array1::<f32>::from_vec(values);
+        let window_vals = ndarray::Array1::<A>::from_vec(values);
         if count_include_pad == Some(1) && pooling_type == PoolingType::Average {
             let shapeidx = (0..y.ndim())
                 .map(|i| {
@@ -281,7 +282,7 @@ fn _pool_f32(
                 .filter(|v| !v.is_nan())
                 .copied()
                 .collect::<Vec<_>>();
-            let no_nan = ndarray::Array1::<f32>::from_vec(no_nan);
+            let no_nan = ndarray::Array1::<A>::from_vec(no_nan);
             let pooled = fpool(no_nan.view());
             let shapeidx = (0..y.ndim())
                 .map(|i| {
@@ -299,7 +300,7 @@ fn _pool_f32(
             y.slice_mut(shapeidx.as_slice()).assign(&pooled);
             if let Some(ref mut z) = z {
                 if indices {
-                    let arg = window_vals.argmax_skipnan()?;
+                    let arg = no_nan.argmax()?;
                     let coordinates = _get_indices(arg, out_shape);
                     let delta = Array1::from_vec(shape[2..].to_vec()) - pads.slice(s![.., 0]);
                     let coordinates = coordinates + delta;
@@ -313,13 +314,13 @@ fn _pool_f32(
 }
 
 /// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/_op_common_pool.py
-pub fn _common_pool_f32(
-    input: &ArrayD<f32>,
+pub fn _commn_pool_generic<A: ArrayElement>(
+    input: &ArrayD<A>,
     pooling_type: PoolingType,
     count_include_pad: i64,
     mut attrs: CommonPoolAttrs,
     output_len: usize,
-) -> BoxResult<PoolOutput> {
+) -> BoxResult<PoolOutput<A>> where f32: F32IntoType<A>, usize: AsPrimitive<A> {
     if attrs.dilations.is_none() && pooling_type == PoolingType::Max {
         attrs.dilations = Some(vec![1; attrs.kernel_shape.len()]);
     }
@@ -367,10 +368,10 @@ pub fn _common_pool_f32(
             .enumerate()
             .map(|(i, v)| v + pad_shape[i])
             .collect::<Vec<_>>();
-        let const_ = if count_include_pad == 0 {
-            f32::NAN
+        let const_: A = if count_include_pad == 0 {
+            F32IntoType::as_(f32::NAN)
         } else {
-            0.0
+            F32IntoType::as_(0.0)
         };
         let padded = ndarray_ndimage::pad(
             input,
@@ -387,10 +388,10 @@ pub fn _common_pool_f32(
     };
     let out_shape;
     if auto_pad == Some(PoolAutoPad::SameLower) || auto_pad == Some(PoolAutoPad::SameUpper) {
-        let const_ = if count_include_pad == 0 {
-            f32::NAN
+        let const_: A = if count_include_pad == 0 {
+            F32IntoType::as_(f32::NAN)
         } else {
-            0.0
+            F32IntoType::as_(0.0)
         };
         out_shape = _get_output_shape(
             auto_pad, // safe to unwrap, verified above
@@ -437,7 +438,7 @@ pub fn _common_pool_f32(
         .flat_map(|i| [pads[i] as usize, pads[i + ndims] as usize].into_iter())
         .collect::<Vec<_>>();
     let new_pads = ndarray::Array2::from_shape_vec(new_pads_dim, new_pads_vec)?;
-    _pool_f32(
+    _pool_generic(
         &padded,
         input.shape(),
         &kernel_shape,
