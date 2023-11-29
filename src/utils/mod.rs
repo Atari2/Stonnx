@@ -1,11 +1,12 @@
 use anyhow::anyhow;
 use num::traits::AsPrimitive;
 use std::io::Read;
+use std::ops::AddAssign;
 use std::os::raw::c_uchar;
 use std::path::PathBuf;
 use std::{collections::HashMap, io, path::Path};
 
-use ndarray::{ArrayD, IxDyn};
+use ndarray::{ArrayD, IxDyn, ScalarOperand};
 use protobuf::Enum;
 
 use crate::onnx::tensor_proto::DataType;
@@ -241,6 +242,98 @@ impl_into_array_type!(Complex128, C128);
 impl_into_array_type!(String, Str);
 impl_into_array_type!(bool, Bool);
 
+pub trait ArrayElement:
+    Copy
+    + Clone
+    + ndarray_npy::WritableElement
+    + num::Num
+    + num::FromPrimitive
+    + Default
+    + PartialOrd
+    + AddAssign
+    + ScalarOperand
+    + 'static
+{
+}
+
+impl<T> ArrayElement for T where
+    T: Copy
+        + Clone
+        + ndarray_npy::WritableElement
+        + num::Num
+        + num::FromPrimitive
+        + Default
+        + PartialOrd
+        + AddAssign
+        + ScalarOperand
+        + 'static
+{
+}
+
+pub trait F32IntoType<T> {
+    fn as_(self) -> T;
+}
+
+impl F32IntoType<Complex64> for f32 {
+    fn as_(self) -> Complex64 {
+        Complex64::new(self, self)
+    }
+}
+
+impl F32IntoType<Complex128> for f32 {
+    fn as_(self) -> Complex128 {
+        Complex128::new(self as f64, self as f64)
+    }
+}
+
+impl F32IntoType<f16> for f32 {
+    fn as_(self) -> f16 {
+        f16::from_f32(self)
+    }
+}
+
+impl F32IntoType<bf16> for f32 {
+    fn as_(self) -> bf16 {
+        bf16::from_f32(self)
+    }
+}
+
+impl F32IntoType<String> for f32 {
+    fn as_(self) -> String {
+        self.to_string()
+    }
+}
+
+impl F32IntoType<bool> for f32 {
+    fn as_(self) -> bool {
+        self != 0.0
+    }
+}
+
+macro_rules! impl_from_f32 {
+    ($t:ty) => {
+        impl F32IntoType<$t> for f32
+        where
+            f32: AsPrimitive<$t>,
+        {
+            fn as_(self) -> $t {
+                num::traits::AsPrimitive::as_(self)
+            }
+        }
+    };
+}
+
+impl_from_f32!(i8);
+impl_from_f32!(i16);
+impl_from_f32!(i32);
+impl_from_f32!(i64);
+impl_from_f32!(u8);
+impl_from_f32!(u16);
+impl_from_f32!(u32);
+impl_from_f32!(u64);
+impl_from_f32!(f32);
+impl_from_f32!(f64);
+
 /*
 typedef struct
 {
@@ -301,8 +394,6 @@ impl std::fmt::Display for ArrayType {
         }
     }
 }
-
-pub trait ArrayTypeTrait: Clone + Copy + num::Zero {}
 
 impl ArrayType {
     pub fn to_file(&self, dir: &Path, name: &str) -> BoxResult<()> {

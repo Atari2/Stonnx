@@ -1,12 +1,12 @@
 use crate::create_intermediate_output_dir_for;
 use crate::named_array_to_file;
 use crate::operators::_commonmatmul::matmul_impl;
+use crate::utils::ArrayElement;
 use crate::VERBOSE;
 use itertools::iproduct;
 use ndarray::Array1;
 use ndarray::Array2;
 use ndarray::ArrayD;
-use ndarray::Ix1;
 use ndarray::SliceInfoElem;
 use ndarray::{Ix2, IxDyn};
 
@@ -109,12 +109,12 @@ impl ConvAttributes {
     }
 }
 
-fn _conv_fast_impl(
-    x: ndarray::ArrayViewD<f32>,
-    w: ndarray::ArrayViewD<f32>,
-    b: Option<ndarray::ArrayViewD<f32>>,
+fn _conv_fast_impl<A: ArrayElement>(
+    x: ndarray::ArrayViewD<A>,
+    w: ndarray::ArrayViewD<A>,
+    b: Option<ndarray::ArrayViewD<A>>,
     attrs: ConvAttributes,
-) -> BoxResult<ArrayType> {
+) -> BoxResult<ndarray::ArrayD<A>> {
     create_intermediate_output_dir_for!(conv);
     let dilations = &attrs.dilations;
     let mut kernel_shape = attrs.kernel_shape.clone();
@@ -197,7 +197,7 @@ fn _conv_fast_impl(
         let mut new_shape = vec![x_shape[0]];
         new_shape.extend(res[0].1.shape()[1..].iter());
         new_shape[1] = td;
-        let mut final_ = ArrayD::<f32>::zeros(new_shape);
+        let mut final_ = ArrayD::<A>::zeros(new_shape);
         let mut p = 0;
         for (b, cv) in res {
             let mut fslicevec = vec![];
@@ -222,11 +222,6 @@ fn _conv_fast_impl(
                     });
                 }
             }
-            let cv = if let ArrayType::F32(c) = cv {
-                c
-            } else {
-                return Err(anyhow!("Conv on f32 returned another type"));
-            };
             final_.slice_mut(fslicevec.as_slice()).assign(&cv);
             p += cv.shape()[1];
             if p >= final_.shape()[1] {
@@ -239,7 +234,7 @@ fn _conv_fast_impl(
             let b = b.to_shape(IxDyn(&new_shape))?;
             final_ += &b;
         }
-        return Ok(ArrayType::F32(final_));
+        return Ok(final_);
     }
     if dilations[0] != 1 || dilations.iter().min() != dilations.iter().max() {
         let nd = dilations.len();
@@ -250,7 +245,7 @@ fn _conv_fast_impl(
             new_shape.push(w_shape[di] + (w_shape[di] - 1) * (d - 1) as usize);
             new_kernel_shape.push(kernel_shape[i] + (kernel_shape[i] - 1) * (d - 1));
         }
-        let mut new_w = ArrayD::<f32>::zeros(new_shape);
+        let mut new_w = ArrayD::<A>::zeros(new_shape);
         let mut indices = vec![
             SliceInfoElem::Slice {
                 start: 0,
@@ -316,7 +311,7 @@ fn _conv_fast_impl(
 
     if let Some(b) = b {
         if b.len() == 1 {
-            Ok(ArrayType::F32(mul + b))
+            Ok(mul + b)
         } else {
             let mut new_shape = vec![1; mul.ndim()];
             new_shape[1] = b.shape()[0];
@@ -324,10 +319,10 @@ fn _conv_fast_impl(
             named_array_to_file!(conv, b, "reshaped_b");
             let output = mul + &b;
             named_array_to_file!(conv, output);
-            Ok(ArrayType::F32(output))
+            Ok(output)
         }
     } else {
-        Ok(ArrayType::F32(mul))
+        Ok(mul)
     }
 }
 
@@ -349,12 +344,12 @@ fn _make_ind(dim: usize, shape: &[i64]) -> BoxResult<ArrayD<i64>> {
     Ok(res)
 }
 
-fn im2col_fast(
-    x: &ndarray::ArrayViewD<f32>,
+fn im2col_fast<A: ArrayElement>(
+    x: &ndarray::ArrayViewD<A>,
     kernel_shape: &[i64],
     pads: &[i64],
     strides: &[i64],
-) -> BoxResult<(ArrayD<f32>, Vec<usize>)> {
+) -> BoxResult<(ArrayD<A>, Vec<usize>)> {
     let n_dims = kernel_shape.len();
     let (m, n_c) = (x.shape()[0], x.shape()[1]);
     let kernel_size = kernel_shape.iter().product::<i64>() as usize;
@@ -369,13 +364,15 @@ fn im2col_fast(
         let kind = _make_ind(i, kernel_shape)?;
         let iind = _make_ind(i, &shape_out)? * strides[i];
         // index = np.tile(kind.ravel(), n_C).reshape(-1, 1) + iind.reshape(1, -1)
-        let kindravel = kind.to_shape(Ix1(kind.len()))?.to_owned();
-        let res = std::iter::repeat(kindravel)
+        let iind = iind.to_shape(Ix2(1, iind.len()))?;
+        let klen = kind.len();
+        let res = std::iter::repeat(&kind)
             .take(n_c)
             .flatten()
+            .copied()
             .collect::<Vec<_>>();
-        let index = Array2::<i64>::from_shape_vec((res.len(), 1), res)?
-            + iind.to_shape(Ix2(1, iind.len()))?.to_owned();
+        let index = Array2::<i64>::from_shape_vec((n_c * klen, 1), res)?;
+        let index = index + iind;
         indices.push(index);
     }
     for (i, index) in indices.iter().enumerate() {
@@ -397,7 +394,7 @@ fn im2col_fast(
     let x_padded = ndarray_ndimage::pad(
         x,
         padding.as_slice(),
-        ndarray_ndimage::PadMode::Constant(0.0),
+        ndarray_ndimage::PadMode::Constant(A::default()),
     );
     named_array_to_file!(conv, x_padded);
 
@@ -434,7 +431,7 @@ fn im2col_fast(
     getitem = (slice(0, m), d, *indices)
     cols = X_padded[getitem]  # type: ignore[index]
      */
-    let mut cols = ArrayD::<f32>::zeros(cols_shape.as_slice());
+    let mut cols = ArrayD::<A>::zeros(cols_shape.as_slice());
     for i in 0..m {
         for (j, k, index) in getitem.clone() {
             let index = [i].into_iter().chain(index).collect::<Vec<_>>();
@@ -467,10 +464,16 @@ fn conv_fast_impl(
     }
     match (x, w, b) {
         (ArrayType::F32(x), ArrayType::F32(w), Some(ArrayType::F32(b))) => {
-            return _conv_fast_impl(x.view(), w.view(), Some(b.view()), attrs);
+            Ok(_conv_fast_impl(x.view(), w.view(), Some(b.view()), attrs)?.into())
         }
         (ArrayType::F32(x), ArrayType::F32(w), None) => {
-            return _conv_fast_impl(x.view(), w.view(), None, attrs);
+            Ok(_conv_fast_impl(x.view(), w.view(), None, attrs)?.into())
+        }
+        (ArrayType::I64(x), ArrayType::I64(w), Some(ArrayType::I64(b))) => {
+            Ok(_conv_fast_impl(x.view(), w.view(), Some(b.view()), attrs)?.into())
+        }
+        (ArrayType::I64(x), ArrayType::I64(w), None) => {
+            Ok(_conv_fast_impl(x.view(), w.view(), None, attrs)?.into())
         }
         (x, w, b) => {
             if let Some(b) = b {

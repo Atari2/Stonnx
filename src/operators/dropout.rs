@@ -1,6 +1,7 @@
+use crate::utils::F32IntoType;
 use crate::{
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
+    utils::{pick_opset_version, ArrayElement, ArrayType, BoxResult, OperationResult},
 };
 use anyhow::anyhow;
 use ndarray::{ArrayD, Ix0};
@@ -60,34 +61,39 @@ impl DropoutAttrs {
     }
 }
 
-fn dropout_common_f32(
-    data: &ArrayD<f32>,
+fn dropout_common_a<A: ArrayElement>(
+    data: &ArrayD<A>,
     training_mode: bool,
     attrs: DropoutAttrs,
     output_len: usize,
-) -> BoxResult<(ArrayType, Option<ArrayType>)> {
+) -> BoxResult<(ArrayType, Option<ArrayType>)>
+where
+    ArrayType: From<ArrayD<A>>,
+    f32: F32IntoType<A>,
+{
     let return_mask = output_len == 2;
     if attrs.ratio == 0.0 || !training_mode {
         if !return_mask {
-            Ok((ArrayType::F32(data.clone()), None))
+            Ok((data.clone().into(), None))
         } else {
             Ok((
-                ArrayType::F32(data.clone()),
+                data.clone().into(),
                 Some(ArrayType::Bool(ArrayD::from_elem(data.shape(), true))),
             ))
         }
     } else {
+        type MapFn<A> = fn(bool) -> A;
         let mut rng = rand::rngs::StdRng::seed_from_u64(attrs.seed as u64);
         let distribution = rand::distributions::Uniform::new(0.0, 1.0);
         let mask = ArrayD::from_shape_simple_fn(data.shape(), || rng.sample(distribution))
             .mapv(|x| x >= attrs.ratio);
-        let scale = 1.0 / (1.0 - attrs.ratio);
-        let btf = |a| if a { 1.0 } else { 0.0 };
+        let scale: A = (1.0 / (1.0 - attrs.ratio)).as_();
+        let btf: MapFn<A> = |a| if a { (1.0).as_() } else { (0.0).as_() };
         if !return_mask {
-            Ok((ArrayType::F32(mask.mapv(btf) * data * scale), None))
+            Ok(((mask.mapv(btf) * data * scale).into(), None))
         } else {
             Ok((
-                ArrayType::F32(mask.mapv(btf) * data * scale),
+                (mask.mapv(btf) * data * scale).into(),
                 Some(ArrayType::Bool(mask)),
             ))
         }
@@ -101,7 +107,8 @@ fn dropout_common(
     output_len: usize,
 ) -> BoxResult<(ArrayType, Option<ArrayType>)> {
     match data {
-        ArrayType::F32(data) => dropout_common_f32(data, training_mode, attrs, output_len),
+        ArrayType::F32(data) => dropout_common_a(data, training_mode, attrs, output_len),
+        ArrayType::I64(data) => dropout_common_a(data, training_mode, attrs, output_len),
         _ => todo!("Dropout for type {}", data),
     }
 }
