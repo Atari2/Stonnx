@@ -1,11 +1,28 @@
 use anyhow::anyhow;
 use petgraph::graphmap::GraphMap;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 
 use crate::{common::BoxResult, onnx::GraphProto};
 
+#[derive(
+    Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, std::hash::Hash,
+)]
+enum NodeType {
+    InputOutput,
+    Operator,
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, std::hash::Hash,
+)]
+struct Node<'a> {
+    name: &'a str,
+    node_type: NodeType,
+}
+
 pub fn build_graph_from_proto(proto: &GraphProto, modelpath: &Path) -> BoxResult<()> {
-    let mut graph = GraphMap::<&str, &str, petgraph::Directed>::new();
+    let mut graph = GraphMap::<Node<'_>, &str, petgraph::Directed>::new();
     let mut count_map = HashMap::<&str, usize>::new();
     let mut node_names = vec![];
     for input in proto.node.iter() {
@@ -24,7 +41,10 @@ pub fn build_graph_from_proto(proto: &GraphProto, modelpath: &Path) -> BoxResult
         }
     }
     for (i, node) in proto.node.iter().enumerate() {
-        let op_node = graph.add_node(node_names[i].as_str());
+        let op_node = graph.add_node(Node {
+            name: node_names[i].as_str(),
+            node_type: NodeType::Operator,
+        });
         let mut inputs = vec![];
         let mut outputs = vec![];
         for input in node.input.iter() {
@@ -34,6 +54,10 @@ pub fn build_graph_from_proto(proto: &GraphProto, modelpath: &Path) -> BoxResult
                     node.name.as_ref().map_or("UNKNOWN", |x| x.as_str())
                 );
             }
+            let input = Node {
+                name: input,
+                node_type: NodeType::InputOutput,
+            };
             if !graph.contains_node(input) {
                 inputs.push(graph.add_node(input));
             } else {
@@ -47,6 +71,10 @@ pub fn build_graph_from_proto(proto: &GraphProto, modelpath: &Path) -> BoxResult
                     node.name.as_ref().map_or("UNKNOWN", |x| x.as_str())
                 );
             }
+            let output = Node {
+                name: output,
+                node_type: NodeType::InputOutput,
+            };
             if !graph.contains_node(output) {
                 outputs.push(graph.add_node(output));
             } else {
