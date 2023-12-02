@@ -1,9 +1,7 @@
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult},
     onnx::{tensor_proto::DataType, NodeProto},
-    utils::{
-        make_tensor_from_proto, make_tensor_from_raw, pick_opset_version, ArrayType, BoxResult,
-        OperationResult,
-    },
+    utils::{make_tensor_from_proto, make_tensor_from_raw, pick_opset_version},
 };
 use anyhow::anyhow;
 use ndarray::{Array0, Array1};

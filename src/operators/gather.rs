@@ -4,8 +4,9 @@ use num::{traits::AsPrimitive, Zero};
 use protobuf::Enum;
 
 use crate::{
+    common::{ArrayType, BoxResult, NDIndex, OperationResult},
     onnx::{tensor_proto::DataType, NodeProto},
-    utils::{make_tensor_from_raw, ArrayType, BoxResult, NDIndex, OperationResult},
+    utils::make_tensor_from_raw,
 };
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 11, 13];

@@ -1,9 +1,8 @@
 use ndarray::{ArrayD, Axis, CowArray, IxDyn};
 
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult, ValueType},
     onnx::NodeProto,
-    utils::{ArrayType, BoxResult},
-    utils::{OperationResult, ValueType},
 };
 use anyhow::anyhow;
 

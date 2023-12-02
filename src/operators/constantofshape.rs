@@ -1,8 +1,9 @@
 use ndarray::{ArrayD, IxDyn};
 
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult},
     onnx::NodeProto,
-    utils::{make_tensor_from_proto, ArrayType, BoxResult, OperationResult},
+    utils::make_tensor_from_proto,
 };
 use anyhow::anyhow;
 

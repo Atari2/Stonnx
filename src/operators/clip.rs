@@ -1,6 +1,7 @@
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult},
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
+    utils::pick_opset_version,
 };
 use anyhow::anyhow;
 

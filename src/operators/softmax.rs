@@ -1,9 +1,9 @@
 use ndarray::{ArrayD, Axis};
 
 use crate::{
+    common::OperationResult,
+    common::{ArrayType, BoxResult},
     onnx::NodeProto,
-    utils::OperationResult,
-    utils::{ArrayType, BoxResult},
 };
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 11, 13];

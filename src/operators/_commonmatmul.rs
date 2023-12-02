@@ -1,6 +1,6 @@
 use ndarray::{ArrayD, Ix2, SliceInfoElem};
 
-use crate::utils::{BoxResult, NDIndex};
+use crate::common::{BoxResult, NDIndex};
 
 pub fn matmul_impl<'b, A: Clone + num::Zero>(
     a: ndarray::ArrayViewD<'b, A>,

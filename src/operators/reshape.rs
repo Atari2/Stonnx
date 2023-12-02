@@ -1,6 +1,7 @@
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult},
     onnx::NodeProto,
-    utils::{shape_safe_product, ArrayType, BoxResult, OperationResult},
+    utils::shape_safe_product,
 };
 use anyhow::anyhow;
 

@@ -1,6 +1,6 @@
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult, ValueType},
     onnx::NodeProto,
-    utils::{ArrayType, BoxResult, OperationResult, ValueType},
 };
 use anyhow::anyhow;
 

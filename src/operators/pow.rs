@@ -1,7 +1,7 @@
 use ndarray::Ix0;
 
+use crate::common::{ArrayType, BoxResult, OperationResult};
 use crate::onnx::NodeProto;
-use crate::utils::{ArrayType, BoxResult, OperationResult};
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 6, 13];
 

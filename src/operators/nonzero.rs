@@ -1,8 +1,8 @@
 use ndarray::ArrayD;
 
 use crate::{
+    common::{ArrayType, BoxResult, NDIndex, OperationResult},
     onnx::NodeProto,
-    utils::{ArrayType, BoxResult, NDIndex, OperationResult},
 };
 
 const _OPSET_VERSIONS: [i64; 2] = [9, 13];

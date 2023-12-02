@@ -1,16 +1,15 @@
+mod common;
 mod onnxparser;
 mod operators;
 mod protograph;
 mod utils;
 
 use anyhow::anyhow;
+use common::{ArrayType, BoxResult, OperationFn, OperationResult, VERBOSE};
 use lazy_static::lazy_static;
 pub use onnxparser::onnx;
 use std::collections::{HashMap, HashSet};
-use utils::BoxResult;
-pub use utils::{
-    make_external_inputs, make_initializers, read_model, read_tensor, OperationFn, VERBOSE,
-};
+pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor};
 
 use operators::add::add;
 use operators::averagepool::averagepool;
@@ -55,7 +54,7 @@ use clap::Parser;
 
 use serde::{Deserialize, Serialize};
 
-use utils::{make_external_outputs, make_graph_outputs, ArrayType, OperationResult};
+use utils::{make_external_outputs, make_graph_outputs};
 
 lazy_static! {
     static ref OPERATION_MAP: HashMap<&'static str, OperationFn> = {

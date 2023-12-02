@@ -1,8 +1,5 @@
-use crate::utils::F32IntoType;
-use crate::{
-    onnx::NodeProto,
-    utils::{pick_opset_version, ArrayElement, ArrayType, BoxResult, OperationResult},
-};
+use crate::common::{ArrayElement, ArrayType, BoxResult, F32IntoType, OperationResult};
+use crate::{onnx::NodeProto, utils::pick_opset_version};
 use anyhow::anyhow;
 use ndarray::{ArrayD, Ix0};
 use rand::{Rng, SeedableRng};

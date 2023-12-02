@@ -1,5 +1,6 @@
+use crate::common::{ArrayType, BoxResult, OperationResult};
 use crate::onnx::NodeProto;
-use crate::utils::{pick_opset_version, ArrayType, BoxResult, OperationResult};
+use crate::utils::pick_opset_version;
 
 const OPSET_VERSIONS: [i64; 4] = [1, 13, 15, 19];
 

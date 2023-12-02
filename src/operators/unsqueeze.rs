@@ -2,8 +2,9 @@ use ndarray::{ArrayD, ArrayViewD, Ix1};
 use num::Zero;
 
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult},
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
+    utils::pick_opset_version,
 };
 use anyhow::anyhow;
 

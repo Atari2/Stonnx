@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use petgraph::graphmap::GraphMap;
 use std::{collections::HashMap, path::Path};
 
-use crate::{onnx::GraphProto, utils::BoxResult};
+use crate::{common::BoxResult, onnx::GraphProto};
 
 pub fn build_graph_from_proto(proto: &GraphProto, modelpath: &Path) -> BoxResult<()> {
     let mut graph = GraphMap::<&str, &str, petgraph::Directed>::new();

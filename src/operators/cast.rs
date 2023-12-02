@@ -3,8 +3,8 @@ use ndarray::ArrayD;
 use num::traits::AsPrimitive;
 use protobuf::Enum;
 
+use crate::common::{ArrayType, BoxResult, OperationResult};
 use crate::onnx::{self, NodeProto};
-use crate::utils::{ArrayType, BoxResult, OperationResult};
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 6, 9, 13, 19];
 

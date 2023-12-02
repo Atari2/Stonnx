@@ -1,5 +1,5 @@
+use crate::common::{ArrayType, BoxResult, OperationResult};
 use crate::onnx::NodeProto;
-use crate::utils::{ArrayType, BoxResult, OperationResult};
 use anyhow::anyhow;
 use ndarray::{ArrayD, SliceInfoElem};
 

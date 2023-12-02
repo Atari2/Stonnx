@@ -1,5 +1,8 @@
 #![allow(clippy::too_many_arguments)]
-use crate::{onnx::AttributeProto, utils::{BoxResult, ArrayElement, F32IntoType}};
+use crate::{
+    common::{ArrayElement, BoxResult, F32IntoType},
+    onnx::AttributeProto,
+};
 use anyhow::anyhow;
 use itertools::Itertools;
 use ndarray::{s, Array0, Array1, Array2, ArrayD, ArrayView1, Ix0, Ix2, SliceInfoElem};
@@ -175,7 +178,10 @@ fn _pool_generic<A: ArrayElement>(
     ceil_mode: Option<bool>,
     indices: bool,
     pads: &Array2<usize>,
-) -> BoxResult<PoolOutput<A>> where usize: AsPrimitive<A> {
+) -> BoxResult<PoolOutput<A>>
+where
+    usize: AsPrimitive<A>,
+{
     let fpool: fn(ArrayView1<A>) -> Array0<A> = match pooling_type {
         PoolingType::Max => |a: ArrayView1<A>| -> Array0<A> {
             Array0::from_elem(Ix0(), a.iter().copied().fold(A::MIN, A::max))
@@ -320,7 +326,11 @@ pub fn _commn_pool_generic<A: ArrayElement>(
     count_include_pad: i64,
     mut attrs: CommonPoolAttrs,
     output_len: usize,
-) -> BoxResult<PoolOutput<A>> where f32: F32IntoType<A>, usize: AsPrimitive<A> {
+) -> BoxResult<PoolOutput<A>>
+where
+    f32: F32IntoType<A>,
+    usize: AsPrimitive<A>,
+{
     if attrs.dilations.is_none() && pooling_type == PoolingType::Max {
         attrs.dilations = Some(vec![1; attrs.kernel_shape.len()]);
     }

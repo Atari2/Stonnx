@@ -3,8 +3,9 @@ use ndarray::{ArrayD, ArrayViewD, Ix2};
 use trait_set::trait_set;
 
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult},
     onnx::NodeProto,
-    utils::{pick_opset_version, ArrayType, BoxResult, OperationResult},
+    utils::pick_opset_version,
 };
 use anyhow::anyhow;
 

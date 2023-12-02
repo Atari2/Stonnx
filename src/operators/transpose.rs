@@ -1,6 +1,6 @@
 use crate::{
+    common::{ArrayType, BoxResult, OperationResult},
     onnx::NodeProto,
-    utils::{ArrayType, BoxResult, OperationResult},
 };
 
 const _OPSET_VERSIONS: [i64; 2] = [1, 13];

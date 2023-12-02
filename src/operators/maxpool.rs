@@ -3,12 +3,15 @@ use ndarray::{s, Array2, ArrayD, Ix1, Ix2, IxDyn};
 use num::traits::AsPrimitive;
 
 use crate::{
+    common::{ArrayElement, ArrayType, BoxResult, F32IntoType, OperationResult},
     onnx::NodeProto,
-    utils::{shape_safe_product, ArrayType, BoxResult, OperationResult, ArrayElement, F32IntoType},
+    utils::shape_safe_product,
 };
 use anyhow::anyhow;
 
-use super::_commonpool::{CommonPoolAttrs, PoolAutoPad, PoolOutput, PoolingType, _commn_pool_generic};
+use super::_commonpool::{
+    CommonPoolAttrs, PoolAutoPad, PoolOutput, PoolingType, _commn_pool_generic,
+};
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 8, 10, 11, 12];
 
@@ -319,7 +322,11 @@ fn maxpool_generic<A: ArrayElement>(
     input: &ArrayD<A>,
     attrs: MaxPoolAttrs,
     output_len: usize,
-) -> BoxResult<PoolOutput<A>> where f32: F32IntoType<A>, usize: AsPrimitive<A> {
+) -> BoxResult<PoolOutput<A>>
+where
+    f32: F32IntoType<A>,
+    usize: AsPrimitive<A>,
+{
     let b1 = if let Some(ref dilations) = attrs.dilations {
         let mindilation = dilations.iter().min().copied().unwrap_or(1);
         let maxdilation = dilations.iter().max().copied().unwrap_or(1);

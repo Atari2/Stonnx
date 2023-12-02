@@ -1,8 +1,8 @@
+use crate::common::ArrayElement;
+use crate::common::VERBOSE;
 use crate::create_intermediate_output_dir_for;
 use crate::named_array_to_file;
 use crate::operators::_commonmatmul::matmul_impl;
-use crate::utils::ArrayElement;
-use crate::VERBOSE;
 use itertools::iproduct;
 use ndarray::Array1;
 use ndarray::Array2;
@@ -10,11 +10,11 @@ use ndarray::ArrayD;
 use ndarray::SliceInfoElem;
 use ndarray::{Ix2, IxDyn};
 
+use crate::common::ArrayType;
+use crate::common::BoxResult;
+use crate::common::OperationResult;
 use crate::onnx::AttributeProto;
 use crate::onnx::NodeProto;
-use crate::utils::ArrayType;
-use crate::utils::BoxResult;
-use crate::utils::OperationResult;
 
 use anyhow::anyhow;
 

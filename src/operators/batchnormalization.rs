@@ -1,7 +1,8 @@
 use ndarray::{ArrayD, SliceInfoElem};
 
+use crate::common::{ArrayElement, ArrayType, BoxResult, F32IntoType, OperationResult};
 use crate::onnx::NodeProto;
-use crate::utils::{pick_opset_version, ArrayType, BoxResult, OperationResult, ArrayElement, F32IntoType};
+use crate::utils::pick_opset_version;
 
 const OPSET_VERSIONS: [i64; 6] = [1, 6, 7, 9, 14, 15];
 
@@ -73,7 +74,11 @@ fn _batchnorm_test_mode<A: ArrayElement>(
     mean: &ArrayD<A>,
     var: &ArrayD<A>,
     epsilon: f32,
-) -> BoxResult<ArrayType> where ArrayType: From<ArrayD<A>>, f32: F32IntoType<A> {
+) -> BoxResult<ArrayType>
+where
+    ArrayType: From<ArrayD<A>>,
+    f32: F32IntoType<A>,
+{
     let dims_x = x.ndim();
     let dim_ones_generator = std::iter::repeat(1).take(dims_x - 2);
     let sshape = [scale.len()]
@@ -109,7 +114,11 @@ fn _batchnorm_training_mode<A: ArrayElement + num::Float>(
     var: &ArrayD<A>,
     momentum: f32,
     epsilon: f32,
-) -> BoxResult<Vec<ArrayType>> where ArrayType: From<ArrayD<A>>, f32: F32IntoType<A> {
+) -> BoxResult<Vec<ArrayType>>
+where
+    ArrayType: From<ArrayD<A>>,
+    f32: F32IntoType<A>,
+{
     let momentum = momentum.as_();
     let axis = (0..x.ndim()).skip_while(|&i| i == 1).collect::<Vec<_>>();
     let mut saved_mean = x.clone();
@@ -128,7 +137,8 @@ fn _batchnorm_training_mode<A: ArrayElement + num::Float>(
         let sliced = x.slice(sliceinfo.as_slice()).to_owned();
         saved_var[i] = sliced.var((0.0).as_());
     }
-    let output_mean = mean.mapv(|x| x * momentum) + saved_mean.mapv(|x| x * (1.0f32.as_() - momentum));
+    let output_mean =
+        mean.mapv(|x| x * momentum) + saved_mean.mapv(|x| x * (1.0f32.as_() - momentum));
     let output_var = var.mapv(|x| x * momentum) + saved_var.mapv(|x| x * (1.0f32.as_() - momentum));
     let y = _batchnorm_test_mode(x, scale, bias, &output_mean, &output_var, epsilon)?;
     Ok(vec![
@@ -147,7 +157,11 @@ fn batchnormalization_1_6<A: ArrayElement + num::Float>(
     mean: &ArrayD<A>,
     var: &ArrayD<A>,
     attrs: BatchNormalizationAttrs,
-) -> BoxResult<Vec<ArrayType>> where ArrayType: From<ArrayD<A>>, f32: F32IntoType<A> {
+) -> BoxResult<Vec<ArrayType>>
+where
+    ArrayType: From<ArrayD<A>>,
+    f32: F32IntoType<A>,
+{
     if attrs.is_test {
         Ok(vec![_batchnorm_test_mode(
             x,
@@ -169,15 +183,20 @@ fn batchnormalization_1_6<A: ArrayElement + num::Float>(
         )
     }
 }
-fn batchnormalization_7_9(
-    x: &ArrayD<f32>,
-    scale: &ArrayD<f32>,
-    bias: &ArrayD<f32>,
-    mean: &ArrayD<f32>,
-    var: &ArrayD<f32>,
+fn batchnormalization_7_9<A: ArrayElement + num::Float>(
+    x: &ArrayD<A>,
+    scale: &ArrayD<A>,
+    bias: &ArrayD<A>,
+    mean: &ArrayD<A>,
+    var: &ArrayD<A>,
     attrs: BatchNormalizationAttrs,
-) -> BoxResult<Vec<ArrayType>> {
+) -> BoxResult<Vec<ArrayType>>
+where
+    ArrayType: From<ArrayD<A>>,
+    f32: F32IntoType<A>,
+{
     if let Some(momentum) = attrs.momentum {
+        let momentum = momentum.as_();
         let axis = (0..x.ndim()).filter(|i| *i != 1).collect::<Vec<_>>();
         let mut saved_mean = x.clone();
         for ax in axis.iter().rev() {
@@ -186,17 +205,19 @@ fn batchnormalization_7_9(
                 .ok_or(anyhow::anyhow!("BatchNormalization: mean_axis failed"))?;
         }
         let saved_var_len = x.shape()[1];
-        let mut saved_var = ArrayD::<f32>::zeros(vec![saved_var_len]);
+        let mut saved_var = ArrayD::<A>::zeros(vec![saved_var_len]);
         for i in 0..saved_var_len {
             let sliceinfo = [(0..).into(), i.into()]
                 .into_iter()
                 .chain(std::iter::repeat((0..).into()).take(x.ndim() - 2))
                 .collect::<Vec<SliceInfoElem>>();
             let sliced = x.slice(sliceinfo.as_slice()).to_owned();
-            saved_var[i] = sliced.var(0.0);
+            saved_var[i] = sliced.var((0.0).as_());
         }
-        let output_mean = mean.mapv(|x| x * momentum) + saved_mean.mapv(|x| x * (1. - momentum));
-        let output_var = var.mapv(|x| x * momentum) + saved_var.mapv(|x| x * (1. - momentum));
+        let output_mean =
+            mean.mapv(|x| x * momentum) + saved_mean.mapv(|x| x * (1f32.as_() - momentum));
+        let output_var =
+            var.mapv(|x| x * momentum) + saved_var.mapv(|x| x * (1f32.as_() - momentum));
         let y = _batchnorm_test_mode(x, scale, bias, &output_mean, &output_var, attrs.epsilon)?;
         Ok(vec![y])
     } else {
@@ -210,14 +231,18 @@ fn batchnormalization_7_9(
         )?])
     }
 }
-fn batchnormalization_14_15(
-    x: &ArrayD<f32>,
-    scale: &ArrayD<f32>,
-    bias: &ArrayD<f32>,
-    mean: &ArrayD<f32>,
-    var: &ArrayD<f32>,
+fn batchnormalization_14_15<A: ArrayElement + num::Float>(
+    x: &ArrayD<A>,
+    scale: &ArrayD<A>,
+    bias: &ArrayD<A>,
+    mean: &ArrayD<A>,
+    var: &ArrayD<A>,
     attrs: BatchNormalizationAttrs,
-) -> BoxResult<Vec<ArrayType>> {
+) -> BoxResult<Vec<ArrayType>>
+where
+    ArrayType: From<ArrayD<A>>,
+    f32: F32IntoType<A>,
+{
     if !attrs.training_mode {
         let res = _batchnorm_test_mode(x, scale, bias, mean, var, attrs.epsilon)?;
         Ok(vec![res])

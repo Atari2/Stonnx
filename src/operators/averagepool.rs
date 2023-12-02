@@ -1,6 +1,6 @@
 use crate::{
+    common::{ArrayElement, ArrayType, BoxResult, F32IntoType, OperationResult},
     onnx::NodeProto,
-    utils::{ArrayType, BoxResult, OperationResult, ArrayElement, F32IntoType},
 };
 use anyhow::anyhow;
 use itertools::Itertools;
@@ -209,7 +209,10 @@ fn pool<A: ArrayElement>(
     pads: &Option<Vec<i64>>,
     dilations: &Option<Vec<i64>>,
     count_include_pad: i64,
-) -> BoxResult<PoolOutput<A>> where usize: AsPrimitive<A> {
+) -> BoxResult<PoolOutput<A>>
+where
+    usize: AsPrimitive<A>,
+{
     let spatial_size = x_shape.len() - 2;
     let y_shape = [x_shape[0], x_shape[1]]
         .into_iter()
@@ -311,7 +314,11 @@ fn _average_pool_generic<A: ArrayElement>(
     count_include_pad: i64,
     attrs: AveragePoolAttrs,
     _output_len: usize,
-) -> BoxResult<PoolOutput<A>> where usize: AsPrimitive<A>, f32: F32IntoType<A> {
+) -> BoxResult<PoolOutput<A>>
+where
+    usize: AsPrimitive<A>,
+    f32: F32IntoType<A>,
+{
     let x_shape = input.shape();
     let padding_value = if count_include_pad == 0 {
         F32IntoType::as_(f32::NAN)
@@ -406,7 +413,8 @@ pub fn averagepool(
     let attrs = AveragePoolAttrs::new(node, inputs[0]);
     match inputs[0] {
         ArrayType::F32(x) => {
-            let (y, i) = _average_pool_generic(x, attrs.count_include_pad as i64, attrs, output_len)?;
+            let (y, i) =
+                _average_pool_generic(x, attrs.count_include_pad as i64, attrs, output_len)?;
             Ok((ArrayType::F32(y), i.map(ArrayType::I64)).into())
         }
         _ => todo!("AveragePool for type {:?}", inputs[0]),
