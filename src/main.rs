@@ -9,7 +9,7 @@ use common::{ArrayType, BoxResult, OperationFn, OperationResult, VERBOSE};
 use lazy_static::lazy_static;
 pub use onnxparser::onnx;
 use std::collections::{HashMap, HashSet};
-pub use utils::{make_external_inputs, make_initializers, read_model, read_tensor};
+pub use utils::{initialize_nodes, make_initializers, read_model, read_tensor};
 
 use operators::add::add;
 use operators::averagepool::averagepool;
@@ -54,7 +54,10 @@ use clap::Parser;
 
 use serde::{Deserialize, Serialize};
 
-use utils::{make_external_outputs, make_graph_outputs};
+use utils::{make_external_outputs, make_graph_outputs, OutputInfo};
+
+use crate::utils::operator_not_implemented;
+use std::sync::mpsc::channel;
 
 lazy_static! {
     static ref OPERATION_MAP: HashMap<&'static str, OperationFn> = {
@@ -181,6 +184,145 @@ impl FileInputs {
 
 const MAX_OPSET_VERSION: i64 = 20;
 
+#[derive(Debug, Clone, PartialEq)]
+struct ONNXNode<'a> {
+    id: usize,
+    op_func: OperationFn,
+    node_ref: &'a onnx::NodeProto,
+}
+
+impl std::hash::Hash for ONNXNode<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl std::cmp::Eq for ONNXNode<'_> {}
+
+fn execute_node(
+    onnxnode: &ONNXNode,
+    node_inputs: &HashMap<String, ArrayType>,
+    opset_version: i64,
+) -> BoxResult<OperationResult> {
+    let node = onnxnode.node_ref;
+    let mut inputs = vec![];
+    let mut outputs = vec![];
+    let mut all_nodes_have_init = true;
+    for input in node.input.iter() {
+        if let Some(k) = node_inputs.get(input) {
+            inputs.push(k);
+        } else {
+            all_nodes_have_init = false;
+        }
+    }
+    for output in node.output.iter() {
+        outputs.push(output);
+    }
+    if !all_nodes_have_init {
+        panic!("Some nodes in this operation have not been initialized yet, this means the operations aren't in order, fix the code to account for this");
+    }
+    let input_names = node.input.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+    let output_names = node
+        .output
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<&str>>();
+    if let Some(op_name) = node.op_type.as_deref() {
+        if let Some(func) = OPERATION_MAP.get(op_name) {
+            println!(
+                "Running {} operator between {:?} to get {:?}",
+                op_name, input_names, output_names
+            );
+            let result = func(&inputs, node, opset_version, outputs.len())?;
+            Ok(result)
+        } else {
+            Err(anyhow!("Op type not implemented {:?}", op_name))
+        }
+    } else {
+        Err(anyhow!("Op type not found"))
+    }
+}
+
+fn handle_output<'a>(
+    result: OperationResult,
+    node: &'a ONNXNode,
+    args: &Args,
+    outputs_dir: &Path,
+    node_inputs: &mut HashMap<String, ArrayType>,
+    graph_outputs: &mut HashMap<String, OutputInfo>,
+) -> BoxResult<Vec<&'a str>> {
+    let node = node.node_ref;
+    let outputs = node
+        .output
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<&str>>();
+    match result {
+        OperationResult::Double((a, b)) => {
+            assert_eq!(outputs.len(), 2);
+            let output_name = outputs[0];
+            let output_name2 = outputs[1];
+            println!("\tOutput {} has shape {:?}", output_name, a.shape());
+            println!("\tOutput {} has shape {:?}", output_name2, b.shape());
+            if args.verbose >= 2 {
+                a.to_file(outputs_dir, output_name)?;
+                b.to_file(outputs_dir, output_name2)?;
+            }
+            node_inputs.insert(output_name.to_string(), a);
+            node_inputs.insert(output_name2.to_string(), b);
+        }
+        OperationResult::Single(res) => {
+            assert_eq!(outputs.len(), 1);
+            let output_name = outputs[0];
+            println!("\tOutput {} has shape {:?}", output_name, res.shape());
+            if args.verbose >= 2 {
+                res.to_file(outputs_dir, output_name)?;
+            }
+            node_inputs.insert(output_name.to_string(), res);
+        }
+        OperationResult::OptionalDouble((a, Some(b))) => {
+            assert_eq!(outputs.len(), 2);
+            let output_name = outputs[0];
+            let output_name2 = outputs[1];
+            println!("\tOutput {} has shape {:?}", output_name, a.shape());
+            println!("\tOutput {} has shape {:?}", output_name2, b.shape());
+            if args.verbose >= 2 {
+                a.to_file(outputs_dir, output_name)?;
+                b.to_file(outputs_dir, output_name2)?;
+            }
+            node_inputs.insert(output_name.to_string(), a);
+            node_inputs.insert(output_name2.to_string(), b);
+        }
+        OperationResult::OptionalDouble((a, None)) => {
+            assert_eq!(outputs.len(), 1);
+            let output_name = outputs[0];
+            println!("\tOutput {} has shape {:?}", output_name, a.shape());
+            if args.verbose >= 2 {
+                a.to_file(outputs_dir, output_name)?;
+            }
+            node_inputs.insert(output_name.to_string(), a);
+        }
+        OperationResult::Multiple(res) => {
+            assert_eq!(outputs.len(), res.len());
+            for (output_name, res) in outputs.iter().zip(res.into_iter()) {
+                println!("\tOutput {} has shape {:?}", output_name, res.shape());
+                if args.verbose >= 2 {
+                    res.to_file(outputs_dir, output_name)?;
+                }
+                node_inputs.insert(output_name.to_string(), res);
+            }
+        }
+    }
+    for output_name in outputs.iter() {
+        if let Some(gout) = graph_outputs.get_mut(*output_name) {
+            if let Some(produced) = node_inputs.get(*output_name) {
+                gout.data = Some(produced.clone());
+            }
+        }
+    }
+    Ok(outputs)
+}
+
 fn main() -> BoxResult<()> {
     let args = Args::parse();
     VERBOSE
@@ -220,18 +362,61 @@ fn main() -> BoxResult<()> {
         if args.gengraph {
             build_graph_from_proto(graph, &fileinputs.modelpath)?;
         }
+        let mut node_input_requirements: HashMap<ONNXNode, Vec<&str>> = HashMap::new();
+        let mut input_link_map: HashMap<&str, Vec<ONNXNode>> = HashMap::new();
         let initializers = make_initializers(graph);
-        let mut node_inputs = make_external_inputs(graph, &fileinputs, &initializers)?;
+        let mut node_inputs = initialize_nodes(graph, &fileinputs, initializers)?;
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
         let mut graph_outputs = make_graph_outputs(graph)?;
         let mut not_implemented = HashSet::new();
-        for node in graph.node.iter() {
+        for (counter, node) in graph.node.iter().enumerate() {
+            let input_names = node
+                .input
+                .iter()
+                .filter_map(|s| {
+                    if node_inputs.contains_key(s.as_str()) {
+                        None
+                    } else {
+                        Some(s.as_str())
+                    }
+                })
+                .collect::<Vec<&str>>();
             if let Some(name) = node.op_type.as_deref() {
-                if OPERATION_MAP.get(name).is_none() {
+                for input_name in input_names.iter() {
+                    input_link_map
+                        .entry(input_name)
+                        .or_default()
+                        .push(ONNXNode {
+                            id: counter,
+                            op_func: *OPERATION_MAP
+                                .get(name)
+                                .unwrap_or(&(operator_not_implemented as OperationFn)),
+                            node_ref: node,
+                        });
+                }
+                if let Some(op_func) = OPERATION_MAP.get(name) {
+                    node_input_requirements.insert(
+                        ONNXNode {
+                            id: counter,
+                            op_func: *op_func,
+                            node_ref: node,
+                        },
+                        input_names,
+                    );
+                } else {
+                    node_input_requirements.insert(
+                        ONNXNode {
+                            id: counter,
+                            op_func: operator_not_implemented as OperationFn,
+                            node_ref: node,
+                        },
+                        input_names,
+                    );
                     not_implemented.insert(name);
                 }
             }
         }
+
         eprintln!(
             "Number of not implemented operators: {}",
             not_implemented.len()
@@ -242,109 +427,52 @@ fn main() -> BoxResult<()> {
         if !not_implemented.is_empty() && args.failfast {
             return Err(anyhow!("Not implemented operators found"));
         }
-        for node in graph.node.iter() {
-            let mut inputs = vec![];
-            let mut outputs = vec![];
-            let mut all_nodes_have_init = true;
-            for input in node.input.iter() {
-                if let Some(i) = initializers.get(input) {
-                    inputs.push(i);
-                } else if let Some(k) = node_inputs.get(input) {
-                    inputs.push(k);
-                } else {
-                    all_nodes_have_init = false;
+        let (tx, rx) = channel();
+        loop {
+            let mut nodes_ready = vec![];
+            for (node, inputs) in node_input_requirements.iter() {
+                if inputs.is_empty() {
+                    println!("Node {} is ready", node.id);
+                    nodes_ready.push(node.clone());
                 }
             }
-            for output in node.output.iter() {
-                outputs.push(output);
-            }
-            if !all_nodes_have_init {
-                panic!("Some nodes in this operation have not been initialized yet, this means the operations aren't in order, fix the code to account for this");
-            }
-            let input_names = node.input.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
-            let output_names = node
-                .output
-                .iter()
-                .map(|s| s.as_str())
-                .collect::<Vec<&str>>();
-            if let Some(op_name) = node.op_type.as_deref() {
-                if let Some(func) = OPERATION_MAP.get(op_name) {
-                    println!(
-                        "Running {} operator between {:?} to get {:?}",
-                        op_name, input_names, output_names
-                    );
-                    let result = func(&inputs, node, opset_version, outputs.len())?;
-                    match result {
-                        OperationResult::Double((a, b)) => {
-                            assert_eq!(outputs.len(), 2);
-                            let output_name = outputs[0];
-                            let output_name2 = outputs[1];
-                            println!("\tOutput {} has shape {:?}", output_name, a.shape());
-                            println!("\tOutput {} has shape {:?}", output_name2, b.shape());
-                            if args.verbose >= 2 {
-                                a.to_file(&outputs_dir, output_name)?;
-                                b.to_file(&outputs_dir, output_name2)?;
-                            }
-                            node_inputs.insert(output_name.to_string(), a);
-                            node_inputs.insert(output_name2.to_string(), b);
-                        }
-                        OperationResult::Single(res) => {
-                            assert_eq!(outputs.len(), 1);
-                            let output_name = outputs[0];
-                            println!("\tOutput {} has shape {:?}", output_name, res.shape());
-                            if args.verbose >= 2 {
-                                res.to_file(&outputs_dir, output_name)?;
-                            }
-                            node_inputs.insert(output_name.to_string(), res);
-                        }
-                        OperationResult::OptionalDouble((a, Some(b))) => {
-                            assert_eq!(outputs.len(), 2);
-                            let output_name = outputs[0];
-                            let output_name2 = outputs[1];
-                            println!("\tOutput {} has shape {:?}", output_name, a.shape());
-                            println!("\tOutput {} has shape {:?}", output_name2, b.shape());
-                            if args.verbose >= 2 {
-                                a.to_file(&outputs_dir, output_name)?;
-                                b.to_file(&outputs_dir, output_name2)?;
-                            }
-                            node_inputs.insert(output_name.to_string(), a);
-                            node_inputs.insert(output_name2.to_string(), b);
-                        }
-                        OperationResult::OptionalDouble((a, None)) => {
-                            assert_eq!(outputs.len(), 1);
-                            let output_name = outputs[0];
-                            println!("\tOutput {} has shape {:?}", output_name, a.shape());
-                            if args.verbose >= 2 {
-                                a.to_file(&outputs_dir, output_name)?;
-                            }
-                            node_inputs.insert(output_name.to_string(), a);
-                        }
-                        OperationResult::Multiple(res) => {
-                            assert_eq!(outputs.len(), res.len());
-                            for (output_name, res) in outputs.iter().zip(res.into_iter()) {
-                                println!("\tOutput {} has shape {:?}", output_name, res.shape());
-                                if args.verbose >= 2 {
-                                    res.to_file(&outputs_dir, output_name)?;
-                                }
-                                node_inputs.insert(output_name.to_string(), res);
-                            }
-                        }
-                    }
-                } else {
-                    todo!("Op type {:?}", op_name)
+            node_input_requirements.retain(|_, v| !v.is_empty());
+            let node_inputs_ref = &node_inputs;
+            rayon::scope(|s| {
+                for node in nodes_ready {
+                    let tx = tx.clone();
+                    s.spawn(move |_| {
+                        let result = execute_node(&node, node_inputs_ref, opset_version);
+                        tx.send((node, result)).unwrap();
+                    })
                 }
-            } else {
-                todo!("Node {:?} doesn't have op type", node)
-            }
+            });
 
-            for output_name in outputs.iter() {
-                if let Some(gout) = graph_outputs.get_mut(*output_name) {
-                    if let Some(produced) = node_inputs.get(*output_name) {
-                        gout.data = Some(produced.clone());
+            let node_inputs = &mut node_inputs;
+            let (node, result) = rx.recv()?;
+            let result = result?;
+            let outputs = handle_output(
+                result,
+                &node,
+                &args,
+                &outputs_dir,
+                node_inputs,
+                &mut graph_outputs,
+            )?;
+            for output in outputs {
+                if let Some(n) = input_link_map.remove(output) {
+                    for node in n {
+                        node_input_requirements.entry(node).and_modify(|v| {
+                            v.retain(|x| *x != output);
+                        });
                     }
                 }
+            }
+            if node_input_requirements.is_empty() {
+                break;
             }
         }
+
         for (name, value) in expected_outputs.iter() {
             if let Some(gout) = graph_outputs.get_mut(name) {
                 if let Some(data) = &gout.data {

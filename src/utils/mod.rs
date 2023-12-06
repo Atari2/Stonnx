@@ -10,7 +10,7 @@ use protobuf::Enum;
 
 use crate::common::*;
 use crate::onnx::tensor_proto::DataType;
-use crate::onnx::{TensorProto, ValueInfoProto};
+use crate::onnx::{NodeProto, TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
 use crate::FileInputs;
 use half::{bf16, f16};
@@ -688,7 +688,7 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> HashMap<String, ArrayType>
 fn make_input_tensors_from_files(
     graph: &onnx::GraphProto,
     files: &[PathBuf],
-    initializers: &HashMap<String, ArrayType>,
+    mut initializers: HashMap<String, ArrayType>,
 ) -> BoxResult<HashMap<String, ArrayType>> {
     let mut map = HashMap::new();
     let mut external_inputs_map = HashMap::new();
@@ -713,12 +713,23 @@ fn make_input_tensors_from_files(
                 tensor.value_type()
             );
             map.insert(input_name.to_string(), tensor);
-        } else if initializers.get(input_name).is_none() {
+        } else if let Some((_, init)) = initializers.remove_entry(input_name) {
+            println!(
+                "  Input {} from initializer has shape {:?} and type {:?}",
+                input_name,
+                init.shape(),
+                init.value_type()
+            );
+            map.insert(input_name.to_string(), init);
+        } else {
             return Err(anyhow!(
                 "Input {} not found in inputs file or graph initializers",
                 input_name
             ));
         }
+    }
+    for (k, v) in initializers {
+        map.insert(k, v);
     }
     Ok(map)
 }
@@ -753,10 +764,10 @@ fn make_output_tensors_from_files(
     Ok(map)
 }
 
-pub fn make_external_inputs(
+pub fn initialize_nodes(
     graph: &onnx::GraphProto,
     fileinputs: &FileInputs,
-    initializers: &HashMap<String, ArrayType>,
+    initializers: HashMap<String, ArrayType>,
 ) -> BoxResult<HashMap<String, ArrayType>> {
     if fileinputs.inputs.is_empty() {
         return Ok(HashMap::new());
@@ -828,4 +839,13 @@ pub fn pick_opset_version(target_ver: i64, opset_versions: &[i64]) -> i64 {
         }
     }
     opset_version
+}
+
+pub fn operator_not_implemented(
+    _inputs: &[&ArrayType],
+    _node: &NodeProto,
+    _opset_version: i64,
+    _output_len: usize,
+) -> BoxResult<OperationResult> {
+    todo!("operator not implemented");
 }
