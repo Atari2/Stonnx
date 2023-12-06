@@ -39,7 +39,7 @@ pub fn log_array_to_file<A: ndarray_npy::WritableElement, D: ndarray::Dimension>
     a: &ndarray::ArrayBase<ndarray::ViewRepr<&A>, D>,
 ) -> BoxResult<()> {
     let verbose_flag = VERBOSE.get();
-    if let Some(4..) = verbose_flag {
+    if let Some(VerbosityLevel::Intermediate) = verbose_flag {
         static mut COUNTER: usize = 0;
         unsafe {
             ndarray_npy::write_npy(
@@ -70,8 +70,9 @@ macro_rules! named_array_to_file {
 #[macro_export]
 macro_rules! create_intermediate_output_dir_for {
     ($name:ident) => {{
+        use $crate::VerbosityLevel;
         let verbose_flag = VERBOSE.get();
-        if let Some(4..) = verbose_flag {
+        if let Some(VerbosityLevel::Intermediate) = verbose_flag {
             match std::fs::create_dir(concat!(stringify!($name), "_intermediate_outputs")) {
                 Ok(_) => {}
                 Err(e) => {

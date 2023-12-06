@@ -1,13 +1,17 @@
 use std::ops::AddAssign;
 use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::anyhow;
+use clap::Parser;
 use half::{bf16, f16};
 use ndarray::ArrayD;
 use ndarray::ScalarOperand;
 use num::traits::AsPrimitive;
 use num::Complex;
 use once_cell::sync::OnceCell;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::onnx::{self, tensor_proto::DataType, NodeProto};
 
@@ -18,7 +22,118 @@ pub static UNKNOWN: &str = "<unknown>";
 
 pub type BoxResult<A> = anyhow::Result<A>;
 
-pub static VERBOSE: OnceCell<usize> = OnceCell::new();
+pub static VERBOSE: OnceCell<VerbosityLevel> = OnceCell::new();
+
+#[derive(Parser, Debug)]
+/// Parse and execute inference on pre-trained ONNX models
+pub struct Args {
+    /// Path to the folder containing the model to run
+    ///
+    /// This folder should contain the model's `inputs.json`
+    ///
+    /// This file should contain a "modelpath" property which indicates the path to the model's `.onnx` file
+    /// if this path is relative, it will be relative to the model's folder
+    ///
+    /// This file should also contain an "inputs" property which is an array of paths to the model's inputs
+    /// if these paths are relative, they will be relative to the model's folder
+    ///
+    /// This file should also contain an "outputs" property which is an array of paths to the model's expected outputs
+    /// if these paths are relative, they will be relative to the model's folder, these outputs will be compared to the outputs of the model
+    #[arg(short, long)]
+    pub model: PathBuf,
+
+    /// Set verbosity level
+    ///
+    /// 0 - No output except basic logging
+    ///
+    /// 2 - Output all results from operators into .npy files
+    ///
+    /// 4 - Output intermediate results from operators into .npy files (only supported by conv for now)
+    #[arg(short, long, default_value = "0")]
+    pub verbose: u64,
+
+    /// Generate json file representing the graph of the model
+    ///
+    /// This JSON file is meant to be parsed and printed by the C# program `ONNXGraphLayout`
+    #[arg(short, long, default_value = "false")]
+    pub gengraph: bool,
+
+    /// Fail immediately if an operator is not implemented yet, otherwise continue and execute the model until panic
+    #[arg(short, long, default_value = "false")]
+    pub failfast: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FileInputs {
+    pub inputs: Vec<PathBuf>,
+    pub outputs: Vec<PathBuf>,
+    pub modelpath: PathBuf,
+}
+
+impl FileInputs {
+    pub fn extend_paths(&mut self, modelname: &Path) {
+        self.inputs = self
+            .inputs
+            .iter()
+            .map(|s| {
+                if s.is_absolute() {
+                    s.clone()
+                } else {
+                    Path::new("models").join(modelname).join(s)
+                }
+            })
+            .collect();
+        self.outputs = self
+            .outputs
+            .iter()
+            .map(|s| {
+                if s.is_absolute() {
+                    s.clone()
+                } else {
+                    Path::new("models").join(modelname).join(s)
+                }
+            })
+            .collect();
+        self.modelpath = if self.modelpath.is_relative() {
+            Path::new("models")
+                .join(modelname)
+                .join(self.modelpath.clone())
+        } else {
+            self.modelpath.clone()
+        };
+    }
+}
+
+pub const MAX_OPSET_VERSION: i64 = 20;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum VerbosityLevel {
+    None,
+    Informational,
+    Results,
+    Intermediate,
+}
+
+impl VerbosityLevel {
+    pub fn new(level: usize) -> Self {
+        match level {
+            0 => VerbosityLevel::None,
+            1 => VerbosityLevel::Informational,
+            2 | 3 => VerbosityLevel::Results,
+            4.. => VerbosityLevel::Intermediate,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! print_at_level {
+    ($level:expr, $($arg:tt)*) => {
+        if $crate::VERBOSE.get() >= Some(&$level) {
+            println!($($arg)*);
+        }
+    };
+}
 
 pub struct NDIndex<'a> {
     indices: &'a [usize],
