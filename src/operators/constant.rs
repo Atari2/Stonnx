@@ -1,5 +1,5 @@
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{ArrayType, BoxResult, OperationResult, SparseArrayType},
     onnx::{tensor_proto::DataType, NodeProto},
     utils::{make_tensor_from_proto, make_tensor_from_raw, pick_opset_version},
 };
@@ -11,7 +11,7 @@ const OPSET_VERSION: [i64; 6] = [1, 9, 11, 12, 13, 19];
 
 #[derive(Debug)]
 struct ConstantAttrs {
-    sparse_value: Option<f32>,
+    sparse_value: Option<SparseArrayType>,
     value: Option<ArrayType>,
     value_float: Option<f32>,
     value_floats: Option<Vec<f32>>,
@@ -22,22 +22,23 @@ struct ConstantAttrs {
 }
 
 impl ConstantAttrs {
-    fn new(node: &NodeProto) -> Self {
-        Self {
-            sparse_value: None, // to be implemented
-            value: node
+    fn new(node: &NodeProto) -> BoxResult<Self> {
+        Ok(Self {
+            sparse_value: node
                 .attribute
                 .iter()
-                .find(|a| a.name() == "value")
+                .find(|a| a.name() == "sparse_value")
                 .and_then(|a| match &a.t {
-                    MessageField(Some(t)) => match make_tensor_from_proto(t) {
-                        Ok(t) => Some(t),
-                        Err(e) => {
-                            panic!("Error while parsing constant attributes: {:?}", e)
-                        }
-                    },
+                    MessageField(Some(_)) => unimplemented!("OP Constant sparse_value"),
                     MessageField(None) => None,
                 }),
+            value: node.attribute.iter().find(|a| a.name() == "value").map_or(
+                Ok::<Option<ArrayType>, anyhow::Error>(None),
+                |a| match &a.t {
+                    MessageField(Some(t)) => Ok(Some(make_tensor_from_proto(t)?)),
+                    MessageField(None) => Ok(None),
+                },
+            )?,
             value_float: node
                 .attribute
                 .iter()
@@ -77,7 +78,7 @@ impl ConstantAttrs {
                         .map(|s| String::from_utf8_lossy(s).to_string())
                         .collect()
                 }),
-        }
+        })
     }
 }
 
@@ -173,12 +174,12 @@ pub fn constant(
 ) -> BoxResult<OperationResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSION);
     if target_version == 1 {
-        Ok(constant_1(ConstantAttrs::new(node))?.into())
+        Ok(constant_1(ConstantAttrs::new(node)?)?.into())
     } else if target_version == 9 {
-        Ok(constant_9(ConstantAttrs::new(node))?.into())
+        Ok(constant_9(ConstantAttrs::new(node)?)?.into())
     } else if target_version == 11 {
-        Ok(constant_11(ConstantAttrs::new(node))?.into())
+        Ok(constant_11(ConstantAttrs::new(node)?)?.into())
     } else {
-        Ok(constant_12(ConstantAttrs::new(node))?.into())
+        Ok(constant_12(ConstantAttrs::new(node)?)?.into())
     }
 }

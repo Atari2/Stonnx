@@ -226,7 +226,11 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
             // panic otherwise
             if dlen != slen && (slen == 0 && dlen != 1) {
-                panic!("Data length {} does not match shape length {}", dlen, slen)
+                return Err(anyhow!(
+                    "Data length {} does not match shape length {}",
+                    dlen,
+                    slen
+                ));
             }
             let a = if data.is_empty() {
                 ArrayD::<i32>::zeros(IxDyn(&shape))
@@ -257,7 +261,11 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
             // panic otherwise
             if dlen != slen && (slen == 0 && dlen != 1) {
-                panic!("Data length {} does not match shape length {}", dlen, slen)
+                return Err(anyhow!(
+                    "Data length {} does not match shape length {}",
+                    dlen,
+                    slen
+                ));
             }
             let a = if data.is_empty() {
                 ArrayD::<i64>::zeros(IxDyn(&shape))
@@ -319,7 +327,11 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
             // panic otherwise
             if dlen != slen && (slen == 0 && dlen != 1) {
-                panic!("Data length {} does not match shape length {}", dlen, slen)
+                return Err(anyhow!(
+                    "Data length {} does not match shape length {}",
+                    dlen,
+                    slen
+                ));
             }
             let a = if data.is_empty() {
                 ArrayD::<u64>::zeros(IxDyn(&shape))
@@ -372,7 +384,11 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
             // panic otherwise
             if dlen != slen && (slen == 0 && dlen != 1) {
-                panic!("Data length {} does not match shape length {}", dlen, slen)
+                return Err(anyhow!(
+                    "Data length {} does not match shape length {}",
+                    dlen,
+                    slen
+                ));
             }
             let a = if data.is_empty() {
                 ArrayD::<f64>::zeros(IxDyn(&shape))
@@ -431,7 +447,11 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
             // panic otherwise
             if dlen != slen && (slen == 0 && dlen != 1) {
-                panic!("Data length {} does not match shape length {}", dlen, slen)
+                return Err(anyhow!(
+                    "Data length {} does not match shape length {}",
+                    dlen,
+                    slen
+                ));
             }
             let a = if data.is_empty() {
                 ArrayD::<f32>::zeros(IxDyn(&shape))
@@ -513,7 +533,11 @@ pub fn make_tensor_from_raw(
                 // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
                 // panic otherwise
                 if dlen != slen && (slen == 0 && dlen != 1) {
-                    panic!("Data length {} does not match shape length {}", dlen, slen)
+                    return Err(anyhow!(
+                        "Data length {} does not match shape length {}",
+                        dlen,
+                        slen
+                    ));
                 }
                 let a = if data.is_empty() {
                     ArrayD::<i64>::zeros(IxDyn(&shape))
@@ -586,7 +610,9 @@ pub fn make_tensor_from_raw(
             }
             Err(e) => Err(anyhow!(e)),
         },
-        DataType::STRING => panic!("String data type not supported, use make_string_tensor()"),
+        DataType::STRING => Err(anyhow!(
+            "String data type not supported, use make_string_tensor()"
+        )),
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
@@ -613,7 +639,11 @@ pub fn make_tensor_from_raw(
                 // if dlen != slen, check if data is 1 long and shape is [], then it is a scalar and it's fine
                 // panic otherwise
                 if dlen != slen && (slen == 0 && dlen != 1) {
-                    panic!("Data length {} does not match shape length {}", dlen, slen)
+                    return Err(anyhow!(
+                        "Data length {} does not match shape length {}",
+                        dlen,
+                        slen
+                    ));
                 }
                 let a = if data.is_empty() {
                     ArrayD::<f32>::zeros(IxDyn(&shape))
@@ -661,29 +691,17 @@ pub fn make_tensor_from_raw(
     }
 }
 
-pub fn make_initializers(graph: &onnx::GraphProto) -> HashMap<String, ArrayType> {
+pub fn make_initializers(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, ArrayType>> {
     let mut initializers: HashMap<String, ArrayType> = HashMap::new();
     for tensor in graph.initializer.iter() {
         let tensor_name = tensor.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
         if !tensor.has_data_type() {
             println!("  Tensor: {} has no data type", tensor_name);
         } else {
-            match make_tensor_from_proto(tensor) {
-                Ok(a) => {
-                    initializers.insert(tensor_name.to_string(), a);
-                }
-                Err(e) => {
-                    panic!(
-                        "  Tensor: {} has data type {:?} but error: {}",
-                        tensor_name,
-                        tensor.data_type(),
-                        e
-                    );
-                }
-            }
+            initializers.insert(tensor_name.to_string(), make_tensor_from_proto(tensor)?);
         }
     }
-    initializers
+    Ok(initializers)
 }
 
 fn make_input_tensors_from_files(

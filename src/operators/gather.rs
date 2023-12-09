@@ -87,7 +87,6 @@ pub fn gather(
         ));
     }
     match indices {
-        // FIXME:  All index values are expected to be within bounds [-s, s-1] along axis of size s
         ArrayType::I32(i) => {
             if i.is_empty() {
                 if let ArrayType::F32(_) = data {

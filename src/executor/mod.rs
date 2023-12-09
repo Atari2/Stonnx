@@ -44,7 +44,7 @@ pub fn execute_node(
         outputs.push(output);
     }
     if !all_nodes_have_init {
-        panic!("Some nodes in this operation have not been initialized yet, this means the operations aren't in order, fix the code to account for this");
+        return Err(anyhow!("Some nodes in this operation have not been initialized yet, this means the operations aren't in order, fix the code to account for this"));
     }
     let input_names = node.input.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
     let output_names = node

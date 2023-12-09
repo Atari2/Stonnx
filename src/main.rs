@@ -58,10 +58,11 @@ fn main() -> BoxResult<()> {
         MAX_OPSET_VERSION
     };
     if opset_version > MAX_OPSET_VERSION {
-        panic!(
+        return Err(anyhow!(
             "Opset version {} is not supported, max supported version is {}",
-            opset_version, MAX_OPSET_VERSION
-        );
+            opset_version,
+            MAX_OPSET_VERSION
+        ));
     }
     let start = Instant::now();
     for graph in model.graph.iter() {
@@ -70,11 +71,18 @@ fn main() -> BoxResult<()> {
         }
         let mut node_input_requirements: HashMap<ONNXNode, Vec<&str>> = HashMap::new();
         let mut input_link_map: HashMap<&str, Vec<ONNXNode>> = HashMap::new();
-        let initializers = make_initializers(graph);
+        let initializers = make_initializers(graph)?;
         let mut node_inputs = initialize_nodes(graph, &fileinputs, initializers)?;
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
         let mut graph_outputs = make_graph_outputs(graph)?;
         let mut not_implemented = HashSet::new();
+        for vi in graph.value_info.iter() {
+            if let Some(onnx::type_proto::Value::TensorType(_)) = vi.type_.value {
+                // If the type is Tensor, then we are fine because that's implemented
+            } else {
+                unimplemented!("ValueInfoProto type {:?}", vi.type_)
+            }
+        }
         for (counter, node) in graph.node.iter().enumerate() {
             let input_names = node
                 .input
@@ -186,7 +194,7 @@ fn main() -> BoxResult<()> {
                     }
                     Err(std::sync::mpsc::TryRecvError::Empty) => break,
                     Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                        panic!("Channel disconnected")
+                        return Err(anyhow!("Channel disconnected"));
                     }
                 }
             }

@@ -294,6 +294,29 @@ pub enum ArrayType {
     Bool(ArrayD<bool>),
 }
 
+/// Sparse array type, not supported yet
+#[derive(Debug, Clone)]
+pub enum SparseArrayType {}
+
+/// Map type, not supported yet
+#[derive(Debug, Clone)]
+pub enum MapType {}
+
+/// Sequence type, not supported yet
+#[derive(Debug, Clone)]
+pub enum SequenceType {}
+
+/// Optional type, not supported yet
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub enum OptionalType {
+    Array(ArrayType),
+    SparseArray(SparseArrayType),
+    Map(MapType),
+    Sequence(SequenceType),
+    None,
+}
+
 macro_rules! impl_into_array_type {
     ($t:ty, $v:ident) => {
         impl From<ArrayD<$t>> for ArrayType {
