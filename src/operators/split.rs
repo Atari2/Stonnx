@@ -108,8 +108,8 @@ fn split_impl(
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_split.py
-/// https://onnx.ai/onnx/operators/onnx__Split.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_split.py>
+/// <https://onnx.ai/onnx/operators/onnx__Split.html>
 pub fn split(
     inputs: &[&ArrayType],
     node: &NodeProto,

@@ -57,8 +57,8 @@ fn _softmax_f32(input: &ArrayD<f32>, axis: usize) -> BoxResult<ArrayType> {
     Ok(ArrayType::F32(y))
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_softmax.py
-/// https://onnx.ai/onnx/operators/onnx__Softmax.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_softmax.py>
+/// <https://onnx.ai/onnx/operators/onnx__Softmax.html>
 pub fn softmax(
     inputs: &[&ArrayType],
     node: &NodeProto,

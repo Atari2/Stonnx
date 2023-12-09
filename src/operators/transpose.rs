@@ -22,8 +22,8 @@ impl TransposeAttrs {
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_transpose.py
-/// https://onnx.ai/onnx/operators/onnx__Transpose.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_transpose.py>
+/// <https://onnx.ai/onnx/operators/onnx__Transpose.html>
 pub fn transpose(
     inputs: &[&ArrayType],
     node: &NodeProto,

@@ -75,8 +75,8 @@ fn unsqueeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_unsqueeze.py
-/// https://onnx.ai/onnx/operators/onnx__Unsqueeze.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_unsqueeze.py>
+/// <https://onnx.ai/onnx/operators/onnx__Unsqueeze.html>
 pub fn unsqueeze(
     inputs: &[&ArrayType],
     node: &NodeProto,

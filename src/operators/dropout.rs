@@ -110,8 +110,8 @@ fn dropout_common(
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_dropout.py
-/// https://onnx.ai/onnx/operators/onnx__Dropout.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_dropout.py>
+/// <https://onnx.ai/onnx/operators/onnx__Dropout.html>
 pub fn dropout(
     inputs: &[&ArrayType],
     node: &NodeProto,

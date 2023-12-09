@@ -3,8 +3,8 @@ use crate::onnx::NodeProto;
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 6, 13];
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_exp.py
-/// https://onnx.ai/onnx/operators/onnx__Exp.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_exp.py>
+/// <https://onnx.ai/onnx/operators/onnx__Exp.html>
 pub fn exp(
     inputs: &[&ArrayType],
     _node: &NodeProto,

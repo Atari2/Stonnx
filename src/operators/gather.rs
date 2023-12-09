@@ -65,8 +65,8 @@ fn _gather_generic<A: Clone + Copy + Zero, B: Clone + Zero + AsPrimitive<usize>>
     output
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gather.py
-/// https://onnx.ai/onnx/operators/onnx__Gather.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gather.py>
+/// <https://onnx.ai/onnx/operators/onnx__Gather.html>
 pub fn gather(
     inputs: &[&ArrayType],
     node: &NodeProto,

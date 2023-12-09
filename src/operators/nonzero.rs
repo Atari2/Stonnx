@@ -19,8 +19,8 @@ fn nonzero_generic<A: Default + std::cmp::PartialEq>(input: &ArrayD<A>) -> BoxRe
     Ok(result)
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_non_zero.py
-/// https://onnx.ai/onnx/operators/onnx__NonZero.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_non_zero.py>
+/// <https://onnx.ai/onnx/operators/onnx__NonZero.html>
 pub fn nonzero(
     inputs: &[&ArrayType],
     _node: &NodeProto,

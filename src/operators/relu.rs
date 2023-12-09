@@ -6,8 +6,8 @@ use anyhow::anyhow;
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 6, 13, 14];
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_relu.py
-/// https://onnx.ai/onnx/operators/onnx__Relu.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_relu.py>
+/// <https://onnx.ai/onnx/operators/onnx__Relu.html>
 pub fn relu(
     inputs: &[&ArrayType],
     _node: &NodeProto,

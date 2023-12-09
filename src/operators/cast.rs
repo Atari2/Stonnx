@@ -96,8 +96,8 @@ macro_rules! cast_impl {
     };
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_cast.py
-/// https://onnx.ai/onnx/operators/onnx__Cast.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_cast.py>
+/// <https://onnx.ai/onnx/operators/onnx__Cast.html>
 pub fn cast(
     inputs: &[&ArrayType],
     _node: &NodeProto,

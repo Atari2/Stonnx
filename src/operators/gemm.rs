@@ -30,9 +30,13 @@ trait_set! {
 }
 
 /// Compute Y = alpha * A’ * B’ + beta * C,
+///
 /// where input tensor A has shape (M, K) or (K, M),
+///
 /// input tensor B has shape (K, N) or (N, K),
+///
 /// input tensor C is broadcastable to shape (M, N), and output tensor Y has shape (M, N).
+///
 /// A will be transposed before doing the computation if attribute transA is non-zero, same for B and transB.
 fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
     lhs: ArrayViewD<'a, A>,
@@ -220,8 +224,8 @@ fn _gemm_internal(
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py
-/// https://onnx.ai/onnx/operators/onnx__Gemm.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py>
+/// <https://onnx.ai/onnx/operators/onnx__Gemm.html>
 pub fn gemm(
     inputs: &[&ArrayType],
     node: &NodeProto,

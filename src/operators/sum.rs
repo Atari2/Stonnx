@@ -44,8 +44,8 @@ fn _sum_f32(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     Ok(ArrayType::F32(val))
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_sum.py
-/// https://onnx.ai/onnx/operators/onnx__Sum.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_sum.py>
+/// <https://onnx.ai/onnx/operators/onnx__Sum.html>
 pub fn sum(
     inputs: &[&ArrayType],
     _node: &NodeProto,

@@ -75,8 +75,8 @@ fn shape_15(inputs: &[&ArrayType], attrs: ShapeAttrs) -> BoxResult<ArrayType> {
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_shape.py
-/// https://onnx.ai/onnx/operators/onnx__Shape.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_shape.py>
+/// <https://onnx.ai/onnx/operators/onnx__Shape.html>
 pub fn shape(
     inputs: &[&ArrayType],
     node: &NodeProto,

@@ -3,8 +3,8 @@ use crate::onnx::NodeProto;
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 6, 7, 13, 14];
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_mul.py
-/// https://onnx.ai/onnx/operators/onnx__Mul.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_mul.py>
+/// <https://onnx.ai/onnx/operators/onnx__Mul.html>
 pub fn mul(
     inputs: &[&ArrayType],
     _node: &NodeProto,

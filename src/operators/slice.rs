@@ -183,8 +183,8 @@ fn slice_10(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     )?))
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_slice.py
-/// https://onnx.ai/onnx/operators/onnx__Slice.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_slice.py>
+/// <https://onnx.ai/onnx/operators/onnx__Slice.html>
 pub fn slice(
     inputs: &[&ArrayType],
     node: &NodeProto,

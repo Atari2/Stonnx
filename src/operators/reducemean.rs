@@ -120,8 +120,8 @@ fn reducemean_18(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arr
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reduce_mean.py
-/// https://onnx.ai/onnx/operators/onnx__ReduceMean.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reduce_mean.py>
+/// <https://onnx.ai/onnx/operators/onnx__ReduceMean.html>
 pub fn reducemean(
     inputs: &[&ArrayType],
     node: &NodeProto,

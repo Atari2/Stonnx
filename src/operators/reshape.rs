@@ -26,8 +26,8 @@ impl ReshapeAttrs {
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reshape.py
-/// https://onnx.ai/onnx/operators/onnx__Reshape.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reshape.py>
+/// <https://onnx.ai/onnx/operators/onnx__Reshape.html>
 pub fn reshape(
     inputs: &[&ArrayType],
     node: &NodeProto,

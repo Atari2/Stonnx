@@ -319,7 +319,7 @@ where
     Ok((y, z))
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/_op_common_pool.py
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/_op_common_pool.py>
 pub fn _commn_pool_generic<A: ArrayElement>(
     input: &ArrayD<A>,
     pooling_type: PoolingType,

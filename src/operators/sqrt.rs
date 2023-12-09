@@ -3,8 +3,8 @@ use crate::onnx::NodeProto;
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 6, 13];
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_sqrt.py
-/// https://onnx.ai/onnx/operators/onnx__Sqrt.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_sqrt.py>
+/// <https://onnx.ai/onnx/operators/onnx__Sqrt.html>
 pub fn sqrt(
     inputs: &[&ArrayType],
     _node: &NodeProto,

@@ -6,8 +6,8 @@ use anyhow::anyhow;
 
 const _OPSET_VERSIONS: [i64; 1] = [1];
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_global_average_pool.py
-/// https://onnx.ai/onnx/operators/onnx__GlobalAveragePool.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_global_average_pool.py>
+/// <https://onnx.ai/onnx/operators/onnx__GlobalAveragePool.html>
 pub fn global_average_pool(
     inputs: &[&ArrayType],
     _node: &NodeProto,

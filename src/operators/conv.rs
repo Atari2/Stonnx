@@ -485,8 +485,8 @@ fn conv_fast_impl(
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_conv.py
-/// https://onnx.ai/onnx/operators/onnx__Conv.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_conv.py>
+/// <https://onnx.ai/onnx/operators/onnx__Conv.html>
 pub fn conv(
     inputs: &[&ArrayType],
     node: &NodeProto,
@@ -502,8 +502,9 @@ pub fn conv(
             let attributes = ConvAttributes::new(node, inputs[0], inputs[1]);
             Ok(conv_fast_impl(inputs[0], inputs[1], Some(inputs[2]), attributes)?.into())
         }
-        _ => {
-            panic!("Unexpected error: convolution has {} inputs", inputs.len());
-        }
+        _ => Err(anyhow!(
+            "Unexpected error: convolution has {} inputs",
+            inputs.len()
+        )),
     }
 }

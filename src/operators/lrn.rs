@@ -66,8 +66,8 @@ fn lrn_f32(input: &ArrayD<f32>, attrs: LRNAttrs) -> BoxResult<ArrayD<f32>> {
     Ok(y)
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_lrn.py
-/// https://onnx.ai/onnx/operators/onnx__LRN.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_lrn.py>
+/// <https://onnx.ai/onnx/operators/onnx__LRN.html>
 pub fn lrn(
     inputs: &[&ArrayType],
     node: &NodeProto,

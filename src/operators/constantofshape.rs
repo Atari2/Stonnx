@@ -40,8 +40,8 @@ fn _constanofshape_generic<A: Clone + std::iter::Sum<A> + Copy>(
     Ok(ArrayD::from_elem(IxDyn(shape), scalar_value))
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_constant_of_shape.py
-/// https://onnx.ai/onnx/operators/onnx__ConstantOfShape.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_constant_of_shape.py>
+/// <https://onnx.ai/onnx/operators/onnx__ConstantOfShape.html>
 pub fn constantofshape(
     input: &[&ArrayType],
     node: &NodeProto,

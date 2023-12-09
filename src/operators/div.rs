@@ -3,8 +3,8 @@ use crate::onnx::NodeProto;
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 6, 7, 13, 14];
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_div.py
-/// https://onnx.ai/onnx/operators/onnx__Div.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_div.py>
+/// <https://onnx.ai/onnx/operators/onnx__Div.html>
 pub fn div(
     inputs: &[&ArrayType],
     _node: &NodeProto,

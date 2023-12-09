@@ -99,8 +99,8 @@ fn _concat_f32(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType
     )?))
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_concat.py
-/// https://onnx.ai/onnx/operators/onnx__Concat.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_concat.py>
+/// <https://onnx.ai/onnx/operators/onnx__Concat.html>
 pub fn concat(
     inputs: &[&ArrayType],
     node: &NodeProto,

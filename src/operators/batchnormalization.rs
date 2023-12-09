@@ -264,8 +264,8 @@ where
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_batch_normalization.py
-/// https://onnx.ai/onnx/operators/onnx__BatchNormalization.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_batch_normalization.py>
+/// <https://onnx.ai/onnx/operators/onnx__BatchNormalization.html>
 pub fn batchnormalization(
     inputs: &[&ArrayType],
     node: &NodeProto,

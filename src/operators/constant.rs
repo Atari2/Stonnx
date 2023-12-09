@@ -164,8 +164,13 @@ fn constant_12(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_constant.py
-/// https://onnx.ai/onnx/operators/onnx__Constant.html
+/// This operator produces a constant tensor.
+///
+/// Exactly one of the provided attributes, either value, sparse_value, or value_* must be specified.
+///
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_constant.py)
+///
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Constant.html)
 pub fn constant(
     _inputs: &[&ArrayType],
     node: &NodeProto,

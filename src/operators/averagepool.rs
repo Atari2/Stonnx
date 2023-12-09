@@ -399,8 +399,8 @@ where
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_average_pool.py
-/// https://onnx.ai/onnx/operators/onnx__AveragePool.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_average_pool.py>
+/// <https://onnx.ai/onnx/operators/onnx__AveragePool.html>
 pub fn averagepool(
     inputs: &[&ArrayType],
     node: &NodeProto,

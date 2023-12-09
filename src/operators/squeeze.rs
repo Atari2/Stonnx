@@ -92,8 +92,8 @@ fn squeeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_squeeze.py
-/// https://onnx.ai/onnx/operators/onnx__Squeeze.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_squeeze.py>
+/// <https://onnx.ai/onnx/operators/onnx__Squeeze.html>
 pub fn squeeze(
     inputs: &[&ArrayType],
     node: &NodeProto,

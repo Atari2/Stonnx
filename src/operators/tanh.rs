@@ -3,8 +3,8 @@ use crate::onnx::NodeProto;
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 6, 13];
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_tanh.py
-/// https://onnx.ai/onnx/operators/onnx__Tanh.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_tanh.py>
+/// <https://onnx.ai/onnx/operators/onnx__Tanh.html>
 pub fn tanh(
     inputs: &[&ArrayType],
     _node: &NodeProto,

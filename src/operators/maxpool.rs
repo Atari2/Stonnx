@@ -348,8 +348,8 @@ where
     }
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_max_pool.py
-/// https://onnx.ai/onnx/operators/onnx__MaxPool.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_max_pool.py>
+/// <https://onnx.ai/onnx/operators/onnx__MaxPool.html>
 pub fn maxpool(
     inputs: &[&ArrayType],
     node: &NodeProto,

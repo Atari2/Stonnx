@@ -35,8 +35,8 @@ fn _flatten<D: Clone>(input: &ArrayD<D>, axis: i64) -> BoxResult<ArrayD<D>> {
     Ok(input.to_owned().into_shape(new_shape)?)
 }
 
-/// https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_flatten.py
-/// https://onnx.ai/onnx/operators/onnx__Flatten.html
+/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_flatten.py>
+/// <https://onnx.ai/onnx/operators/onnx__Flatten.html>
 pub fn flatten(
     inputs: &[&ArrayType],
     node: &NodeProto,
