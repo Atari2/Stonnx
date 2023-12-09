@@ -8,6 +8,7 @@ use crate::{common::BoxResult, onnx::GraphProto};
 #[derive(
     Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, std::hash::Hash,
 )]
+/// The type of node, either an input/output node, or an operator node.
 enum NodeType {
     InputOutput,
     Operator,
@@ -16,11 +17,22 @@ enum NodeType {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, std::hash::Hash,
 )]
+/// A node in the graph, with a name and a type.
 struct Node<'a> {
     name: &'a str,
     node_type: NodeType,
 }
 
+/// Given a graph, and the model's path, it will create a graph.json file in the same directory.
+///
+/// This file can be used to visualize the graph using a custom made tool called ONNXGraphLayout.
+///
+/// The format of the graph is simple JSON and as such can be easily parsed by other tools.
+///
+/// The top level JSON object is has 2 keys, "nodes" and "edges".
+/// - "nodes" is an array of objects, each object has a "name" and a "node_type" key. Both are strings, and the node_type can be either "InputOutput" or "Operator".
+/// - "edges" is an array of arrays, each array has, in order, 1 number that represents the index of the source node, 1 number that represents the index of the target node and a string that represents the name of the edge.
+///   The index of the source/target node is the 0-based index of the node in the "nodes" array.
 pub fn build_graph_from_proto(proto: &GraphProto, modelpath: &Path) -> BoxResult<()> {
     let mut graph = GraphMap::<Node<'_>, &str, petgraph::Directed>::new();
     let mut count_map = HashMap::<&str, usize>::new();

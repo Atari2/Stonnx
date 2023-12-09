@@ -18,10 +18,12 @@ use crate::onnx::{self, tensor_proto::DataType, NodeProto};
 pub type Complex64 = Complex<f32>;
 pub type Complex128 = Complex<f64>;
 
+/// Static string that is used when the name of a node is not known
 pub static UNKNOWN: &str = "<unknown>";
 
 pub type BoxResult<A> = anyhow::Result<A>;
 
+/// This static variable holds the verbosity level of the program
 pub static VERBOSE: OnceCell<VerbosityLevel> = OnceCell::new();
 
 #[derive(Parser, Debug)]
@@ -214,6 +216,7 @@ impl Iterator for NDIndex<'_> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// This enum represents the type of a TensorType
 pub enum ValueType {
     I8,
     I16,
@@ -270,6 +273,11 @@ impl From<Vec<TensorType>> for OperatorResult {
     }
 }
 
+/// This is the type of an operator function
+///
+/// It takes a slice of inputs, the node that is being executed, the opset version, and the number of outputs
+///
+/// It returns a `BoxResult` containing the result of the operation or an error
 pub type OperationFn = for<'a, 'b, 'c> fn(
     &'a [&'b TensorType],
     &'c NodeProto,
@@ -306,6 +314,7 @@ impl ValueType {
 }
 
 #[derive(Debug, Clone)]
+/// Represents an ONNX tensor
 pub enum TensorType {
     I8(ArrayD<i8>),
     I16(ArrayD<i16>),
@@ -348,6 +357,10 @@ pub enum OptionalType {
     None,
 }
 
+/// This macro creates a function that implements the `From<ArrayD<A>>` trait for TensorType
+/// and the `TryFrom<&TensorType>` trait for `&ArrayD<A>`
+///
+/// This macro is used to implement the `From` and `TryFrom` traits for all the types that are supported by ndarray  
 macro_rules! impl_into_array_type {
     ($t:ty, $v:ident) => {
         impl From<ArrayD<$t>> for TensorType {
@@ -387,6 +400,9 @@ impl_into_array_type!(Complex128, C128);
 impl_into_array_type!(String, Str);
 impl_into_array_type!(bool, Bool);
 
+/// This is the trait that represents the types that are supported by TensorType
+///
+/// Most of the time this is the only trait needed to make a function generic over the types supported by TensorType
 pub trait ArrayElement:
     Copy
     + Clone
@@ -423,21 +439,27 @@ impl<T> ArrayElement for T where
 {
 }
 
+/// This trait implements the `as_` method that converts from &lt;T&gt; from f32
 pub trait F32IntoType<T> {
     fn as_(self) -> T;
 }
 
+/// This trait is a is_nan trait that is implemented for all types supported by TensorType
+/// including integers and Complex numbers
 pub trait IsNan {
     #[allow(clippy::wrong_self_convention)]
     fn is_nan(self) -> bool;
 }
 
+/// This trait is a min and max trait that is implemented for all types supported by TensorType
 pub trait MinMax {
     const MAX: Self;
     const MIN: Self;
     fn max(self, rhs: Self) -> Self;
     fn min(self, lhs: Self) -> Self;
 }
+
+/// This trait is a sqrt trait that is implemented for all types supported by TensorType
 pub trait HasSqrt {
     fn sqrt(self) -> Self;
 }
@@ -489,6 +511,7 @@ impl F32IntoType<bool> for f32 {
     }
 }
 
+/// This macro implements the `F32IntoType` trait for all the types supported by TensorType
 macro_rules! impl_from_f32 {
     ($t:ty) => {
         impl F32IntoType<$t> for f32
@@ -502,6 +525,7 @@ macro_rules! impl_from_f32 {
     };
 }
 
+/// This macro implements the `IsNan` trait for all the types supported by TensorType
 macro_rules! impl_is_nan {
     ($t:ty) => {
         impl IsNan for $t {
@@ -512,6 +536,7 @@ macro_rules! impl_is_nan {
     };
 }
 
+/// This macro implements the `MinMax` trait for all the types supported by TensorType
 macro_rules! impl_minmax {
     ($t:ty) => {
         impl MinMax for $t {
@@ -535,6 +560,7 @@ macro_rules! impl_minmax {
     };
 }
 
+/// This macro implements the `HasSqrt` trait for all the integer types supported by TensorType
 macro_rules! impl_has_sqrt_i {
     ($t:ty) => {
         impl HasSqrt for $t {
@@ -545,6 +571,7 @@ macro_rules! impl_has_sqrt_i {
     };
 }
 
+/// This macro implements the `HasSqrt` trait for all the float types supported by TensorType
 macro_rules! impl_has_sqrt_f {
     ($t:ty) => {
         impl HasSqrt for $t {
@@ -597,25 +624,17 @@ impl_has_sqrt_i!(u64);
 impl_has_sqrt_f!(f32);
 impl_has_sqrt_f!(f64);
 
-/*
-typedef struct
-{
-    double _Val[2];
-} npy_cdouble;
-
-#define NPY_COMPLEX128 NPY_CDOUBLE
-        typedef double npy_float64;
-        typedef npy_cdouble npy_complex128;
-
-typedef struct
-{
-    float _Val[2];
-} npy_cfloat;
-
-#define NPY_COMPLEX64 NPY_CFLOAT
-        typedef float npy_float32;
-        typedef npy_cfloat npy_complex64;
-*/
+/// This struct is used to represent a complex 64-bit number in numpy, it is purely for the sake of reading from raw data arrays in models
+/// ```c
+/// typedef struct
+/// {
+///     float _Val[2];
+/// } npy_cfloat;
+///
+/// #define NPY_COMPLEX64 NPY_CFLOAT
+///         typedef float npy_float32;
+///         typedef npy_cfloat npy_complex64;
+/// ```
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::AnyBitPattern)]
@@ -625,12 +644,24 @@ pub struct Complex64Repr {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::AnyBitPattern)]
+/// This struct is used to represent a complex 128-bit number in numpy, it is purely for the sake of reading from raw data arrays in models
+/// ```c
+/// typedef struct
+/// {
+///     double _Val[2];
+/// } npy_cdouble;
+///
+/// #define NPY_COMPLEX128 NPY_CDOUBLE
+///         typedef double npy_float64;
+///         typedef npy_cdouble npy_complex128;
+/// ```
 pub struct Complex128Repr {
     pub _val: [f64; 2],
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::AnyBitPattern)]
+/// This struct is used to represent a half precision number in numpy, it is purely for the sake of reading from raw data arrays in models
 pub struct HalfFloat {
     pub _val: u16,
 }
@@ -659,6 +690,9 @@ impl std::fmt::Display for TensorType {
 }
 
 impl TensorType {
+    /// Writes the data of a TensorType to a file
+    ///
+    /// The file will be written in the numpy format, using the directory and name provided
     pub fn to_file(&self, dir: &Path, name: &str) -> BoxResult<()> {
         let name = name.replace('/', "_");
         use ndarray_npy::write_npy;
@@ -681,6 +715,8 @@ impl TensorType {
             TensorType::Bool(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
         }
     }
+
+    /// Returns the shape of a TensorType
     pub fn shape(&self) -> &[usize] {
         match self {
             TensorType::I8(a) => a.shape(),
@@ -701,6 +737,8 @@ impl TensorType {
             TensorType::Bool(a) => a.shape(),
         }
     }
+
+    /// Returns the number of dimensions of a TensorType
     pub fn ndim(&self) -> usize {
         match self {
             TensorType::I8(a) => a.ndim(),
@@ -721,6 +759,8 @@ impl TensorType {
             TensorType::Bool(a) => a.ndim(),
         }
     }
+
+    /// Returns the data type of a TensorType, useful when you want to know the type of a tensor without using a match statement
     pub fn value_type(&self) -> ValueType {
         match self {
             TensorType::I64(_) => ValueType::I64,
@@ -741,6 +781,8 @@ impl TensorType {
             TensorType::Bool(_) => ValueType::Bool,
         }
     }
+
+    /// Returns the *internal* data type of a TensorType, this is useful when you have a onnx::tensor_proto::DataType instead of a ValueType
     pub fn data_type(&self) -> onnx::tensor_proto::DataType {
         // FIXME: types such as FLOAT8E4M3FN all map to FLOAT right now
         //        need to handle them properly
