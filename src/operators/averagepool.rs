@@ -1,5 +1,5 @@
 use crate::{
-    common::{ArrayElement, ArrayType, BoxResult, F32IntoType, OperationResult},
+    common::{ArrayElement, BoxResult, F32IntoType, OperatorResult, TensorType},
     onnx::NodeProto,
 };
 use anyhow::anyhow;
@@ -22,7 +22,7 @@ struct AveragePoolAttrs {
     strides: Option<Vec<i64>>,
 }
 impl AveragePoolAttrs {
-    fn new(node: &NodeProto, x: &ArrayType) -> Self {
+    fn new(node: &NodeProto, x: &TensorType) -> Self {
         Self {
             auto_pad: node
                 .attribute
@@ -402,20 +402,20 @@ where
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_average_pool.py>
 /// <https://onnx.ai/onnx/operators/onnx__AveragePool.html>
 pub fn averagepool(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     if inputs.is_empty() {
         return Err(anyhow!("No inputs"));
     }
     let attrs = AveragePoolAttrs::new(node, inputs[0]);
     match inputs[0] {
-        ArrayType::F32(x) => {
+        TensorType::F32(x) => {
             let (y, i) =
                 _average_pool_generic(x, attrs.count_include_pad as i64, attrs, output_len)?;
-            Ok((ArrayType::F32(y), i.map(ArrayType::I64)).into())
+            Ok((TensorType::F32(y), i.map(TensorType::I64)).into())
         }
         _ => todo!("AveragePool for type {:?}", inputs[0]),
     }

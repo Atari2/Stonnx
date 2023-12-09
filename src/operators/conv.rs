@@ -10,9 +10,9 @@ use ndarray::ArrayD;
 use ndarray::SliceInfoElem;
 use ndarray::{Ix2, IxDyn};
 
-use crate::common::ArrayType;
 use crate::common::BoxResult;
-use crate::common::OperationResult;
+use crate::common::OperatorResult;
+use crate::common::TensorType;
 use crate::onnx::AttributeProto;
 use crate::onnx::NodeProto;
 
@@ -61,7 +61,7 @@ impl ConvAttributes {
             strides: other.strides.clone(),
         }
     }
-    fn new(node: &NodeProto, x: &ArrayType, w: &ArrayType) -> Self {
+    fn new(node: &NodeProto, x: &TensorType, w: &TensorType) -> Self {
         Self {
             auto_pad: node
                 .attribute
@@ -454,25 +454,25 @@ fn im2col_fast<A: ArrayElement>(
 }
 
 fn conv_fast_impl(
-    x: &ArrayType,
-    w: &ArrayType,
-    b: Option<&ArrayType>,
+    x: &TensorType,
+    w: &TensorType,
+    b: Option<&TensorType>,
     attrs: ConvAttributes,
-) -> BoxResult<ArrayType> {
+) -> BoxResult<TensorType> {
     if x.ndim() < 3 {
         return Err(anyhow!("X must have at least 3 dimensions"));
     }
     match (x, w, b) {
-        (ArrayType::F32(x), ArrayType::F32(w), Some(ArrayType::F32(b))) => {
+        (TensorType::F32(x), TensorType::F32(w), Some(TensorType::F32(b))) => {
             Ok(_conv_fast_impl(x.view(), w.view(), Some(b.view()), attrs)?.into())
         }
-        (ArrayType::F32(x), ArrayType::F32(w), None) => {
+        (TensorType::F32(x), TensorType::F32(w), None) => {
             Ok(_conv_fast_impl(x.view(), w.view(), None, attrs)?.into())
         }
-        (ArrayType::I64(x), ArrayType::I64(w), Some(ArrayType::I64(b))) => {
+        (TensorType::I64(x), TensorType::I64(w), Some(TensorType::I64(b))) => {
             Ok(_conv_fast_impl(x.view(), w.view(), Some(b.view()), attrs)?.into())
         }
-        (ArrayType::I64(x), ArrayType::I64(w), None) => {
+        (TensorType::I64(x), TensorType::I64(w), None) => {
             Ok(_conv_fast_impl(x.view(), w.view(), None, attrs)?.into())
         }
         (x, w, b) => {
@@ -488,11 +488,11 @@ fn conv_fast_impl(
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_conv.py>
 /// <https://onnx.ai/onnx/operators/onnx__Conv.html>
 pub fn conv(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64, // defined but never used because even thought Conv has 2 versions they both do the same thing
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     match inputs.len() {
         2 => {
             let attributes = ConvAttributes::new(node, inputs[0], inputs[1]);

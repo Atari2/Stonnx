@@ -1,7 +1,7 @@
 use ndarray::ArrayD;
 
 use crate::{
-    common::{ArrayType, BoxResult, NDIndex, OperationResult},
+    common::{BoxResult, NDIndex, OperatorResult, TensorType},
     onnx::NodeProto,
 };
 
@@ -22,15 +22,15 @@ fn nonzero_generic<A: Default + std::cmp::PartialEq>(input: &ArrayD<A>) -> BoxRe
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_non_zero.py>
 /// <https://onnx.ai/onnx/operators/onnx__NonZero.html>
 pub fn nonzero(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     _node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let input = inputs[0];
     match input {
-        ArrayType::F32(x) => Ok(ArrayType::I64(nonzero_generic(x)?).into()),
-        ArrayType::I64(x) => Ok(ArrayType::I64(nonzero_generic(x)?).into()),
+        TensorType::F32(x) => Ok(TensorType::I64(nonzero_generic(x)?).into()),
+        TensorType::I64(x) => Ok(TensorType::I64(nonzero_generic(x)?).into()),
         x => {
             todo!("NonZero for type {}", x);
         }

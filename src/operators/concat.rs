@@ -1,7 +1,7 @@
 use ndarray::{ArrayD, Axis, CowArray, IxDyn};
 
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult, ValueType},
+    common::{BoxResult, OperatorResult, TensorType, ValueType},
     onnx::NodeProto,
 };
 use anyhow::anyhow;
@@ -43,11 +43,11 @@ fn _preprocess<A: Clone>(a: &ArrayD<A>, axis: i64) -> BoxResult<CowArray<'_, A, 
     }
 }
 
-fn _concat_i64(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType> {
+fn _concat_i64(inputs: &[&TensorType], attrs: ConcatAttrs) -> BoxResult<TensorType> {
     let mut inputs_i64 = vec![];
     let mut cow_array = vec![];
     for input in inputs.iter() {
-        if let ArrayType::I64(x) = input {
+        if let TensorType::I64(x) = input {
             cow_array.push(_preprocess(x, attrs.axis)?);
         } else {
             return Err(anyhow!("Inputs not all of I64"));
@@ -65,17 +65,17 @@ fn _concat_i64(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType
     } else {
         attrs.axis
     } as usize;
-    Ok(ArrayType::I64(ndarray::concatenate(
+    Ok(TensorType::I64(ndarray::concatenate(
         Axis(axis),
         &inputs_i64,
     )?))
 }
 
-fn _concat_f32(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType> {
+fn _concat_f32(inputs: &[&TensorType], attrs: ConcatAttrs) -> BoxResult<TensorType> {
     let mut inputs_f32 = vec![];
     let mut cow_array = vec![];
     for input in inputs.iter() {
-        if let ArrayType::F32(x) = input {
+        if let TensorType::F32(x) = input {
             cow_array.push(_preprocess(x, attrs.axis)?);
         } else {
             return Err(anyhow!("Inputs not all of F32"));
@@ -93,7 +93,7 @@ fn _concat_f32(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType
     } else {
         attrs.axis
     } as usize;
-    Ok(ArrayType::F32(ndarray::concatenate(
+    Ok(TensorType::F32(ndarray::concatenate(
         Axis(axis),
         &inputs_f32,
     )?))
@@ -102,11 +102,11 @@ fn _concat_f32(inputs: &[&ArrayType], attrs: ConcatAttrs) -> BoxResult<ArrayType
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_concat.py>
 /// <https://onnx.ai/onnx/operators/onnx__Concat.html>
 pub fn concat(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let attrs = ConcatAttrs::new(node);
 
     if inputs.is_empty() {

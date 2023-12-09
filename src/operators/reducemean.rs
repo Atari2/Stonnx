@@ -1,6 +1,6 @@
 use ndarray::Axis;
 
-use crate::common::{ArrayType, BoxResult, OperationResult};
+use crate::common::{BoxResult, OperatorResult, TensorType};
 use crate::onnx::NodeProto;
 use crate::utils::pick_opset_version;
 use anyhow::anyhow;
@@ -35,11 +35,11 @@ impl<'a> ReduceMeanAttrs<'a> {
     }
 }
 
-fn reducemean_1(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<ArrayType> {
+fn reducemean_1(inputs: &[&TensorType], attrs: ReduceMeanAttrs) -> BoxResult<TensorType> {
     let a = inputs[0];
 
     match a {
-        ArrayType::F32(a) => {
+        TensorType::F32(a) => {
             let mut a = a.to_owned();
 
             let mut reduced_dims: Vec<usize> = Vec::new();
@@ -69,13 +69,13 @@ fn reducemean_1(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arra
                 }
             }
 
-            Ok(ArrayType::F32(a))
+            Ok(TensorType::F32(a))
         }
         _ => todo!("ReduceMean for type {:?}", a),
     }
 }
 
-fn reducemean_18(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<ArrayType> {
+fn reducemean_18(inputs: &[&TensorType], attrs: ReduceMeanAttrs) -> BoxResult<TensorType> {
     let a = inputs[0];
 
     if attrs.axes.is_none() && attrs.noop_with_empty_axes {
@@ -86,7 +86,7 @@ fn reducemean_18(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arr
     let axes = attrs.axes.filter(|&axes| !axes.is_empty());
 
     match a {
-        ArrayType::F32(a) => {
+        TensorType::F32(a) => {
             let mut a = a.to_owned();
             let mut reduced_dims: Vec<usize> = Vec::new();
             if let Some(axes) = axes {
@@ -114,7 +114,7 @@ fn reducemean_18(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arr
                 }
             }
 
-            Ok(ArrayType::F32(a))
+            Ok(TensorType::F32(a))
         }
         _ => todo!("ReduceMean for type {:?}", a),
     }
@@ -123,11 +123,11 @@ fn reducemean_18(inputs: &[&ArrayType], attrs: ReduceMeanAttrs) -> BoxResult<Arr
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reduce_mean.py>
 /// <https://onnx.ai/onnx/operators/onnx__ReduceMean.html>
 pub fn reducemean(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version < 18 {
         Ok(reducemean_1(inputs, ReduceMeanAttrs::new(node))?.into())

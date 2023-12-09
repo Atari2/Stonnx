@@ -1,5 +1,5 @@
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{BoxResult, OperatorResult, TensorType},
     onnx::NodeProto,
     utils::shape_safe_product,
 };
@@ -29,18 +29,18 @@ impl ReshapeAttrs {
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reshape.py>
 /// <https://onnx.ai/onnx/operators/onnx__Reshape.html>
 pub fn reshape(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let data = inputs[0];
     let shape = inputs[1];
     if shape.shape().len() != 1 {
         return Err(anyhow!("shape must be 1D"));
     }
     // new_shape = np.copy(shape)
-    let mut new_shape = if let ArrayType::I64(shape) = shape {
+    let mut new_shape = if let TensorType::I64(shape) = shape {
         shape.view().into_dimensionality::<Ix1>()?.to_vec()
     } else {
         return Err(anyhow!("shape must be I64"));
@@ -72,13 +72,13 @@ pub fn reshape(
     let new_shape = new_shape.iter().map(|&v| v as usize).collect::<Vec<_>>();
     let new_shape = ndarray::IxDyn(&new_shape);
     match data {
-        ArrayType::F32(data) => {
+        TensorType::F32(data) => {
             let data = data.to_shape(new_shape)?.to_owned();
-            Ok(ArrayType::F32(data).into())
+            Ok(TensorType::F32(data).into())
         }
-        ArrayType::I64(data) => {
+        TensorType::I64(data) => {
             let data = data.to_shape(new_shape)?.to_owned();
-            Ok(ArrayType::I64(data).into())
+            Ok(TensorType::I64(data).into())
         }
         _ => todo!("Reshape for type {} not implemented", data),
     }

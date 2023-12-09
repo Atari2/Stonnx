@@ -234,47 +234,48 @@ pub enum ValueType {
 }
 
 #[derive(Debug)]
-pub struct OperationResult {
-    pub result: Vec<ArrayType>,
+/// This structs encapsulates the result of an operator
+pub struct OperatorResult {
+    pub result: Vec<TensorType>,
 }
 
-impl From<ArrayType> for OperationResult {
-    fn from(r: ArrayType) -> Self {
-        OperationResult { result: vec![r] }
+impl From<TensorType> for OperatorResult {
+    fn from(r: TensorType) -> Self {
+        OperatorResult { result: vec![r] }
     }
 }
 
-impl From<(ArrayType, Option<ArrayType>)> for OperationResult {
-    fn from(r: (ArrayType, Option<ArrayType>)) -> Self {
+impl From<(TensorType, Option<TensorType>)> for OperatorResult {
+    fn from(r: (TensorType, Option<TensorType>)) -> Self {
         let v = if let (r, Some(l)) = r {
             vec![r, l]
         } else {
             vec![r.0]
         };
-        OperationResult { result: v }
+        OperatorResult { result: v }
     }
 }
 
-impl From<(ArrayType, ArrayType)> for OperationResult {
-    fn from(r: (ArrayType, ArrayType)) -> Self {
-        OperationResult {
+impl From<(TensorType, TensorType)> for OperatorResult {
+    fn from(r: (TensorType, TensorType)) -> Self {
+        OperatorResult {
             result: vec![r.0, r.1],
         }
     }
 }
 
-impl From<Vec<ArrayType>> for OperationResult {
-    fn from(r: Vec<ArrayType>) -> Self {
-        OperationResult { result: r }
+impl From<Vec<TensorType>> for OperatorResult {
+    fn from(r: Vec<TensorType>) -> Self {
+        OperatorResult { result: r }
     }
 }
 
 pub type OperationFn = for<'a, 'b, 'c> fn(
-    &'a [&'b ArrayType],
+    &'a [&'b TensorType],
     &'c NodeProto,
     i64,
     usize,
-) -> BoxResult<OperationResult>;
+) -> BoxResult<OperatorResult>;
 
 impl ValueType {
     pub fn new(proto: onnx::tensor_proto::DataType) -> BoxResult<ValueType> {
@@ -305,7 +306,7 @@ impl ValueType {
 }
 
 #[derive(Debug, Clone)]
-pub enum ArrayType {
+pub enum TensorType {
     I8(ArrayD<i8>),
     I16(ArrayD<i16>),
     I32(ArrayD<i32>),
@@ -326,7 +327,7 @@ pub enum ArrayType {
 
 /// Sparse array type, not supported yet
 #[derive(Debug, Clone)]
-pub enum SparseArrayType {}
+pub enum SparseTensorType {}
 
 /// Map type, not supported yet
 #[derive(Debug, Clone)]
@@ -340,8 +341,8 @@ pub enum SequenceType {}
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum OptionalType {
-    Array(ArrayType),
-    SparseArray(SparseArrayType),
+    Tensor(TensorType),
+    SparseTensor(SparseTensorType),
     Map(MapType),
     Sequence(SequenceType),
     None,
@@ -349,16 +350,16 @@ pub enum OptionalType {
 
 macro_rules! impl_into_array_type {
     ($t:ty, $v:ident) => {
-        impl From<ArrayD<$t>> for ArrayType {
+        impl From<ArrayD<$t>> for TensorType {
             fn from(a: ArrayD<$t>) -> Self {
-                ArrayType::$v(a)
+                TensorType::$v(a)
             }
         }
-        impl<'a> TryFrom<&'a ArrayType> for &'a ArrayD<$t> {
+        impl<'a> TryFrom<&'a TensorType> for &'a ArrayD<$t> {
             type Error = anyhow::Error;
-            fn try_from(a: &'a ArrayType) -> BoxResult<&'a ArrayD<$t>> {
+            fn try_from(a: &'a TensorType) -> BoxResult<&'a ArrayD<$t>> {
                 match a {
-                    ArrayType::$v(a) => Ok(&a),
+                    TensorType::$v(a) => Ok(&a),
                     _ => Err(anyhow!("Wrong type")),
                 }
             }
@@ -634,132 +635,132 @@ pub struct HalfFloat {
     pub _val: u16,
 }
 
-impl std::fmt::Display for ArrayType {
+impl std::fmt::Display for TensorType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArrayType::I8(_) => write!(f, "I8"),
-            ArrayType::I16(_) => write!(f, "I16"),
-            ArrayType::I32(_) => write!(f, "I32"),
-            ArrayType::U8(_) => write!(f, "U8"),
-            ArrayType::U16(_) => write!(f, "U16"),
-            ArrayType::U32(_) => write!(f, "U32"),
-            ArrayType::I64(_) => write!(f, "I64"),
-            ArrayType::U64(_) => write!(f, "U64"),
-            ArrayType::F16(_) => write!(f, "F16"),
-            ArrayType::BF16(_) => write!(f, "BF16"),
-            ArrayType::F32(_) => write!(f, "F32"),
-            ArrayType::F64(_) => write!(f, "F64"),
-            ArrayType::C64(_) => write!(f, "C64"),
-            ArrayType::C128(_) => write!(f, "C128"),
-            ArrayType::Str(_) => write!(f, "STR"),
-            ArrayType::Bool(_) => write!(f, "BOOL"),
+            TensorType::I8(_) => write!(f, "I8"),
+            TensorType::I16(_) => write!(f, "I16"),
+            TensorType::I32(_) => write!(f, "I32"),
+            TensorType::U8(_) => write!(f, "U8"),
+            TensorType::U16(_) => write!(f, "U16"),
+            TensorType::U32(_) => write!(f, "U32"),
+            TensorType::I64(_) => write!(f, "I64"),
+            TensorType::U64(_) => write!(f, "U64"),
+            TensorType::F16(_) => write!(f, "F16"),
+            TensorType::BF16(_) => write!(f, "BF16"),
+            TensorType::F32(_) => write!(f, "F32"),
+            TensorType::F64(_) => write!(f, "F64"),
+            TensorType::C64(_) => write!(f, "C64"),
+            TensorType::C128(_) => write!(f, "C128"),
+            TensorType::Str(_) => write!(f, "STR"),
+            TensorType::Bool(_) => write!(f, "BOOL"),
         }
     }
 }
 
-impl ArrayType {
+impl TensorType {
     pub fn to_file(&self, dir: &Path, name: &str) -> BoxResult<()> {
         let name = name.replace('/', "_");
         use ndarray_npy::write_npy;
         match self {
-            ArrayType::I8(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::I16(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::I32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::I64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::U8(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::U16(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::U32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::U64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::F16(_) => todo!("Half precision data type not supported"),
-            ArrayType::BF16(_) => todo!("BFloat16 data type not supported"),
-            ArrayType::F32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::F64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::C64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::C128(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
-            ArrayType::Str(_) => todo!("String data type not supported"),
-            ArrayType::Bool(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::I8(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::I16(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::I32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::I64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::U8(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::U16(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::U32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::U64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::F16(_) => todo!("Half precision data type not supported"),
+            TensorType::BF16(_) => todo!("BFloat16 data type not supported"),
+            TensorType::F32(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::F64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::C64(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::C128(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
+            TensorType::Str(_) => todo!("String data type not supported"),
+            TensorType::Bool(data) => Ok(write_npy(dir.join(name).with_extension("npy"), data)?),
         }
     }
     pub fn shape(&self) -> &[usize] {
         match self {
-            ArrayType::I8(a) => a.shape(),
-            ArrayType::I16(a) => a.shape(),
-            ArrayType::I32(a) => a.shape(),
-            ArrayType::I64(a) => a.shape(),
-            ArrayType::U8(a) => a.shape(),
-            ArrayType::U16(a) => a.shape(),
-            ArrayType::U32(a) => a.shape(),
-            ArrayType::U64(a) => a.shape(),
-            ArrayType::F16(a) => a.shape(),
-            ArrayType::BF16(a) => a.shape(),
-            ArrayType::F32(a) => a.shape(),
-            ArrayType::F64(a) => a.shape(),
-            ArrayType::C64(a) => a.shape(),
-            ArrayType::C128(a) => a.shape(),
-            ArrayType::Str(a) => a.shape(),
-            ArrayType::Bool(a) => a.shape(),
+            TensorType::I8(a) => a.shape(),
+            TensorType::I16(a) => a.shape(),
+            TensorType::I32(a) => a.shape(),
+            TensorType::I64(a) => a.shape(),
+            TensorType::U8(a) => a.shape(),
+            TensorType::U16(a) => a.shape(),
+            TensorType::U32(a) => a.shape(),
+            TensorType::U64(a) => a.shape(),
+            TensorType::F16(a) => a.shape(),
+            TensorType::BF16(a) => a.shape(),
+            TensorType::F32(a) => a.shape(),
+            TensorType::F64(a) => a.shape(),
+            TensorType::C64(a) => a.shape(),
+            TensorType::C128(a) => a.shape(),
+            TensorType::Str(a) => a.shape(),
+            TensorType::Bool(a) => a.shape(),
         }
     }
     pub fn ndim(&self) -> usize {
         match self {
-            ArrayType::I8(a) => a.ndim(),
-            ArrayType::I16(a) => a.ndim(),
-            ArrayType::I32(a) => a.ndim(),
-            ArrayType::I64(a) => a.ndim(),
-            ArrayType::U8(a) => a.ndim(),
-            ArrayType::U16(a) => a.ndim(),
-            ArrayType::U32(a) => a.ndim(),
-            ArrayType::U64(a) => a.ndim(),
-            ArrayType::F16(a) => a.ndim(),
-            ArrayType::BF16(a) => a.ndim(),
-            ArrayType::F32(a) => a.ndim(),
-            ArrayType::F64(a) => a.ndim(),
-            ArrayType::C64(a) => a.ndim(),
-            ArrayType::C128(a) => a.ndim(),
-            ArrayType::Str(a) => a.ndim(),
-            ArrayType::Bool(a) => a.ndim(),
+            TensorType::I8(a) => a.ndim(),
+            TensorType::I16(a) => a.ndim(),
+            TensorType::I32(a) => a.ndim(),
+            TensorType::I64(a) => a.ndim(),
+            TensorType::U8(a) => a.ndim(),
+            TensorType::U16(a) => a.ndim(),
+            TensorType::U32(a) => a.ndim(),
+            TensorType::U64(a) => a.ndim(),
+            TensorType::F16(a) => a.ndim(),
+            TensorType::BF16(a) => a.ndim(),
+            TensorType::F32(a) => a.ndim(),
+            TensorType::F64(a) => a.ndim(),
+            TensorType::C64(a) => a.ndim(),
+            TensorType::C128(a) => a.ndim(),
+            TensorType::Str(a) => a.ndim(),
+            TensorType::Bool(a) => a.ndim(),
         }
     }
     pub fn value_type(&self) -> ValueType {
         match self {
-            ArrayType::I64(_) => ValueType::I64,
-            ArrayType::F32(_) => ValueType::F32,
-            ArrayType::I8(_) => ValueType::I8,
-            ArrayType::I16(_) => ValueType::I16,
-            ArrayType::I32(_) => ValueType::I32,
-            ArrayType::U8(_) => ValueType::U8,
-            ArrayType::U16(_) => ValueType::U16,
-            ArrayType::U32(_) => ValueType::U32,
-            ArrayType::U64(_) => ValueType::U64,
-            ArrayType::F16(_) => ValueType::F16,
-            ArrayType::BF16(_) => ValueType::BF16,
-            ArrayType::F64(_) => ValueType::F64,
-            ArrayType::C64(_) => ValueType::C64,
-            ArrayType::C128(_) => ValueType::C128,
-            ArrayType::Str(_) => ValueType::String,
-            ArrayType::Bool(_) => ValueType::Bool,
+            TensorType::I64(_) => ValueType::I64,
+            TensorType::F32(_) => ValueType::F32,
+            TensorType::I8(_) => ValueType::I8,
+            TensorType::I16(_) => ValueType::I16,
+            TensorType::I32(_) => ValueType::I32,
+            TensorType::U8(_) => ValueType::U8,
+            TensorType::U16(_) => ValueType::U16,
+            TensorType::U32(_) => ValueType::U32,
+            TensorType::U64(_) => ValueType::U64,
+            TensorType::F16(_) => ValueType::F16,
+            TensorType::BF16(_) => ValueType::BF16,
+            TensorType::F64(_) => ValueType::F64,
+            TensorType::C64(_) => ValueType::C64,
+            TensorType::C128(_) => ValueType::C128,
+            TensorType::Str(_) => ValueType::String,
+            TensorType::Bool(_) => ValueType::Bool,
         }
     }
     pub fn data_type(&self) -> onnx::tensor_proto::DataType {
         // FIXME: types such as FLOAT8E4M3FN all map to FLOAT right now
         //        need to handle them properly
         match self {
-            ArrayType::I64(_) => DataType::INT64,
-            ArrayType::F32(_) => DataType::FLOAT,
-            ArrayType::I8(_) => DataType::INT8,
-            ArrayType::I16(_) => DataType::INT16,
-            ArrayType::I32(_) => DataType::INT32,
-            ArrayType::U8(_) => DataType::UINT8,
-            ArrayType::U16(_) => DataType::UINT16,
-            ArrayType::U32(_) => DataType::UINT32,
-            ArrayType::U64(_) => DataType::UINT64,
-            ArrayType::F16(_) => DataType::FLOAT16,
-            ArrayType::BF16(_) => DataType::BFLOAT16,
-            ArrayType::F64(_) => DataType::DOUBLE,
-            ArrayType::C64(_) => DataType::COMPLEX64,
-            ArrayType::C128(_) => DataType::COMPLEX128,
-            ArrayType::Str(_) => DataType::STRING,
-            ArrayType::Bool(_) => DataType::BOOL,
+            TensorType::I64(_) => DataType::INT64,
+            TensorType::F32(_) => DataType::FLOAT,
+            TensorType::I8(_) => DataType::INT8,
+            TensorType::I16(_) => DataType::INT16,
+            TensorType::I32(_) => DataType::INT32,
+            TensorType::U8(_) => DataType::UINT8,
+            TensorType::U16(_) => DataType::UINT16,
+            TensorType::U32(_) => DataType::UINT32,
+            TensorType::U64(_) => DataType::UINT64,
+            TensorType::F16(_) => DataType::FLOAT16,
+            TensorType::BF16(_) => DataType::BFLOAT16,
+            TensorType::F64(_) => DataType::DOUBLE,
+            TensorType::C64(_) => DataType::COMPLEX64,
+            TensorType::C128(_) => DataType::COMPLEX128,
+            TensorType::Str(_) => DataType::STRING,
+            TensorType::Bool(_) => DataType::BOOL,
         }
     }
 }

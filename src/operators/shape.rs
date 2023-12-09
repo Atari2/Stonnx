@@ -1,4 +1,4 @@
-use crate::common::{ArrayType, BoxResult, OperationResult};
+use crate::common::{BoxResult, OperatorResult, TensorType};
 use crate::onnx::NodeProto;
 use crate::utils::pick_opset_version;
 
@@ -27,11 +27,11 @@ impl ShapeAttrs {
     }
 }
 
-fn shape_1(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
+fn shape_1(inputs: &[&TensorType]) -> BoxResult<TensorType> {
     let input = inputs[0];
     let shape = input.shape();
     let output_shape = ndarray::IxDyn(&[shape.len()]);
-    Ok(ArrayType::I64(ndarray::ArrayD::from_shape_vec(
+    Ok(TensorType::I64(ndarray::ArrayD::from_shape_vec(
         output_shape,
         shape.iter().map(|v| *v as i64).collect(),
     )?))
@@ -59,14 +59,14 @@ fn interval(n: i64, start: i64, end: Option<i64>) -> Option<(i64, i64)> {
     }
 }
 
-fn shape_15(inputs: &[&ArrayType], attrs: ShapeAttrs) -> BoxResult<ArrayType> {
+fn shape_15(inputs: &[&TensorType], attrs: ShapeAttrs) -> BoxResult<TensorType> {
     let data = inputs[0];
     let shape = data.shape();
     let absome = interval(data.shape().len() as i64, attrs.start, attrs.end);
     if let Some((a, b)) = absome {
         let shape = &shape[a as usize..b as usize];
         let output_shape = ndarray::IxDyn(&[shape.len()]);
-        Ok(ArrayType::I64(ndarray::ArrayD::from_shape_vec(
+        Ok(TensorType::I64(ndarray::ArrayD::from_shape_vec(
             output_shape,
             shape.iter().map(|v| *v as i64).collect(),
         )?))
@@ -78,11 +78,11 @@ fn shape_15(inputs: &[&ArrayType], attrs: ShapeAttrs) -> BoxResult<ArrayType> {
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_shape.py>
 /// <https://onnx.ai/onnx/operators/onnx__Shape.html>
 pub fn shape(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version < 15 {
         Ok(shape_1(inputs)?.into())

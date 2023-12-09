@@ -95,7 +95,7 @@ pub struct ValueInfo {
 #[derive(Debug)]
 pub struct OutputInfo {
     pub valueinfo: ValueInfo,
-    pub data: Option<ArrayType>,
+    pub data: Option<TensorType>,
 }
 
 impl OutputInfo {
@@ -134,7 +134,7 @@ impl ValueInfo {
 
 // FIXME: data in tensor may be external. Need to handle that.
 
-pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<ArrayType> {
+pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<TensorType> {
     let shape = &proto.dims;
     if proto.data_location() != onnx::tensor_proto::DataLocation::DEFAULT {
         return Err(anyhow!("External data location not supported"));
@@ -175,7 +175,7 @@ fn get_raw_data(proto: &TensorProto) -> BoxResult<(&[u8], usize)> {
     }
 }
 
-pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxResult<ArrayType> {
+pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxResult<TensorType> {
     let enum_dt = DataType::from_i32(data_type).unwrap_or_default();
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
     let (bytedata, origin_elem_size) = get_raw_data(proto)?;
@@ -192,7 +192,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                         data.iter().step_by(origin_elem_size).copied().collect(),
                     )?
                 };
-                Ok(ArrayType::I8(a))
+                Ok(TensorType::I8(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -200,7 +200,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             Ok(data) => {
                 assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<i16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::I16(a))
+                Ok(TensorType::I16(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -237,7 +237,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             } else {
                 ArrayD::<i32>::from_shape_vec(IxDyn(&shape), data.to_vec())?
             };
-            Ok(ArrayType::I32(a))
+            Ok(TensorType::I32(a))
         }
         DataType::INT64 => {
             let data = if let Some(data) = &proto.raw_data {
@@ -272,7 +272,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             } else {
                 ArrayD::<i64>::from_shape_vec(IxDyn(&shape), data.to_vec())?
             };
-            Ok(ArrayType::I64(a))
+            Ok(TensorType::I64(a))
         }
         DataType::UINT8 => match bytemuck::try_cast_slice::<u8, u8>(bytedata) {
             Ok(data) => {
@@ -285,7 +285,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                         data.iter().step_by(origin_elem_size).copied().collect(),
                     )?
                 };
-                Ok(ArrayType::U8(a))
+                Ok(TensorType::U8(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -293,7 +293,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             Ok(data) => {
                 assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<u16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::U16(a))
+                Ok(TensorType::U16(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -301,7 +301,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             Ok(data) => {
                 assert_eq!(data.len() / origin_elem_size, shape_safe_product(&shape));
                 let a = ArrayD::<u32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::U32(a))
+                Ok(TensorType::U32(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -338,7 +338,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             } else {
                 ArrayD::<u64>::from_shape_vec(IxDyn(&shape), data.to_vec())?
             };
-            Ok(ArrayType::U64(a))
+            Ok(TensorType::U64(a))
         }
         DataType::FLOAT16 => match bytemuck::try_cast_slice::<u8, u16>(bytedata) {
             Ok(data) => {
@@ -347,7 +347,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                     IxDyn(&shape),
                     data.iter().map(|x| f16::from_bits(*x)).collect(),
                 )?;
-                Ok(ArrayType::F16(a))
+                Ok(TensorType::F16(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -358,7 +358,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                     IxDyn(&shape),
                     data.iter().map(|x| bf16::from_f32(*x)).collect(),
                 )?;
-                Ok(ArrayType::BF16(a))
+                Ok(TensorType::BF16(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -395,7 +395,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             } else {
                 ArrayD::<f64>::from_shape_vec(IxDyn(&shape), data.to_vec())?
             };
-            Ok(ArrayType::F64(a))
+            Ok(TensorType::F64(a))
         }
         DataType::STRING => {
             let bytedata = &proto.string_data;
@@ -406,7 +406,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                     .map(|v| String::from_utf8_lossy(v.as_ref()).to_string())
                     .collect(),
             )?;
-            Ok(ArrayType::Str(a))
+            Ok(TensorType::Str(a))
         }
         DataType::BOOL => match bytemuck::try_cast_slice::<u8, c_uchar>(bytedata) {
             Ok(data) => {
@@ -415,7 +415,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                     IxDyn(&shape),
                     data.iter().map(|x| *x != 0).collect(),
                 )?;
-                Ok(ArrayType::Bool(a))
+                Ok(TensorType::Bool(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -458,7 +458,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
             } else {
                 ArrayD::<f32>::from_shape_vec(IxDyn(&shape), data.to_vec())?
             };
-            Ok(ArrayType::F32(a))
+            Ok(TensorType::F32(a))
         }
         DataType::COMPLEX64 => match bytemuck::try_cast_slice::<u8, Complex64Repr>(bytedata) {
             Ok(data) => {
@@ -469,7 +469,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                         .map(|v| Complex64::new(v._val[0], v._val[1]))
                         .collect(),
                 )?;
-                Ok(ArrayType::C64(a))
+                Ok(TensorType::C64(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -482,7 +482,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
                         .map(|v| Complex128::new(v._val[0], v._val[1]))
                         .collect(),
                 )?;
-                Ok(ArrayType::C128(a))
+                Ok(TensorType::C128(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -493,7 +493,7 @@ pub fn make_tensor_from_raw(
     shape: &[i64],
     bytedata: &[u8],
     data_type: i32,
-) -> BoxResult<ArrayType> {
+) -> BoxResult<TensorType> {
     let enum_dt = DataType::from_i32(data_type).unwrap_or_default();
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
     match enum_dt {
@@ -502,7 +502,7 @@ pub fn make_tensor_from_raw(
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::I8(a))
+                Ok(TensorType::I8(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -510,7 +510,7 @@ pub fn make_tensor_from_raw(
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::I16(a))
+                Ok(TensorType::I16(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -518,7 +518,7 @@ pub fn make_tensor_from_raw(
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<i32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::I32(a))
+                Ok(TensorType::I32(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -544,7 +544,7 @@ pub fn make_tensor_from_raw(
                 } else {
                     ArrayD::<i64>::from_shape_vec(IxDyn(&shape), data.to_vec())?
                 };
-                Ok(ArrayType::I64(a))
+                Ok(TensorType::I64(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -552,7 +552,7 @@ pub fn make_tensor_from_raw(
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<u8>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::U8(a))
+                Ok(TensorType::U8(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -560,7 +560,7 @@ pub fn make_tensor_from_raw(
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<u16>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::U16(a))
+                Ok(TensorType::U16(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -568,7 +568,7 @@ pub fn make_tensor_from_raw(
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<u32>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::U32(a))
+                Ok(TensorType::U32(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -576,7 +576,7 @@ pub fn make_tensor_from_raw(
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<u64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::U64(a))
+                Ok(TensorType::U64(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -587,7 +587,7 @@ pub fn make_tensor_from_raw(
                     IxDyn(&shape),
                     data.iter().map(|x| f16::from_bits(*x)).collect(),
                 )?;
-                Ok(ArrayType::F16(a))
+                Ok(TensorType::F16(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -598,7 +598,7 @@ pub fn make_tensor_from_raw(
                     IxDyn(&shape),
                     data.iter().map(|x| bf16::from_f32(*x)).collect(),
                 )?;
-                Ok(ArrayType::BF16(a))
+                Ok(TensorType::BF16(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -606,7 +606,7 @@ pub fn make_tensor_from_raw(
             Ok(data) => {
                 assert_eq!(data.len(), shape_safe_product(&shape));
                 let a = ArrayD::<f64>::from_shape_vec(IxDyn(&shape), data.to_vec())?;
-                Ok(ArrayType::F64(a))
+                Ok(TensorType::F64(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -620,7 +620,7 @@ pub fn make_tensor_from_raw(
                     IxDyn(&shape),
                     data.iter().map(|x| *x != 0).collect(),
                 )?;
-                Ok(ArrayType::Bool(a))
+                Ok(TensorType::Bool(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -650,7 +650,7 @@ pub fn make_tensor_from_raw(
                 } else {
                     ArrayD::<f32>::from_shape_vec(IxDyn(&shape), data.to_vec())?
                 };
-                Ok(ArrayType::F32(a))
+                Ok(TensorType::F32(a))
             }
             Err(e) => {
                 println!("Copying data of tensor as f32 because {}", e);
@@ -659,7 +659,7 @@ pub fn make_tensor_from_raw(
                     copied_data.push(f32::from_le_bytes(float_slice.try_into()?));
                 }
                 let a = ArrayD::<f32>::from_shape_vec(IxDyn(&shape), copied_data)?;
-                Ok(ArrayType::F32(a))
+                Ok(TensorType::F32(a))
             }
         },
         DataType::COMPLEX64 => match bytemuck::try_cast_slice::<u8, Complex64Repr>(bytedata) {
@@ -671,7 +671,7 @@ pub fn make_tensor_from_raw(
                         .map(|v| Complex64::new(v._val[0], v._val[1]))
                         .collect(),
                 )?;
-                Ok(ArrayType::C64(a))
+                Ok(TensorType::C64(a))
             }
             Err(e) => Err(anyhow!(e)),
         },
@@ -684,15 +684,15 @@ pub fn make_tensor_from_raw(
                         .map(|v| Complex128::new(v._val[0], v._val[1]))
                         .collect(),
                 )?;
-                Ok(ArrayType::C128(a))
+                Ok(TensorType::C128(a))
             }
             Err(e) => Err(anyhow!(e.to_string())),
         },
     }
 }
 
-pub fn make_initializers(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, ArrayType>> {
-    let mut initializers: HashMap<String, ArrayType> = HashMap::new();
+pub fn make_initializers(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, TensorType>> {
+    let mut initializers: HashMap<String, TensorType> = HashMap::new();
     for tensor in graph.initializer.iter() {
         let tensor_name = tensor.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
         if !tensor.has_data_type() {
@@ -707,8 +707,8 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, 
 fn make_input_tensors_from_files(
     graph: &onnx::GraphProto,
     files: &[PathBuf],
-    mut initializers: HashMap<String, ArrayType>,
-) -> BoxResult<HashMap<String, ArrayType>> {
+    mut initializers: HashMap<String, TensorType>,
+) -> BoxResult<HashMap<String, TensorType>> {
     let mut map = HashMap::new();
     let mut external_inputs_map = HashMap::new();
     for input in files.iter() {
@@ -756,7 +756,7 @@ fn make_input_tensors_from_files(
 fn make_output_tensors_from_files(
     graph: &onnx::GraphProto,
     files: &[PathBuf],
-) -> BoxResult<HashMap<String, ArrayType>> {
+) -> BoxResult<HashMap<String, TensorType>> {
     let mut map = HashMap::new();
     let mut external_outputs_map = HashMap::new();
     for output in files.iter() {
@@ -786,8 +786,8 @@ fn make_output_tensors_from_files(
 pub fn initialize_nodes(
     graph: &onnx::GraphProto,
     fileinputs: &FileInputs,
-    initializers: HashMap<String, ArrayType>,
-) -> BoxResult<HashMap<String, ArrayType>> {
+    initializers: HashMap<String, TensorType>,
+) -> BoxResult<HashMap<String, TensorType>> {
     if fileinputs.inputs.is_empty() {
         return Ok(HashMap::new());
     }
@@ -797,7 +797,7 @@ pub fn initialize_nodes(
 pub fn make_external_outputs(
     graph: &onnx::GraphProto,
     fileinputs: &FileInputs,
-) -> BoxResult<HashMap<String, ArrayType>> {
+) -> BoxResult<HashMap<String, TensorType>> {
     if fileinputs.outputs.is_empty() {
         return Ok(HashMap::new());
     }
@@ -861,10 +861,10 @@ pub fn pick_opset_version(target_ver: i64, opset_versions: &[i64]) -> i64 {
 }
 
 pub fn operator_not_implemented(
-    _inputs: &[&ArrayType],
+    _inputs: &[&TensorType],
     _node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     todo!("operator not implemented");
 }

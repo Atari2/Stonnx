@@ -2,7 +2,7 @@ use ndarray::{ArrayD, ArrayViewD, Ix1};
 use num::Zero;
 
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{BoxResult, OperatorResult, TensorType},
     onnx::NodeProto,
     utils::pick_opset_version,
 };
@@ -39,7 +39,7 @@ fn _squeeze_generic<A: Clone + Copy + Zero>(
     Ok(data.to_shape(new_shape).unwrap().to_owned())
 }
 
-fn squeeze_11(inputs: &[&ArrayType], attrs: SqueezeAttrs) -> BoxResult<ArrayType> {
+fn squeeze_11(inputs: &[&TensorType], attrs: SqueezeAttrs) -> BoxResult<TensorType> {
     let input = inputs[0];
     let input_shape = input.shape();
     let shape = if let Some(axes) = attrs.axes {
@@ -58,15 +58,15 @@ fn squeeze_11(inputs: &[&ArrayType], attrs: SqueezeAttrs) -> BoxResult<ArrayType
     };
 
     match input {
-        ArrayType::F32(a) => Ok(ArrayType::F32(_squeeze_generic(a.view(), &shape).unwrap())),
-        ArrayType::I64(a) => Ok(ArrayType::I64(_squeeze_generic(a.view(), &shape).unwrap())),
+        TensorType::F32(a) => Ok(TensorType::F32(_squeeze_generic(a.view(), &shape).unwrap())),
+        TensorType::I64(a) => Ok(TensorType::I64(_squeeze_generic(a.view(), &shape).unwrap())),
         _ => todo!("Squeeze for type {}", input),
     }
 }
 
-fn squeeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
+fn squeeze_13(inputs: &[&TensorType]) -> BoxResult<TensorType> {
     let input = inputs[0];
-    let axes = if let Some(ArrayType::I64(a)) = inputs.get(1) {
+    let axes = if let Some(TensorType::I64(a)) = inputs.get(1) {
         a.clone().into_dimensionality::<Ix1>()?.to_vec()
     } else {
         input
@@ -86,8 +86,8 @@ fn squeeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
         shape.remove(axis);
     }
     match input {
-        ArrayType::F32(a) => Ok(ArrayType::F32(_squeeze_generic(a.view(), &shape).unwrap())),
-        ArrayType::I64(a) => Ok(ArrayType::I64(_squeeze_generic(a.view(), &shape).unwrap())),
+        TensorType::F32(a) => Ok(TensorType::F32(_squeeze_generic(a.view(), &shape).unwrap())),
+        TensorType::I64(a) => Ok(TensorType::I64(_squeeze_generic(a.view(), &shape).unwrap())),
         _ => todo!("Squeeze for type {}", input),
     }
 }
@@ -95,11 +95,11 @@ fn squeeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_squeeze.py>
 /// <https://onnx.ai/onnx/operators/onnx__Squeeze.html>
 pub fn squeeze(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version > 11 {
         Ok(squeeze_13(inputs).unwrap().into())

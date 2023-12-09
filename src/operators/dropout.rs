@@ -1,4 +1,4 @@
-use crate::common::{ArrayElement, ArrayType, BoxResult, F32IntoType, OperationResult};
+use crate::common::{ArrayElement, BoxResult, F32IntoType, OperatorResult, TensorType};
 use crate::{onnx::NodeProto, utils::pick_opset_version};
 use anyhow::anyhow;
 use ndarray::{ArrayD, Ix0};
@@ -63,9 +63,9 @@ fn dropout_common_generic<A: ArrayElement>(
     training_mode: bool,
     attrs: DropoutAttrs,
     output_len: usize,
-) -> BoxResult<(ArrayType, Option<ArrayType>)>
+) -> BoxResult<(TensorType, Option<TensorType>)>
 where
-    ArrayType: From<ArrayD<A>>,
+    TensorType: From<ArrayD<A>>,
     f32: F32IntoType<A>,
 {
     let return_mask = output_len == 2;
@@ -75,7 +75,7 @@ where
         } else {
             Ok((
                 data.clone().into(),
-                Some(ArrayType::Bool(ArrayD::from_elem(data.shape(), true))),
+                Some(TensorType::Bool(ArrayD::from_elem(data.shape(), true))),
             ))
         }
     } else {
@@ -91,21 +91,21 @@ where
         } else {
             Ok((
                 (mask.mapv(btf) * data * scale).into(),
-                Some(ArrayType::Bool(mask)),
+                Some(TensorType::Bool(mask)),
             ))
         }
     }
 }
 
 fn dropout_common(
-    data: &ArrayType,
+    data: &TensorType,
     training_mode: bool,
     attrs: DropoutAttrs,
     output_len: usize,
-) -> BoxResult<(ArrayType, Option<ArrayType>)> {
+) -> BoxResult<(TensorType, Option<TensorType>)> {
     match data {
-        ArrayType::F32(data) => dropout_common_generic(data, training_mode, attrs, output_len),
-        ArrayType::I64(data) => dropout_common_generic(data, training_mode, attrs, output_len),
+        TensorType::F32(data) => dropout_common_generic(data, training_mode, attrs, output_len),
+        TensorType::I64(data) => dropout_common_generic(data, training_mode, attrs, output_len),
         _ => todo!("Dropout for type {}", data),
     }
 }
@@ -113,11 +113,11 @@ fn dropout_common(
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_dropout.py>
 /// <https://onnx.ai/onnx/operators/onnx__Dropout.html>
 pub fn dropout(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     opset_version: i64,
     output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     let mut attrs = DropoutAttrs::new(node, target_version);
     if attrs.is_test && target_version < 7 {
@@ -128,7 +128,7 @@ pub fn dropout(
     } else {
         attrs.ratio = if let Some(ratio) = inputs.get(1) {
             match ratio {
-                ArrayType::F32(ratio) => ratio.clone().into_dimensionality::<Ix0>()?.into_scalar(),
+                TensorType::F32(ratio) => ratio.clone().into_dimensionality::<Ix0>()?.into_scalar(),
                 _ => return Err(anyhow!("Ratio must be a scalar")),
             }
         } else {
@@ -136,7 +136,7 @@ pub fn dropout(
         };
         let training_mode = if let Some(mode) = inputs.get(2) {
             match mode {
-                ArrayType::I64(mode) => {
+                TensorType::I64(mode) => {
                     mode.clone().into_dimensionality::<Ix0>()?.into_scalar() != 0
                 }
                 _ => return Err(anyhow!("Training mode must be a scalar")),

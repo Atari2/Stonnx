@@ -1,7 +1,7 @@
 use ndarray::{ArrayD, IxDyn};
 
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{BoxResult, OperatorResult, TensorType},
     onnx::NodeProto,
     utils::make_tensor_from_proto,
 };
@@ -11,7 +11,7 @@ const _OPSET_VERSIONS: [i64; 2] = [9, 20];
 
 #[derive(Debug)]
 struct ConstantOfShapeAttrs {
-    value: ArrayType,
+    value: TensorType,
 }
 
 impl ConstantOfShapeAttrs {
@@ -22,10 +22,10 @@ impl ConstantOfShapeAttrs {
                 .iter()
                 .find(|a| a.name() == "value")
                 .map_or_else(
-                    || ArrayType::F32(ArrayD::zeros(IxDyn(&[]))),
+                    || TensorType::F32(ArrayD::zeros(IxDyn(&[]))),
                     |a| {
                         make_tensor_from_proto(&a.t)
-                            .unwrap_or_else(|_| ArrayType::F32(ArrayD::zeros(IxDyn(&[]))))
+                            .unwrap_or_else(|_| TensorType::F32(ArrayD::zeros(IxDyn(&[]))))
                     },
                 ),
         }
@@ -43,20 +43,20 @@ fn _constanofshape_generic<A: Clone + std::iter::Sum<A> + Copy>(
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_constant_of_shape.py>
 /// <https://onnx.ai/onnx/operators/onnx__ConstantOfShape.html>
 pub fn constantofshape(
-    input: &[&ArrayType],
+    input: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
-    let shape = if let Some(ArrayType::I64(shape)) = input.get(0) {
+) -> BoxResult<OperatorResult> {
+    let shape = if let Some(TensorType::I64(shape)) = input.get(0) {
         shape.iter().map(|v| *v as usize).collect::<Vec<_>>()
     } else {
         return Err(anyhow!("ConstantOfShape: shape must be i64"));
     };
     let attrs = ConstantOfShapeAttrs::new(node);
     match attrs.value {
-        ArrayType::F32(v) => Ok(ArrayType::F32(_constanofshape_generic(&shape, v)?).into()),
-        ArrayType::I64(v) => Ok(ArrayType::I64(_constanofshape_generic(&shape, v)?).into()),
+        TensorType::F32(v) => Ok(TensorType::F32(_constanofshape_generic(&shape, v)?).into()),
+        TensorType::I64(v) => Ok(TensorType::I64(_constanofshape_generic(&shape, v)?).into()),
         _ => Err(anyhow!(
             "ConstantOfShape: value must be f32, i64, u8 or bool"
         )),

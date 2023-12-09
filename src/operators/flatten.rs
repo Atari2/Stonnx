@@ -1,5 +1,5 @@
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{BoxResult, OperatorResult, TensorType},
     onnx::NodeProto,
 };
 use anyhow::anyhow;
@@ -38,11 +38,11 @@ fn _flatten<D: Clone>(input: &ArrayD<D>, axis: i64) -> BoxResult<ArrayD<D>> {
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_flatten.py>
 /// <https://onnx.ai/onnx/operators/onnx__Flatten.html>
 pub fn flatten(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let attrs = FlattenAttrs::new(node);
     let input = inputs.get(0).ok_or(anyhow!("No input"))?;
     let axis = if attrs.axis < 0 {
@@ -51,8 +51,8 @@ pub fn flatten(
         attrs.axis
     };
     match input {
-        ArrayType::F32(x) => Ok(ArrayType::F32(_flatten(x, axis)?).into()),
-        ArrayType::I64(x) => Ok(ArrayType::I64(_flatten(x, axis)?).into()),
+        TensorType::F32(x) => Ok(TensorType::F32(_flatten(x, axis)?).into()),
+        TensorType::I64(x) => Ok(TensorType::I64(_flatten(x, axis)?).into()),
         _ => Err(anyhow!("Unsupported input type")),
     }
 }

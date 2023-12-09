@@ -3,7 +3,7 @@ use ndarray::ArrayD;
 use num::traits::AsPrimitive;
 use protobuf::Enum;
 
-use crate::common::{ArrayType, BoxResult, OperationResult};
+use crate::common::{BoxResult, OperatorResult, TensorType};
 use crate::onnx::{self, NodeProto};
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 6, 9, 13, 19];
@@ -58,34 +58,34 @@ macro_rules! cast_impl {
         match $input.data_type() {
             DataType::UNDEFINED => Err(anyhow!("Cast to undefined type")),
             DataType::FLOAT => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, f32>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, f32>($input.try_into()?, None)?).into())
             }
             DataType::UINT8 => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, u8>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, u8>($input.try_into()?, None)?).into())
             }
             DataType::INT8 => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, i8>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, i8>($input.try_into()?, None)?).into())
             }
             DataType::UINT16 => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, u16>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, u16>($input.try_into()?, None)?).into())
             }
             DataType::INT16 => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, i16>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, i16>($input.try_into()?, None)?).into())
             }
             DataType::INT32 => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, i32>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, i32>($input.try_into()?, None)?).into())
             }
             DataType::INT64 => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, i64>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, i64>($input.try_into()?, None)?).into())
             }
             DataType::DOUBLE => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, f64>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, f64>($input.try_into()?, None)?).into())
             }
             DataType::UINT32 => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, u32>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, u32>($input.try_into()?, None)?).into())
             }
             DataType::UINT64 => {
-                Ok(ArrayType::$tgt(cast_generic::<$from, u64>($input.try_into()?, None)?).into())
+                Ok(TensorType::$tgt(cast_generic::<$from, u64>($input.try_into()?, None)?).into())
             }
             _ => Err(anyhow!(
                 "Cast from {:?} to {} not supported",
@@ -99,11 +99,11 @@ macro_rules! cast_impl {
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_cast.py>
 /// <https://onnx.ai/onnx/operators/onnx__Cast.html>
 pub fn cast(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     _node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let input = inputs[0];
     let attrs = CastAttrs::new(_node);
     if attrs.to == input.data_type() {

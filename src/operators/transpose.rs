@@ -1,5 +1,5 @@
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{BoxResult, OperatorResult, TensorType},
     onnx::NodeProto,
 };
 
@@ -25,30 +25,30 @@ impl TransposeAttrs {
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_transpose.py>
 /// <https://onnx.ai/onnx/operators/onnx__Transpose.html>
 pub fn transpose(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let data = inputs[0];
     let attrs = TransposeAttrs::new(node);
 
     match data {
-        ArrayType::F32(data) => {
+        TensorType::F32(data) => {
             let transposed = if attrs.perm.is_empty() {
                 data.t().to_owned()
             } else {
                 data.clone().permuted_axes(attrs.perm)
             };
-            Ok(ArrayType::F32(transposed).into())
+            Ok(TensorType::F32(transposed).into())
         }
-        ArrayType::I64(data) => {
+        TensorType::I64(data) => {
             let transposed = if attrs.perm.is_empty() {
                 data.t().to_owned()
             } else {
                 data.clone().permuted_axes(attrs.perm)
             };
-            Ok(ArrayType::I64(transposed).into())
+            Ok(TensorType::I64(transposed).into())
         }
         _ => todo!("Transpose for type {}", data),
     }

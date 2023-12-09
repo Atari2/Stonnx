@@ -1,6 +1,6 @@
 use ndarray::{ArrayD, SliceInfoElem};
 
-use crate::common::{ArrayElement, ArrayType, BoxResult, F32IntoType, OperationResult};
+use crate::common::{ArrayElement, BoxResult, F32IntoType, OperatorResult, TensorType};
 use crate::onnx::NodeProto;
 use crate::utils::pick_opset_version;
 
@@ -74,9 +74,9 @@ fn _batchnorm_test_mode<A: ArrayElement>(
     mean: &ArrayD<A>,
     var: &ArrayD<A>,
     epsilon: f32,
-) -> BoxResult<ArrayType>
+) -> BoxResult<TensorType>
 where
-    ArrayType: From<ArrayD<A>>,
+    TensorType: From<ArrayD<A>>,
     f32: F32IntoType<A>,
 {
     let dims_x = x.ndim();
@@ -114,9 +114,9 @@ fn _batchnorm_training_mode<A: ArrayElement + num::Float>(
     var: &ArrayD<A>,
     momentum: f32,
     epsilon: f32,
-) -> BoxResult<Vec<ArrayType>>
+) -> BoxResult<Vec<TensorType>>
 where
-    ArrayType: From<ArrayD<A>>,
+    TensorType: From<ArrayD<A>>,
     f32: F32IntoType<A>,
 {
     let momentum = momentum.as_();
@@ -157,9 +157,9 @@ fn batchnormalization_1_6<A: ArrayElement + num::Float>(
     mean: &ArrayD<A>,
     var: &ArrayD<A>,
     attrs: BatchNormalizationAttrs,
-) -> BoxResult<Vec<ArrayType>>
+) -> BoxResult<Vec<TensorType>>
 where
-    ArrayType: From<ArrayD<A>>,
+    TensorType: From<ArrayD<A>>,
     f32: F32IntoType<A>,
 {
     if attrs.is_test {
@@ -190,9 +190,9 @@ fn batchnormalization_7_9<A: ArrayElement + num::Float>(
     mean: &ArrayD<A>,
     var: &ArrayD<A>,
     attrs: BatchNormalizationAttrs,
-) -> BoxResult<Vec<ArrayType>>
+) -> BoxResult<Vec<TensorType>>
 where
-    ArrayType: From<ArrayD<A>>,
+    TensorType: From<ArrayD<A>>,
     f32: F32IntoType<A>,
 {
     if let Some(momentum) = attrs.momentum {
@@ -238,9 +238,9 @@ fn batchnormalization_14_15<A: ArrayElement + num::Float>(
     mean: &ArrayD<A>,
     var: &ArrayD<A>,
     attrs: BatchNormalizationAttrs,
-) -> BoxResult<Vec<ArrayType>>
+) -> BoxResult<Vec<TensorType>>
 where
-    ArrayType: From<ArrayD<A>>,
+    TensorType: From<ArrayD<A>>,
     f32: F32IntoType<A>,
 {
     if !attrs.training_mode {
@@ -267,11 +267,11 @@ where
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_batch_normalization.py>
 /// <https://onnx.ai/onnx/operators/onnx__BatchNormalization.html>
 pub fn batchnormalization(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let attrs = BatchNormalizationAttrs::new(node);
     let target_ver = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if inputs.len() < 5 {
@@ -279,27 +279,27 @@ pub fn batchnormalization(
             "BatchNormalization: inputs must be at least 5"
         ));
     }
-    let x = if let ArrayType::F32(x) = inputs[0] {
+    let x = if let TensorType::F32(x) = inputs[0] {
         x
     } else {
         todo!("BatchNormalization for x type {}", inputs[0])
     };
-    let scale = if let ArrayType::F32(scale) = inputs[1] {
+    let scale = if let TensorType::F32(scale) = inputs[1] {
         scale
     } else {
         todo!("BatchNormalization for scale type {}", inputs[1])
     };
-    let bias = if let ArrayType::F32(bias) = inputs[2] {
+    let bias = if let TensorType::F32(bias) = inputs[2] {
         bias
     } else {
         todo!("BatchNormalization for bias type {}", inputs[2])
     };
-    let mean = if let ArrayType::F32(mean) = inputs[3] {
+    let mean = if let TensorType::F32(mean) = inputs[3] {
         mean
     } else {
         todo!("BatchNormalization for mean type {}", inputs[3])
     };
-    let var = if let ArrayType::F32(var) = inputs[4] {
+    let var = if let TensorType::F32(var) = inputs[4] {
         var
     } else {
         todo!("BatchNormalization for var type {}", inputs[4])

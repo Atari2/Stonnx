@@ -1,7 +1,7 @@
 use ndarray::{s, ArrayD, Axis};
 
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{BoxResult, OperatorResult, TensorType},
     onnx::NodeProto,
 };
 use anyhow::anyhow;
@@ -69,16 +69,16 @@ fn lrn_f32(input: &ArrayD<f32>, attrs: LRNAttrs) -> BoxResult<ArrayD<f32>> {
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_lrn.py>
 /// <https://onnx.ai/onnx/operators/onnx__LRN.html>
 pub fn lrn(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let attrs = LRNAttrs::new(node);
     match inputs.get(0) {
-        Some(ArrayType::F32(input)) => {
+        Some(TensorType::F32(input)) => {
             let output = lrn_f32(input, attrs)?;
-            Ok(ArrayType::F32(output).into())
+            Ok(TensorType::F32(output).into())
         }
         _ => todo!("LRN for type {:?}", inputs.get(0)),
     }

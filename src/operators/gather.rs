@@ -4,7 +4,7 @@ use num::{traits::AsPrimitive, Zero};
 use protobuf::Enum;
 
 use crate::{
-    common::{ArrayType, BoxResult, NDIndex, OperationResult},
+    common::{BoxResult, NDIndex, OperatorResult, TensorType},
     onnx::{tensor_proto::DataType, NodeProto},
     utils::make_tensor_from_raw,
 };
@@ -68,11 +68,11 @@ fn _gather_generic<A: Clone + Copy + Zero, B: Clone + Zero + AsPrimitive<usize>>
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gather.py>
 /// <https://onnx.ai/onnx/operators/onnx__Gather.html>
 pub fn gather(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     if inputs.len() != 2 {
         return Err(anyhow!("Gather expects 2 inputs, got: {}", inputs.len()));
     }
@@ -87,24 +87,24 @@ pub fn gather(
         ));
     }
     match indices {
-        ArrayType::I32(i) => {
+        TensorType::I32(i) => {
             if i.is_empty() {
-                if let ArrayType::F32(_) = data {
+                if let TensorType::F32(_) = data {
                     Ok(make_tensor_from_raw(&[1], &[], DataType::FLOAT.value())?.into())
                 } else {
                     todo!("Gather for non-float data {}", data)
                 }
             } else {
                 match data {
-                    ArrayType::F32(f32_data) => {
+                    TensorType::F32(f32_data) => {
                         Ok(
-                            ArrayType::F32(_gather_generic(f32_data.view(), i.view(), &attrs))
+                            TensorType::F32(_gather_generic(f32_data.view(), i.view(), &attrs))
                                 .into(),
                         )
                     }
-                    ArrayType::I64(i64_data) => {
+                    TensorType::I64(i64_data) => {
                         Ok(
-                            ArrayType::I64(_gather_generic(i64_data.view(), i.view(), &attrs))
+                            TensorType::I64(_gather_generic(i64_data.view(), i.view(), &attrs))
                                 .into(),
                         )
                     }
@@ -112,24 +112,24 @@ pub fn gather(
                 }
             }
         }
-        ArrayType::I64(i) => {
+        TensorType::I64(i) => {
             if i.is_empty() {
-                if let ArrayType::F32(_) = data {
+                if let TensorType::F32(_) = data {
                     Ok(make_tensor_from_raw(&[1], &[], DataType::FLOAT.value())?.into())
                 } else {
                     todo!("Gather for non-float data {}", data)
                 }
             } else {
                 match data {
-                    ArrayType::F32(f32_data) => {
+                    TensorType::F32(f32_data) => {
                         Ok(
-                            ArrayType::F32(_gather_generic(f32_data.view(), i.view(), &attrs))
+                            TensorType::F32(_gather_generic(f32_data.view(), i.view(), &attrs))
                                 .into(),
                         )
                     }
-                    ArrayType::I64(i64_data) => {
+                    TensorType::I64(i64_data) => {
                         Ok(
-                            ArrayType::I64(_gather_generic(i64_data.view(), i.view(), &attrs))
+                            TensorType::I64(_gather_generic(i64_data.view(), i.view(), &attrs))
                                 .into(),
                         )
                     }

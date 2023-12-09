@@ -3,7 +3,7 @@ use ndarray::{ArrayD, ArrayViewD, Ix2};
 use trait_set::trait_set;
 
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{BoxResult, OperatorResult, TensorType},
     onnx::NodeProto,
     utils::pick_opset_version,
 };
@@ -145,39 +145,39 @@ fn _gemm_common_i64(
 }
 
 fn gemm_6(
-    a: &ArrayType,
-    b: &ArrayType,
-    c: Option<&ArrayType>,
+    a: &TensorType,
+    b: &TensorType,
+    c: Option<&TensorType>,
     attrs: GemmAttrs,
-) -> BoxResult<ArrayType> {
+) -> BoxResult<TensorType> {
     match (a, b, c) {
-        (ArrayType::F32(a), ArrayType::F32(b), Some(ArrayType::F32(c))) => {
+        (TensorType::F32(a), TensorType::F32(b), Some(TensorType::F32(c))) => {
             if !attrs.broadcast {
                 let res = _gemm_common_f32(a, b, Some(c), attrs)?;
                 if c.shape() != res.shape() {
                     return Err(anyhow!("Gemm: c and res must have the same shape"));
                 }
-                Ok(ArrayType::F32(res + c))
+                Ok(TensorType::F32(res + c))
             } else {
-                Ok(ArrayType::F32(_gemm_common_f32(a, b, Some(c), attrs)?))
+                Ok(TensorType::F32(_gemm_common_f32(a, b, Some(c), attrs)?))
             }
         }
-        (ArrayType::F32(a), ArrayType::F32(b), None) => {
-            Ok(ArrayType::F32(_gemm_common_f32(a, b, None, attrs)?))
+        (TensorType::F32(a), TensorType::F32(b), None) => {
+            Ok(TensorType::F32(_gemm_common_f32(a, b, None, attrs)?))
         }
-        (ArrayType::I64(a), ArrayType::I64(b), Some(ArrayType::I64(c))) => {
+        (TensorType::I64(a), TensorType::I64(b), Some(TensorType::I64(c))) => {
             if !attrs.broadcast {
                 let res = _gemm_common_i64(a, b, Some(c), attrs)?;
                 if c.shape() != res.shape() {
                     return Err(anyhow!("Gemm: c and res must have the same shape"));
                 }
-                Ok(ArrayType::I64(res + c))
+                Ok(TensorType::I64(res + c))
             } else {
-                Ok(ArrayType::I64(_gemm_common_i64(a, b, Some(c), attrs)?))
+                Ok(TensorType::I64(_gemm_common_i64(a, b, Some(c), attrs)?))
             }
         }
-        (ArrayType::I64(a), ArrayType::I64(b), None) => {
-            Ok(ArrayType::I64(_gemm_common_i64(a, b, None, attrs)?))
+        (TensorType::I64(a), TensorType::I64(b), None) => {
+            Ok(TensorType::I64(_gemm_common_i64(a, b, None, attrs)?))
         }
         _ => {
             todo!("GEMM: {} {} {:?}", a, b, c)
@@ -186,23 +186,23 @@ fn gemm_6(
 }
 
 fn gemm_7(
-    a: &ArrayType,
-    b: &ArrayType,
-    c: Option<&ArrayType>,
+    a: &TensorType,
+    b: &TensorType,
+    c: Option<&TensorType>,
     attrs: GemmAttrs,
-) -> BoxResult<ArrayType> {
+) -> BoxResult<TensorType> {
     match (a, b, c) {
-        (ArrayType::F32(a), ArrayType::F32(b), Some(ArrayType::F32(c))) => {
-            Ok(ArrayType::F32(_gemm_common_f32(a, b, Some(c), attrs)?))
+        (TensorType::F32(a), TensorType::F32(b), Some(TensorType::F32(c))) => {
+            Ok(TensorType::F32(_gemm_common_f32(a, b, Some(c), attrs)?))
         }
-        (ArrayType::F32(a), ArrayType::F32(b), None) => {
-            Ok(ArrayType::F32(_gemm_common_f32(a, b, None, attrs)?))
+        (TensorType::F32(a), TensorType::F32(b), None) => {
+            Ok(TensorType::F32(_gemm_common_f32(a, b, None, attrs)?))
         }
-        (ArrayType::I64(a), ArrayType::I64(b), Some(ArrayType::I64(c))) => {
-            Ok(ArrayType::I64(_gemm_common_i64(a, b, Some(c), attrs)?))
+        (TensorType::I64(a), TensorType::I64(b), Some(TensorType::I64(c))) => {
+            Ok(TensorType::I64(_gemm_common_i64(a, b, Some(c), attrs)?))
         }
-        (ArrayType::I64(a), ArrayType::I64(b), None) => {
-            Ok(ArrayType::I64(_gemm_common_i64(a, b, None, attrs)?))
+        (TensorType::I64(a), TensorType::I64(b), None) => {
+            Ok(TensorType::I64(_gemm_common_i64(a, b, None, attrs)?))
         }
         (a, b, c) => {
             todo!("GEMM: {:?} {:?} {:?}", a, b, c)
@@ -211,12 +211,12 @@ fn gemm_7(
 }
 
 fn _gemm_internal(
-    a: &ArrayType,
-    b: &ArrayType,
-    c: Option<&ArrayType>,
+    a: &TensorType,
+    b: &TensorType,
+    c: Option<&TensorType>,
     attrs: GemmAttrs,
     target_version: i64,
-) -> BoxResult<ArrayType> {
+) -> BoxResult<TensorType> {
     if target_version >= 7 {
         gemm_7(a, b, c, attrs)
     } else {
@@ -227,11 +227,11 @@ fn _gemm_internal(
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py>
 /// <https://onnx.ai/onnx/operators/onnx__Gemm.html>
 pub fn gemm(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     let attrs = GemmAttrs::new(node);
 

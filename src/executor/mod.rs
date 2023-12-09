@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use crate::{
-    common::{ArrayType, BoxResult, OperationFn, OperationResult, VerbosityLevel},
+    common::{BoxResult, OperationFn, OperatorResult, TensorType, VerbosityLevel},
     onnx, print_at_level,
     utils::OutputInfo,
     Args, OPERATION_MAP,
@@ -26,9 +26,9 @@ impl std::cmp::Eq for ONNXNode<'_> {}
 
 pub fn execute_node(
     onnxnode: &ONNXNode,
-    node_inputs: &HashMap<String, ArrayType>,
+    node_inputs: &HashMap<String, TensorType>,
     opset_version: i64,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let node = onnxnode.node_ref;
     let mut inputs = vec![];
     let mut outputs = vec![];
@@ -72,11 +72,11 @@ pub fn execute_node(
 }
 
 pub fn handle_output<'a>(
-    result: OperationResult,
+    result: OperatorResult,
     node: &'a ONNXNode,
     args: &Args,
     outputs_dir: &Path,
-    node_inputs: &mut HashMap<String, ArrayType>,
+    node_inputs: &mut HashMap<String, TensorType>,
     graph_outputs: &mut HashMap<String, OutputInfo>,
 ) -> BoxResult<Vec<&'a str>> {
     let node = node.node_ref;
@@ -110,7 +110,7 @@ pub fn handle_output<'a>(
 }
 
 pub fn compare_outputs(
-    expected_outputs: HashMap<String, ArrayType>,
+    expected_outputs: HashMap<String, TensorType>,
     graph_outputs: &mut HashMap<String, OutputInfo>,
 ) -> BoxResult<()> {
     for (name, value) in expected_outputs.iter() {
@@ -141,7 +141,7 @@ pub fn compare_outputs(
                     );
                 }
                 match (value, data) {
-                    (ArrayType::F32(v), ArrayType::F32(d)) => {
+                    (TensorType::F32(v), TensorType::F32(d)) => {
                         let mut count = 0;
                         let mut diff = vec![];
                         for (i, (v, d)) in v.iter().zip(d.iter()).enumerate() {

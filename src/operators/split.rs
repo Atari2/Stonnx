@@ -1,4 +1,4 @@
-use crate::common::{ArrayType, BoxResult, OperationResult};
+use crate::common::{BoxResult, OperatorResult, TensorType};
 use crate::onnx::NodeProto;
 use anyhow::anyhow;
 use ndarray::{ArrayD, SliceInfoElem};
@@ -55,11 +55,11 @@ fn _split_part_generic<A: Copy>(
 }
 
 fn split_impl(
-    mat: &ArrayType,
-    split: Option<&ArrayType>,
+    mat: &TensorType,
+    split: Option<&TensorType>,
     attrs: SplitAttrs,
     output_len: usize,
-) -> BoxResult<Vec<ArrayType>> {
+) -> BoxResult<Vec<TensorType>> {
     let n_outputs = attrs.num_outputs.unwrap_or(output_len as i64) as usize;
     let axis = if attrs.axis < 0 {
         mat.ndim() as i64 + attrs.axis
@@ -67,7 +67,7 @@ fn split_impl(
         attrs.axis
     } as usize;
     let split = match split {
-        Some(ArrayType::I64(s)) => Some(s.clone()),
+        Some(TensorType::I64(s)) => Some(s.clone()),
         None => Some(ArrayD::<i64>::from_shape_vec(
             vec![attrs.split.len()],
             attrs.split.to_vec(),
@@ -94,13 +94,13 @@ fn split_impl(
     };
 
     match mat {
-        ArrayType::F32(mat) => Ok(_split_part_generic(mat, split, axis)
+        TensorType::F32(mat) => Ok(_split_part_generic(mat, split, axis)
             .into_iter()
-            .map(ArrayType::F32)
+            .map(TensorType::F32)
             .collect()),
-        ArrayType::I64(mat) => Ok(_split_part_generic(mat, split, axis)
+        TensorType::I64(mat) => Ok(_split_part_generic(mat, split, axis)
             .into_iter()
-            .map(ArrayType::I64)
+            .map(TensorType::I64)
             .collect()),
         _ => {
             todo!("Split for type {}", mat)
@@ -111,11 +111,11 @@ fn split_impl(
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_split.py>
 /// <https://onnx.ai/onnx/operators/onnx__Split.html>
 pub fn split(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let mat = inputs[0];
     let split = inputs.get(1);
     let attrs = SplitAttrs::new(node);

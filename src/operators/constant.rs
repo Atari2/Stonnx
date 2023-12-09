@@ -1,5 +1,5 @@
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult, SparseArrayType},
+    common::{BoxResult, OperatorResult, SparseTensorType, TensorType},
     onnx::{tensor_proto::DataType, NodeProto},
     utils::{make_tensor_from_proto, make_tensor_from_raw, pick_opset_version},
 };
@@ -11,8 +11,8 @@ const OPSET_VERSION: [i64; 6] = [1, 9, 11, 12, 13, 19];
 
 #[derive(Debug)]
 struct ConstantAttrs {
-    sparse_value: Option<SparseArrayType>,
-    value: Option<ArrayType>,
+    sparse_value: Option<SparseTensorType>,
+    value: Option<TensorType>,
     value_float: Option<f32>,
     value_floats: Option<Vec<f32>>,
     value_int: Option<i64>,
@@ -33,7 +33,7 @@ impl ConstantAttrs {
                     MessageField(None) => None,
                 }),
             value: node.attribute.iter().find(|a| a.name() == "value").map_or(
-                Ok::<Option<ArrayType>, anyhow::Error>(None),
+                Ok::<Option<TensorType>, anyhow::Error>(None),
                 |a| match &a.t {
                     MessageField(Some(t)) => Ok(Some(make_tensor_from_proto(t)?)),
                     MessageField(None) => Ok(None),
@@ -82,18 +82,18 @@ impl ConstantAttrs {
     }
 }
 
-fn constant_1(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
+fn constant_1(attrs: ConstantAttrs) -> BoxResult<TensorType> {
     let value = attrs.value.ok_or(anyhow!(
         "Constant_1 operator requires the 'value' attribute"
     ))?;
     Ok(value)
 }
 
-fn constant_9(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
+fn constant_9(attrs: ConstantAttrs) -> BoxResult<TensorType> {
     constant_1(attrs)
 }
 
-fn constant_11(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
+fn constant_11(attrs: ConstantAttrs) -> BoxResult<TensorType> {
     let value = attrs.value;
     let sparse_value = attrs.sparse_value;
 
@@ -108,7 +108,7 @@ fn constant_11(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
     }
 }
 
-fn constant_12(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
+fn constant_12(attrs: ConstantAttrs) -> BoxResult<TensorType> {
     let v = attrs.value;
     let s_v = attrs.sparse_value;
     let v_f = attrs.value_float;
@@ -155,10 +155,10 @@ fn constant_12(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
             )?)
         }
         (None, None, None, None, None, None, Some(v_s), None) => {
-            Ok(ArrayType::Str(Array0::from_elem([], v_s).into_dyn()))
+            Ok(TensorType::Str(Array0::from_elem([], v_s).into_dyn()))
         }
         (None, None, None, None, None, None, None, Some(v_ss)) => {
-            Ok(ArrayType::Str(Array1::from_vec(v_ss).into_dyn()))
+            Ok(TensorType::Str(Array1::from_vec(v_ss).into_dyn()))
         }
         _ => todo!(),
     }
@@ -172,11 +172,11 @@ fn constant_12(attrs: ConstantAttrs) -> BoxResult<ArrayType> {
 ///
 /// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Constant.html)
 pub fn constant(
-    _inputs: &[&ArrayType],
+    _inputs: &[&TensorType],
     node: &NodeProto,
     opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSION);
     if target_version == 1 {
         Ok(constant_1(ConstantAttrs::new(node)?)?.into())

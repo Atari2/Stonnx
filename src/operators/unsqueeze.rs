@@ -2,7 +2,7 @@ use ndarray::{ArrayD, ArrayViewD, Ix1};
 use num::Zero;
 
 use crate::{
-    common::{ArrayType, BoxResult, OperationResult},
+    common::{BoxResult, OperatorResult, TensorType},
     onnx::NodeProto,
     utils::pick_opset_version,
 };
@@ -34,7 +34,7 @@ fn _unsqueeze_generic<A: Clone + Copy + Zero>(
     Ok(data.to_shape(new_shape)?.to_owned())
 }
 
-fn unsqueeze_11(inputs: &[&ArrayType], attrs: UnsqueezeAttrs) -> BoxResult<ArrayType> {
+fn unsqueeze_11(inputs: &[&TensorType], attrs: UnsqueezeAttrs) -> BoxResult<TensorType> {
     let input = inputs[0];
     let mut shape = input.shape().to_vec();
     for axis in attrs.axes.iter() {
@@ -46,15 +46,15 @@ fn unsqueeze_11(inputs: &[&ArrayType], attrs: UnsqueezeAttrs) -> BoxResult<Array
         shape.insert(axis, 1);
     }
     match input {
-        ArrayType::F32(a) => Ok(ArrayType::F32(_unsqueeze_generic(a.view(), &shape)?)),
-        ArrayType::I64(a) => Ok(ArrayType::I64(_unsqueeze_generic(a.view(), &shape)?)),
+        TensorType::F32(a) => Ok(TensorType::F32(_unsqueeze_generic(a.view(), &shape)?)),
+        TensorType::I64(a) => Ok(TensorType::I64(_unsqueeze_generic(a.view(), &shape)?)),
         _ => todo!("Unsqueeze for type {}", input),
     }
 }
 
-fn unsqueeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
+fn unsqueeze_13(inputs: &[&TensorType]) -> BoxResult<TensorType> {
     let input = inputs[0];
-    let axes = if let ArrayType::I64(a) = inputs[1] {
+    let axes = if let TensorType::I64(a) = inputs[1] {
         a.clone().into_dimensionality::<Ix1>()?.to_vec()
     } else {
         return Err(anyhow!("Axes must be an int64"));
@@ -69,8 +69,8 @@ fn unsqueeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
         shape.insert(axis, 1);
     }
     match input {
-        ArrayType::F32(a) => Ok(ArrayType::F32(_unsqueeze_generic(a.view(), &shape)?)),
-        ArrayType::I64(a) => Ok(ArrayType::I64(_unsqueeze_generic(a.view(), &shape)?)),
+        TensorType::F32(a) => Ok(TensorType::F32(_unsqueeze_generic(a.view(), &shape)?)),
+        TensorType::I64(a) => Ok(TensorType::I64(_unsqueeze_generic(a.view(), &shape)?)),
         _ => todo!("Unsqueeze for type {}", input),
     }
 }
@@ -78,11 +78,11 @@ fn unsqueeze_13(inputs: &[&ArrayType]) -> BoxResult<ArrayType> {
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_unsqueeze.py>
 /// <https://onnx.ai/onnx/operators/onnx__Unsqueeze.html>
 pub fn unsqueeze(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     opset_version: i64,
     _output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version > 11 {
         Ok(unsqueeze_13(inputs)?.into())

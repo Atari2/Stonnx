@@ -3,7 +3,7 @@ use ndarray::{s, Array2, ArrayD, Ix1, Ix2, IxDyn};
 use num::traits::AsPrimitive;
 
 use crate::{
-    common::{ArrayElement, ArrayType, BoxResult, F32IntoType, OperationResult},
+    common::{ArrayElement, BoxResult, F32IntoType, OperatorResult, TensorType},
     onnx::NodeProto,
     utils::shape_safe_product,
 };
@@ -30,7 +30,7 @@ impl MaxPoolAttrs {
         self.dilations = Some(dilations);
         self.strides = Some(strides);
     }
-    fn new(node: &NodeProto, x: &ArrayType) -> Self {
+    fn new(node: &NodeProto, x: &TensorType) -> Self {
         Self {
             auto_pad: node
                 .attribute
@@ -351,19 +351,19 @@ where
 /// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_max_pool.py>
 /// <https://onnx.ai/onnx/operators/onnx__MaxPool.html>
 pub fn maxpool(
-    inputs: &[&ArrayType],
+    inputs: &[&TensorType],
     node: &NodeProto,
     _opset_version: i64,
     output_len: usize,
-) -> BoxResult<OperationResult> {
+) -> BoxResult<OperatorResult> {
     if inputs.is_empty() {
         return Err(anyhow!("No inputs"));
     }
     let attrs = MaxPoolAttrs::new(node, inputs[0]);
     match inputs[0] {
-        ArrayType::F32(x) => {
+        TensorType::F32(x) => {
             let (y, i) = maxpool_generic(x, attrs, output_len)?;
-            Ok((ArrayType::F32(y), i.map(ArrayType::I64)).into())
+            Ok((TensorType::F32(y), i.map(TensorType::I64)).into())
         }
         _ => todo!("MaxPool for type {}", inputs[0]),
     }
