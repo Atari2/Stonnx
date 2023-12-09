@@ -64,6 +64,8 @@ pub struct Args {
 }
 
 #[derive(Serialize, Deserialize)]
+/// This struct holds the names of the inputs and outputs of a model
+/// as well as the path to the model's `.onnx` file
 pub struct FileInputs {
     pub inputs: Vec<PathBuf>,
     pub outputs: Vec<PathBuf>,
@@ -71,6 +73,11 @@ pub struct FileInputs {
 }
 
 impl FileInputs {
+    /// This function extends the paths of the inputs and outputs of a model
+    ///
+    /// If the paths are relative, they will be relative to the model's folder
+    ///
+    /// If the paths are absolute, they are untouched
     pub fn extend_paths(&mut self, modelname: &Path) {
         self.inputs = self
             .inputs
@@ -104,13 +111,19 @@ impl FileInputs {
     }
 }
 
+/// Maximum supported opset version
 pub const MAX_OPSET_VERSION: i64 = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// Indicates the verbosity level of the program
 pub enum VerbosityLevel {
+    /// No output except basic logging
     None,
+    /// Outputs information about each operator that is executed
     Informational,
+    /// Output all results from operators into .npy files
     Results,
+    /// Output intermediate results from operators into .npy files (only supported by conv for now)
     Intermediate,
 }
 
@@ -127,6 +140,7 @@ impl VerbosityLevel {
 }
 
 #[macro_export]
+/// This macro prints a message if the verbosity level is high enough
 macro_rules! print_at_level {
     ($level:expr, $($arg:tt)*) => {
         if $crate::VERBOSE.get() >= Some(&$level) {
@@ -135,6 +149,20 @@ macro_rules! print_at_level {
     };
 }
 
+/// This is a helper struct that creates an iterator over the indices of a multidimensional array
+///
+/// This is used just like python's `numpy.ndindex`
+///
+/// The shape is visited in row-major order
+/// ```
+/// use common::NDIndex;
+///
+/// let shape = vec![2, 3, 4];
+/// let mut ndindex = NDIndex::new(&shape);
+/// for i in ndindex {
+///     println!("{:?}", i); /// [0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 0, 3], [0, 1, 0], [0, 1, 1], ...
+/// }
+/// ```
 pub struct NDIndex<'a> {
     indices: &'a [usize],
     current_index: Vec<usize>,
@@ -206,38 +234,40 @@ pub enum ValueType {
 }
 
 #[derive(Debug)]
-pub enum OperationResult {
-    Single(ArrayType),
-    OptionalDouble((ArrayType, Option<ArrayType>)),
-    Double((ArrayType, ArrayType)),
-    Multiple(Vec<ArrayType>),
+pub struct OperationResult {
+    pub result: Vec<ArrayType>,
 }
 
 impl From<ArrayType> for OperationResult {
     fn from(r: ArrayType) -> Self {
-        OperationResult::Single(r)
+        OperationResult { result: vec![r] }
     }
 }
 
 impl From<(ArrayType, Option<ArrayType>)> for OperationResult {
     fn from(r: (ArrayType, Option<ArrayType>)) -> Self {
-        OperationResult::OptionalDouble(r)
+        let v = if let (r, Some(l)) = r {
+            vec![r, l]
+        } else {
+            vec![r.0]
+        };
+        OperationResult { result: v }
     }
 }
 
 impl From<(ArrayType, ArrayType)> for OperationResult {
     fn from(r: (ArrayType, ArrayType)) -> Self {
-        OperationResult::Double(r)
+        OperationResult {
+            result: vec![r.0, r.1],
+        }
     }
 }
 
 impl From<Vec<ArrayType>> for OperationResult {
     fn from(r: Vec<ArrayType>) -> Self {
-        OperationResult::Multiple(r)
+        OperationResult { result: r }
     }
 }
-
-impl OperationResult {}
 
 pub type OperationFn = for<'a, 'b, 'c> fn(
     &'a [&'b ArrayType],

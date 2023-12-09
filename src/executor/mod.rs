@@ -85,96 +85,19 @@ pub fn handle_output<'a>(
         .iter()
         .map(|s| s.as_str())
         .collect::<Vec<&str>>();
-    match result {
-        OperationResult::Double((a, b)) => {
-            assert_eq!(outputs.len(), 2);
-            let output_name = outputs[0];
-            let output_name2 = outputs[1];
-            print_at_level!(
-                VerbosityLevel::Informational,
-                "\tOutput {} has shape {:?}",
-                output_name,
-                a.shape()
-            );
-            print_at_level!(
-                VerbosityLevel::Informational,
-                "\tOutput {} has shape {:?}",
-                output_name2,
-                b.shape()
-            );
-            if args.verbose >= 2 {
-                a.to_file(outputs_dir, output_name)?;
-                b.to_file(outputs_dir, output_name2)?;
-            }
-            node_inputs.insert(output_name.to_string(), a);
-            node_inputs.insert(output_name2.to_string(), b);
+    let result = result.result; // we love rust
+    assert_eq!(outputs.len(), result.len());
+    for (output_name, res) in outputs.iter().zip(result.into_iter()) {
+        print_at_level!(
+            VerbosityLevel::Informational,
+            "\tOutput {} has shape {:?}",
+            output_name,
+            res.shape()
+        );
+        if args.verbose >= 2 {
+            res.to_file(outputs_dir, output_name)?;
         }
-        OperationResult::Single(res) => {
-            assert_eq!(outputs.len(), 1);
-            let output_name = outputs[0];
-            print_at_level!(
-                VerbosityLevel::Informational,
-                "\tOutput {} has shape {:?}",
-                output_name,
-                res.shape()
-            );
-            if args.verbose >= 2 {
-                res.to_file(outputs_dir, output_name)?;
-            }
-            node_inputs.insert(output_name.to_string(), res);
-        }
-        OperationResult::OptionalDouble((a, Some(b))) => {
-            assert_eq!(outputs.len(), 2);
-            let output_name = outputs[0];
-            let output_name2 = outputs[1];
-            print_at_level!(
-                VerbosityLevel::Informational,
-                "\tOutput {} has shape {:?}",
-                output_name,
-                a.shape()
-            );
-            print_at_level!(
-                VerbosityLevel::Informational,
-                "\tOutput {} has shape {:?}",
-                output_name2,
-                b.shape()
-            );
-            if args.verbose >= 2 {
-                a.to_file(outputs_dir, output_name)?;
-                b.to_file(outputs_dir, output_name2)?;
-            }
-            node_inputs.insert(output_name.to_string(), a);
-            node_inputs.insert(output_name2.to_string(), b);
-        }
-        OperationResult::OptionalDouble((a, None)) => {
-            assert_eq!(outputs.len(), 1);
-            let output_name = outputs[0];
-            print_at_level!(
-                VerbosityLevel::Informational,
-                "\tOutput {} has shape {:?}",
-                output_name,
-                a.shape()
-            );
-            if args.verbose >= 2 {
-                a.to_file(outputs_dir, output_name)?;
-            }
-            node_inputs.insert(output_name.to_string(), a);
-        }
-        OperationResult::Multiple(res) => {
-            assert_eq!(outputs.len(), res.len());
-            for (output_name, res) in outputs.iter().zip(res.into_iter()) {
-                print_at_level!(
-                    VerbosityLevel::Informational,
-                    "\tOutput {} has shape {:?}",
-                    output_name,
-                    res.shape()
-                );
-                if args.verbose >= 2 {
-                    res.to_file(outputs_dir, output_name)?;
-                }
-                node_inputs.insert(output_name.to_string(), res);
-            }
-        }
+        node_inputs.insert(output_name.to_string(), res);
     }
     for output_name in outputs.iter() {
         if let Some(gout) = graph_outputs.get_mut(*output_name) {
