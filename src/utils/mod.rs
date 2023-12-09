@@ -15,6 +15,7 @@ use crate::onnxparser::onnx;
 use crate::FileInputs;
 use half::{bf16, f16};
 
+/// Calculates the product of the elements of an iterator, returning 1 if the iterator is empty.
 pub fn shape_safe_product<
     'a,
     B: 'a + std::iter::Product<&'a B> + std::default::Default + Copy + 'static,
@@ -33,6 +34,7 @@ where
     }
 }
 
+/// Writes an ndarray to a file in the npy format, only if the verbosity level is set to Intermediate or above.
 pub fn log_array_to_file<A: ndarray_npy::WritableElement, D: ndarray::Dimension>(
     operation: &str,
     name: &str,
@@ -56,6 +58,7 @@ pub fn log_array_to_file<A: ndarray_npy::WritableElement, D: ndarray::Dimension>
 }
 
 #[macro_export]
+/// Logs an ndarray to a file in the npy format, only if the verbosity level is set to Intermediate or above.
 macro_rules! named_array_to_file {
     ($op:ident, $name:ident) => {{
         let $name = $name.view();
@@ -68,6 +71,7 @@ macro_rules! named_array_to_file {
 }
 
 #[macro_export]
+/// Creates a directory for intermediate outputs, only if the verbosity level is set to Intermediate or above.
 macro_rules! create_intermediate_output_dir_for {
     ($name:ident) => {{
         use $crate::VerbosityLevel;
@@ -86,6 +90,7 @@ macro_rules! create_intermediate_output_dir_for {
 }
 
 #[derive(Debug)]
+/// Represents an ONNX ValueInfo stripped down to the bare minimum.
 pub struct ValueInfo {
     pub name: String,
     pub type_: (ValueType, Vec<i64>),
@@ -93,6 +98,7 @@ pub struct ValueInfo {
 }
 
 #[derive(Debug)]
+/// Represents an output to the graph, with the ValueInfo and the data.
 pub struct OutputInfo {
     pub valueinfo: ValueInfo,
     pub data: Option<TensorType>,
@@ -108,6 +114,7 @@ impl OutputInfo {
 }
 
 impl ValueInfo {
+    /// Creates a new ValueInfo from an ONNX ValueInfoProto.
     fn from_proto(proto: &ValueInfoProto) -> BoxResult<Self> {
         if let Some(onnx::type_proto::Value::TensorType(tensor)) = &proto.type_.value {
             let dt = onnx::tensor_proto::DataType::from_i32(tensor.elem_type.unwrap_or_default())
@@ -133,7 +140,7 @@ impl ValueInfo {
 }
 
 // FIXME: data in tensor may be external. Need to handle that.
-
+/// Creates a tensor from ONNX's TensorProto.
 pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<TensorType> {
     let shape = &proto.dims;
     if proto.data_location() != onnx::tensor_proto::DataLocation::DEFAULT {
@@ -142,6 +149,7 @@ pub fn make_tensor_from_proto(proto: &TensorProto) -> BoxResult<TensorType> {
     make_tensor(shape, proto, proto.data_type())
 }
 
+/// Gets the raw data from an ONNX TensorProto, returning a slice of bytes and the size of each element.
 fn get_raw_data(proto: &TensorProto) -> BoxResult<(&[u8], usize)> {
     if let Some(ref raw_data) = proto.raw_data {
         Ok((raw_data.as_slice(), 1))
@@ -175,6 +183,7 @@ fn get_raw_data(proto: &TensorProto) -> BoxResult<(&[u8], usize)> {
     }
 }
 
+/// Creates a tensor from ONNX's TensorProto, given the shape and the data type.
 pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxResult<TensorType> {
     let enum_dt = DataType::from_i32(data_type).unwrap_or_default();
     let shape = shape.iter().map(|v| *v as usize).collect::<Vec<usize>>();
@@ -489,6 +498,7 @@ pub fn make_tensor(shape: &[i64], proto: &TensorProto, data_type: i32) -> BoxRes
     }
 }
 
+/// Creates a tensor from the given the shape, byte slice and the data type.
 pub fn make_tensor_from_raw(
     shape: &[i64],
     bytedata: &[u8],
@@ -691,6 +701,7 @@ pub fn make_tensor_from_raw(
     }
 }
 
+/// Creates the graph initializers from the ONNX graph.
 pub fn make_initializers(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, TensorType>> {
     let mut initializers: HashMap<String, TensorType> = HashMap::new();
     for tensor in graph.initializer.iter() {
@@ -704,6 +715,7 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, 
     Ok(initializers)
 }
 
+/// Creates the graph inputs from the ONNX graph reading from external files.
 fn make_input_tensors_from_files(
     graph: &onnx::GraphProto,
     files: &[PathBuf],
@@ -753,6 +765,7 @@ fn make_input_tensors_from_files(
     Ok(map)
 }
 
+/// Reads the expected outputs from external files.
 fn make_output_tensors_from_files(
     graph: &onnx::GraphProto,
     files: &[PathBuf],
@@ -783,6 +796,7 @@ fn make_output_tensors_from_files(
     Ok(map)
 }
 
+/// Initializes the graph inputs from the ONNX graph with the input tensors from external files.
 pub fn initialize_nodes(
     graph: &onnx::GraphProto,
     fileinputs: &FileInputs,
@@ -794,6 +808,7 @@ pub fn initialize_nodes(
     make_input_tensors_from_files(graph, &fileinputs.inputs, initializers)
 }
 
+/// Creates the *expected* graph outputs from the ONNX graph reading from external files.
 pub fn make_external_outputs(
     graph: &onnx::GraphProto,
     fileinputs: &FileInputs,
@@ -804,6 +819,7 @@ pub fn make_external_outputs(
     make_output_tensors_from_files(graph, &fileinputs.outputs)
 }
 
+/// Creates the graph outputs from the ONNX graph, without the data.
 pub fn make_graph_outputs(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, OutputInfo>> {
     let mut map = HashMap::new();
     for output in graph.output.iter() {
@@ -816,6 +832,7 @@ pub fn make_graph_outputs(graph: &onnx::GraphProto) -> BoxResult<HashMap<String,
     Ok(map)
 }
 
+/// Reads an ONNX model in text format
 fn read_model_text(p: &Path) -> BoxResult<onnx::ModelProto> {
     let file = std::fs::File::open(p)?;
     let mut reader = io::BufReader::new(file);
@@ -824,6 +841,8 @@ fn read_model_text(p: &Path) -> BoxResult<onnx::ModelProto> {
     let model = protobuf::text_format::parse_from_str(&buf)?;
     Ok(model)
 }
+
+/// Reads an ONNX model in binary format
 fn read_model_binary(p: &Path) -> BoxResult<onnx::ModelProto> {
     let file = std::fs::File::open(p)?;
     let mut reader = io::BufReader::new(file);
@@ -831,6 +850,7 @@ fn read_model_binary(p: &Path) -> BoxResult<onnx::ModelProto> {
     Ok(model)
 }
 
+/// Attempts to read an ONNX model in binary format, and if it fails, tries to read it in text format.
 pub fn read_model(p: &Path) -> BoxResult<onnx::ModelProto> {
     println!("Reading model from {}", p.display());
     let merr = read_model_binary(p);
@@ -843,6 +863,7 @@ pub fn read_model(p: &Path) -> BoxResult<onnx::ModelProto> {
     }
 }
 
+/// Reads an ONNX tensor in binary format from a file
 pub fn read_tensor(p: &Path) -> BoxResult<onnx::TensorProto> {
     let file = std::fs::File::open(p)?;
     let mut reader = io::BufReader::new(file);
@@ -850,6 +871,7 @@ pub fn read_tensor(p: &Path) -> BoxResult<onnx::TensorProto> {
     Ok(model)
 }
 
+/// Selects the opset version to use for the given target version and the opset versions that the operator supports.
 pub fn pick_opset_version(target_ver: i64, opset_versions: &[i64]) -> i64 {
     let mut opset_version = 0;
     for v in opset_versions.iter() {
@@ -860,6 +882,7 @@ pub fn pick_opset_version(target_ver: i64, opset_versions: &[i64]) -> i64 {
     opset_version
 }
 
+/// Stub for operators that are not implemented.
 pub fn operator_not_implemented(
     _inputs: &[&TensorType],
     _node: &NodeProto,

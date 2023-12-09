@@ -1,19 +1,82 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 use crate::{
-    common::{BoxResult, OperationFn, OperatorResult, TensorType, VerbosityLevel},
-    onnx, print_at_level,
-    utils::OutputInfo,
-    Args, OPERATION_MAP,
+    common::{BoxResult, OperationFn, OperatorResult, TensorType, VerbosityLevel, VERBOSE},
+    onnx,
+    operators::OPERATION_MAP,
+    print_at_level,
+    utils::{operator_not_implemented, OutputInfo},
 };
 
 use anyhow::anyhow;
 
 #[derive(Debug, Clone, PartialEq)]
+/// Represent an ONNX execution node, with an ID, the function to execute it and a reference to the internal ONNX node
 pub struct ONNXNode<'a> {
-    pub id: usize,
-    pub op_func: OperationFn,
-    pub node_ref: &'a onnx::NodeProto,
+    id: usize,
+    op_func: OperationFn,
+    node_ref: &'a onnx::NodeProto,
+}
+
+impl<'a> ONNXNode<'a> {
+    /// Create a new ONNXNode
+    pub fn new(id: usize, op_func: OperationFn, node_ref: &'a onnx::NodeProto) -> Self {
+        Self {
+            id,
+            op_func,
+            node_ref,
+        }
+    }
+
+    /// Executes the ONNX node given the inputs map and the opset version
+    pub fn execute(
+        &self,
+        node_inputs: &HashMap<String, TensorType>,
+        opset_version: i64,
+    ) -> BoxResult<OperatorResult> {
+        let mut inputs = vec![];
+        let mut outputs = vec![];
+        let mut all_nodes_have_init = true;
+        for input in self.node_ref.input.iter() {
+            if let Some(k) = node_inputs.get(input) {
+                inputs.push(k);
+            } else {
+                all_nodes_have_init = false;
+            }
+        }
+        for output in self.node_ref.output.iter() {
+            outputs.push(output);
+        }
+        if !all_nodes_have_init {
+            return Err(anyhow!("Some nodes in this operation have not been initialized yet, this means the operations aren't in order, fix the code to account for this"));
+        }
+        let input_names = self
+            .node_ref
+            .input
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<&str>>();
+        let output_names = self
+            .node_ref
+            .output
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<&str>>();
+        print_at_level!(
+            VerbosityLevel::Informational,
+            "Running {} operator (id: {}, thread: {}) between {:?} to get {:?}",
+            self.node_ref.op_type(),
+            self.id,
+            rayon::current_thread_index()
+                .map_or_else(|| "(no thread)".to_string(), |i| i.to_string()),
+            input_names,
+            output_names
+        );
+        (self.op_func)(&inputs, self.node_ref, opset_version, output_names.len())
+    }
 }
 
 impl std::hash::Hash for ONNXNode<'_> {
@@ -24,57 +87,10 @@ impl std::hash::Hash for ONNXNode<'_> {
 
 impl std::cmp::Eq for ONNXNode<'_> {}
 
-pub fn execute_node(
-    onnxnode: &ONNXNode,
-    node_inputs: &HashMap<String, TensorType>,
-    opset_version: i64,
-) -> BoxResult<OperatorResult> {
-    let node = onnxnode.node_ref;
-    let mut inputs = vec![];
-    let mut outputs = vec![];
-    let mut all_nodes_have_init = true;
-    for input in node.input.iter() {
-        if let Some(k) = node_inputs.get(input) {
-            inputs.push(k);
-        } else {
-            all_nodes_have_init = false;
-        }
-    }
-    for output in node.output.iter() {
-        outputs.push(output);
-    }
-    if !all_nodes_have_init {
-        return Err(anyhow!("Some nodes in this operation have not been initialized yet, this means the operations aren't in order, fix the code to account for this"));
-    }
-    let input_names = node.input.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
-    let output_names = node
-        .output
-        .iter()
-        .map(|s| s.as_str())
-        .collect::<Vec<&str>>();
-    if let Some(op_name) = node.op_type.as_deref() {
-        if let Some(func) = OPERATION_MAP.get(op_name) {
-            print_at_level!(
-                VerbosityLevel::Informational,
-                "Running {} operator between {:?} to get {:?}",
-                op_name,
-                input_names,
-                output_names
-            );
-            let result = func(&inputs, node, opset_version, outputs.len())?;
-            Ok(result)
-        } else {
-            Err(anyhow!("Op type not implemented {:?}", op_name))
-        }
-    } else {
-        Err(anyhow!("Op type not found"))
-    }
-}
-
+/// Handle the output of an operator, saving it to disk if verbose is VerbosityLevel::Results or higher, and saving it to graph_outputs
 pub fn handle_output<'a>(
     result: OperatorResult,
     node: &'a ONNXNode,
-    args: &Args,
     outputs_dir: &Path,
     node_inputs: &mut HashMap<String, TensorType>,
     graph_outputs: &mut HashMap<String, OutputInfo>,
@@ -94,7 +110,10 @@ pub fn handle_output<'a>(
             output_name,
             res.shape()
         );
-        if args.verbose >= 2 {
+        if VERBOSE
+            .get()
+            .map_or(false, |&v| v >= VerbosityLevel::Results)
+        {
             res.to_file(outputs_dir, output_name)?;
         }
         node_inputs.insert(output_name.to_string(), res);
@@ -109,6 +128,71 @@ pub fn handle_output<'a>(
     Ok(outputs)
 }
 
+/// A dependency graph of ONNX nodes
+pub struct DependencyGraph<'a> {
+    /// A map of ONNX nodes to their input requirements
+    pub node_input_requirements: HashMap<ONNXNode<'a>, Vec<&'a str>>,
+    /// A map of input names to the nodes that require them
+    pub input_link_map: HashMap<&'a str, Vec<ONNXNode<'a>>>,
+    /// A set of not implemented operators
+    pub not_implemented: HashSet<&'a str>,
+    /// A map of input names to their corresponding tensors
+    pub node_inputs: HashMap<String, TensorType>,
+}
+
+/// Create a dependency graph from an ONNX graph and a map of input names to their corresponding tensors
+pub fn create_links_and_requirements(
+    graph: &onnx::GraphProto,
+    node_inputs: HashMap<String, TensorType>,
+) -> BoxResult<DependencyGraph> {
+    let mut node_input_requirements: HashMap<ONNXNode, Vec<&str>> = HashMap::new();
+    let mut input_link_map: HashMap<&str, Vec<ONNXNode>> = HashMap::new();
+    let mut not_implemented = HashSet::new();
+    for (counter, node) in graph.node.iter().enumerate() {
+        let input_names = node
+            .input
+            .iter()
+            .filter_map(|s| {
+                if node_inputs.contains_key(s.as_str()) {
+                    None
+                } else {
+                    Some(s.as_str())
+                }
+            })
+            .collect::<Vec<&str>>();
+        if let Some(name) = node.op_type.as_deref() {
+            for input_name in input_names.iter() {
+                input_link_map
+                    .entry(input_name)
+                    .or_default()
+                    .push(ONNXNode::new(
+                        counter,
+                        *OPERATION_MAP
+                            .get(name)
+                            .unwrap_or(&(operator_not_implemented as OperationFn)),
+                        node,
+                    ));
+            }
+            if let Some(op_func) = OPERATION_MAP.get(name) {
+                node_input_requirements.insert(ONNXNode::new(counter, *op_func, node), input_names);
+            } else {
+                node_input_requirements.insert(
+                    ONNXNode::new(counter, operator_not_implemented as OperationFn, node),
+                    input_names,
+                );
+                not_implemented.insert(name);
+            }
+        }
+    }
+    Ok(DependencyGraph {
+        node_input_requirements,
+        input_link_map,
+        not_implemented,
+        node_inputs,
+    })
+}
+
+/// Compare the expected outputs to the actual outputs
 pub fn compare_outputs(
     expected_outputs: HashMap<String, TensorType>,
     graph_outputs: &mut HashMap<String, OutputInfo>,
@@ -124,7 +208,12 @@ pub fn compare_outputs(
                         data.shape()
                     ));
                 } else {
-                    println!("Output {} has shape {:?} as expected", name, value.shape());
+                    print_at_level!(
+                        VerbosityLevel::Minimal,
+                        "Output {} has shape {:?} as expected",
+                        name,
+                        value.shape()
+                    );
                 }
                 if value.value_type() != data.value_type() {
                     return Err(anyhow!(
@@ -134,7 +223,8 @@ pub fn compare_outputs(
                         data.value_type()
                     ));
                 } else {
-                    println!(
+                    print_at_level!(
+                        VerbosityLevel::Minimal,
                         "Output {} has type {:?} as expected",
                         name,
                         value.value_type()
@@ -156,11 +246,13 @@ pub fn compare_outputs(
                                 d1.partial_cmp(d2).unwrap_or(std::cmp::Ordering::Less)
                             })
                             .expect("Failed to get max difference");
-                        println!(
-                            "Output {} has {} values with absolute difference of more than .0001",
-                            name, count
+                        print_at_level!(
+                            VerbosityLevel::Minimal,
+                            "Output {} has {} values with absolute difference of more than .0001\n\tMax difference: {:?}",
+                            name,
+                            count,
+                            max
                         );
-                        println!("\tMax difference: {:?}", max);
                     }
                     _ => todo!(
                         "Compare output {:?} with {:?}",

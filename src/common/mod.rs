@@ -60,6 +60,12 @@ pub struct Args {
     #[arg(short, long, default_value = "false")]
     pub gengraph: bool,
 
+    /// Type of graph to generate, either json or dot, only used if `gengraph` is true
+    ///
+    /// Default is json
+    #[arg(short, long, default_value = "json")]
+    pub graphtype: String,
+
     /// Fail immediately if an operator is not implemented yet, otherwise continue and execute the model until panic
     #[arg(short, long, default_value = "false")]
     pub failfast: bool,
@@ -120,7 +126,7 @@ pub const MAX_OPSET_VERSION: i64 = 20;
 /// Indicates the verbosity level of the program
 pub enum VerbosityLevel {
     /// No output except basic logging
-    None,
+    Minimal,
     /// Outputs information about each operator that is executed
     Informational,
     /// Output all results from operators into .npy files
@@ -132,7 +138,7 @@ pub enum VerbosityLevel {
 impl VerbosityLevel {
     pub fn new(level: usize) -> Self {
         match level {
-            0 => VerbosityLevel::None,
+            0 => VerbosityLevel::Minimal,
             1 => VerbosityLevel::Informational,
             2 | 3 => VerbosityLevel::Results,
             4.. => VerbosityLevel::Intermediate,
