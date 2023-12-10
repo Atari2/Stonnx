@@ -485,8 +485,13 @@ fn conv_fast_impl(
     }
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_conv.py>
-/// <https://onnx.ai/onnx/operators/onnx__Conv.html>
+/// Performs convolution between 2 tensors.
+///
+/// The convolution operator consumes an input tensor and a filter, and computes the output.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_conv.py>
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Conv.html>)
 pub fn conv(
     inputs: &[&TensorType],
     node: &NodeProto,

@@ -65,8 +65,11 @@ fn _gather_generic<A: Clone + Copy + Zero, B: Clone + Zero + AsPrimitive<usize>>
     output
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gather.py>
-/// <https://onnx.ai/onnx/operators/onnx__Gather.html>
+/// Given data tensor of rank r >= 1, and indices tensor of rank q, gather entries of the axis dimension of data (by default outer-most one as axis=0) indexed by indices, and concatenates them in an output tensor of rank q + (r - 1).
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gather.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Gather.html>)
 pub fn gather(
     inputs: &[&TensorType],
     node: &NodeProto,

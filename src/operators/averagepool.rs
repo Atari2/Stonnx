@@ -399,8 +399,13 @@ where
     }
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_average_pool.py>
-/// <https://onnx.ai/onnx/operators/onnx__AveragePool.html>
+/// Average pooling consisting of computing the average on all values of a subset of the input tensor according to the kernel size and downsampling the data into the output tensor Y for further processing.
+///
+/// AveragePool consumes an input tensor X and applies average pooling across the tensor according to kernel sizes, stride sizes, and pad lengths.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_average_pool.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__AveragePool.html>)
 pub fn averagepool(
     inputs: &[&TensorType],
     node: &NodeProto,

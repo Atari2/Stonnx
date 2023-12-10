@@ -120,8 +120,15 @@ fn reducemean_18(inputs: &[&TensorType], attrs: ReduceMeanAttrs) -> BoxResult<Te
     }
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reduce_mean.py>
-/// <https://onnx.ai/onnx/operators/onnx__ReduceMean.html>
+/// Computes the mean of the input tensor’s elements along the provided axes.
+///
+/// The resulting tensor has the same rank as the input if keepdims equals 1.
+///
+/// If keepdims equals 0, then the resulting tensor has the reduced dimension pruned. Input tensors of rank zero are valid. Reduction over an empty set of values yields undefined.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reduce_mean.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__ReduceMean.html>)
 pub fn reducemean(
     inputs: &[&TensorType],
     node: &NodeProto,

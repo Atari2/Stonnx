@@ -5,8 +5,11 @@ use crate::onnx::NodeProto;
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 6, 13];
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_pow.py>
-/// <https://onnx.ai/onnx/operators/onnx__Pow.html>
+/// Performs element-wise binary power (with limited broadcast support).
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_pow.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Pow.html>)
 pub fn pow(
     inputs: &[&TensorType],
     _node: &NodeProto,

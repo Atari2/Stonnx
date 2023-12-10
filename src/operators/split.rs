@@ -108,8 +108,17 @@ fn split_impl(
     }
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_split.py>
-/// <https://onnx.ai/onnx/operators/onnx__Split.html>
+/// Split a tensor into a list of tensors, along the specified ‘axis’.
+///
+/// Either input ‘split’ or the attribute ‘num_outputs’ should be specified, but not both.
+///
+/// If the attribute ‘num_outputs’ is specified, then the tensor is split into equal sized parts.
+/// If the tensor is not evenly splittable into num_outputs, the last chunk will be smaller.
+/// If the input ‘split’ is specified, it indicates the sizes of each output in the split.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_split.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Split.html>)
 pub fn split(
     inputs: &[&TensorType],
     node: &NodeProto,

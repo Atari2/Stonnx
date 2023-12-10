@@ -3,8 +3,11 @@ use crate::onnx::NodeProto;
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 6, 13];
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_sqrt.py>
-/// <https://onnx.ai/onnx/operators/onnx__Sqrt.html>
+/// Performs element-wise square root.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_sqrt.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Sqrt.html>)
 pub fn sqrt(
     inputs: &[&TensorType],
     _node: &NodeProto,

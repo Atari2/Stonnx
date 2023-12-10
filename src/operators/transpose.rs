@@ -22,8 +22,13 @@ impl TransposeAttrs {
     }
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_transpose.py>
-/// <https://onnx.ai/onnx/operators/onnx__Transpose.html>
+/// Transpose the input tensor similar to numpy.transpose (<https://numpy.org/doc/stable/reference/generated/numpy.transpose.html>).
+///
+/// For example, when perm=(1, 0, 2), given an input tensor of shape (1, 2, 3), the output shape will be (2, 1, 3).
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_transpose.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Transpose.html>)
 pub fn transpose(
     inputs: &[&TensorType],
     node: &NodeProto,

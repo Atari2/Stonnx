@@ -3,8 +3,11 @@ use crate::onnx::NodeProto;
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 6, 7, 13, 14];
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_add.py>
-/// <https://onnx.ai/onnx/operators/onnx__Add.html>
+/// Performs element-wise binary addition (with limited broadcast support).
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_add.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Add.html>)
 pub fn add(
     inputs: &[&TensorType],
     _node: &NodeProto,

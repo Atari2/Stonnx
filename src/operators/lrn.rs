@@ -66,8 +66,13 @@ fn lrn_f32(input: &ArrayD<f32>, attrs: LRNAttrs) -> BoxResult<ArrayD<f32>> {
     Ok(y)
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_lrn.py>
-/// <https://onnx.ai/onnx/operators/onnx__LRN.html>
+/// Local Response Normalization proposed in the AlexNet paper. It normalizes over local input regions.
+///
+/// The local region is defined across the channels.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_lrn.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__LRN.html>)
 pub fn lrn(
     inputs: &[&TensorType],
     node: &NodeProto,

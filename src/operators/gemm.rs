@@ -224,8 +224,18 @@ fn _gemm_internal(
     }
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py>
-/// <https://onnx.ai/onnx/operators/onnx__Gemm.html>
+/// General Matrix multiplication: <https://en.wikipedia.org/wiki/Basic_Linear_Algebra_Subprograms#Level_3>
+///
+/// - A’ = transpose(A) if transA else A
+/// - B’ = transpose(B) if transB else B
+///
+/// Compute Y = alpha * A’ * B’ + beta * C, where input tensor A has shape (M, K) or (K, M), input tensor B has shape (K, N) or (N, K), input tensor C is broadcastable to shape (M, N), and output tensor Y has shape (M, N).
+///
+/// A will be transposed before doing the computation if attribute transA is non-zero, same for B and transB.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Gemm.html>)
 pub fn gemm(
     inputs: &[&TensorType],
     node: &NodeProto,

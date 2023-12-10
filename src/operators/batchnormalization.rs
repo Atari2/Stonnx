@@ -264,8 +264,13 @@ where
     }
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_batch_normalization.py>
-/// <https://onnx.ai/onnx/operators/onnx__BatchNormalization.html>
+/// Carries out batch normalization as described in the paper <https://arxiv.org/abs/1502.03167>.
+///
+/// Depending on the mode it is being run, There are five required inputs ‘X’, ‘scale’, ‘B’, ‘input_mean’ and ‘input_var’.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_batch_normalization.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__BatchNormalization.html>)
 pub fn batchnormalization(
     inputs: &[&TensorType],
     node: &NodeProto,

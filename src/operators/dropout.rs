@@ -110,8 +110,13 @@ fn dropout_common(
     }
 }
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_dropout.py>
-/// <https://onnx.ai/onnx/operators/onnx__Dropout.html>
+/// Dropout takes one input data (Tensor) and produces two Tensor outputs, output (Tensor) and mask (Tensor).
+///
+/// Depending on whether it is in test mode or not, the output Y will either be a random dropout, or a simple copy of the input.
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_dropout.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Dropout.html>)
 pub fn dropout(
     inputs: &[&TensorType],
     node: &NodeProto,

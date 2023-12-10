@@ -5,8 +5,11 @@ use super::_commonmatmul::matmul_impl;
 
 const _OPSET_VERSIONS: [i64; 3] = [1, 9, 13];
 
-/// <https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_matmul.py>
-/// <https://onnx.ai/onnx/operators/onnx__MatMul.html>
+/// Matrix product that behaves like numpy.matmul: <https://docs.scipy.org/doc/numpy-1.13.0/reference/generated/numpy.matmul.html>
+///
+/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_matmul.py>)
+///
+/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__MatMul.html>)
 pub fn matmul(
     inputs: &[&TensorType],
     _node: &NodeProto,
