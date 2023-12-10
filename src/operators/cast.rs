@@ -100,9 +100,9 @@ macro_rules! cast_impl {
 ///
 /// The ‘to’ argument must be one of the data types specified in the ‘DataType’ enum field in the TensorProto message.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_cast.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_cast.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Cast.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Cast.html)
 pub fn cast(
     inputs: &[&TensorType],
     _node: &NodeProto,

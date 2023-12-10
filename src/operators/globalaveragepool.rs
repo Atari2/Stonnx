@@ -10,9 +10,9 @@ const _OPSET_VERSIONS: [i64; 1] = [1];
 ///
 /// This is equivalent to AveragePool with kernel size equal to the spatial dimension of input tensor.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_global_average_pool.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_global_average_pool.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__GlobalAveragePool.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__GlobalAveragePool.html)
 pub fn global_average_pool(
     inputs: &[&TensorType],
     _node: &NodeProto,

@@ -403,9 +403,9 @@ where
 ///
 /// AveragePool consumes an input tensor X and applies average pooling across the tensor according to kernel sizes, stride sizes, and pad lengths.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_average_pool.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_average_pool.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__AveragePool.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__AveragePool.html)
 pub fn averagepool(
     inputs: &[&TensorType],
     node: &NodeProto,

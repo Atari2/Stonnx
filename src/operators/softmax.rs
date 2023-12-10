@@ -63,9 +63,9 @@ fn _softmax_f32(input: &ArrayD<f32>, axis: usize) -> BoxResult<TensorType> {
 /// The “axis” attribute indicates the dimension along which Softmax will be performed.
 /// The output tensor has the same shape and contains the Softmax values of the corresponding input.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_softmax.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_softmax.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Softmax.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Softmax.html)
 pub fn softmax(
     inputs: &[&TensorType],
     node: &NodeProto,

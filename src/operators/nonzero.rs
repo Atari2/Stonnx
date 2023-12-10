@@ -23,9 +23,9 @@ fn nonzero_generic<A: Default + std::cmp::PartialEq>(input: &ArrayD<A>) -> BoxRe
 ///
 /// NonZero behaves similar to numpy.nonzero: <https://docs.scipy.org/doc/numpy/reference/generated/numpy.nonzero.html>, but for scalar input, NonZero produces output shape (0, N) instead of (1, N), which is different from Numpy’s behavior.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_non_zero.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_non_zero.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__NonZero.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__NonZero.html)
 pub fn nonzero(
     inputs: &[&TensorType],
     _node: &NodeProto,

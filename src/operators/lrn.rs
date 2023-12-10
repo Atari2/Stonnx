@@ -70,9 +70,9 @@ fn lrn_f32(input: &ArrayD<f32>, attrs: LRNAttrs) -> BoxResult<ArrayD<f32>> {
 ///
 /// The local region is defined across the channels.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_lrn.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_lrn.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__LRN.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__LRN.html)
 pub fn lrn(
     inputs: &[&TensorType],
     node: &NodeProto,

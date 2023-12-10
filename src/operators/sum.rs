@@ -48,9 +48,9 @@ fn _sum_f32(inputs: &[&TensorType]) -> BoxResult<TensorType> {
 ///
 /// All inputs and outputs must have the same data type.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_sum.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_sum.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Sum.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Sum.html)
 pub fn sum(
     inputs: &[&TensorType],
     _node: &NodeProto,

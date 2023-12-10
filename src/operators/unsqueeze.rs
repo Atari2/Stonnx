@@ -79,9 +79,9 @@ fn unsqueeze_13(inputs: &[&TensorType]) -> BoxResult<TensorType> {
 ///
 /// Takes one required input axes - which contains a list of dimension indices and this operator will insert a dimension of value 1 into the corresponding index of the output tensor (expanded).
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_unsqueeze.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_unsqueeze.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Unsqueeze.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Unsqueeze.html)
 pub fn unsqueeze(
     inputs: &[&TensorType],
     node: &NodeProto,

@@ -77,9 +77,9 @@ fn shape_15(inputs: &[&TensorType], attrs: ShapeAttrs) -> BoxResult<TensorType> 
 
 /// Takes a tensor as input and outputs an 1D int64 tensor containing the shape of the input tensor.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_shape.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_shape.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Shape.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Shape.html)
 pub fn shape(
     inputs: &[&TensorType],
     node: &NodeProto,

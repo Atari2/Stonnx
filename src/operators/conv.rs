@@ -491,7 +491,7 @@ fn conv_fast_impl(
 ///
 /// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_conv.py>
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Conv.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Conv.html)
 pub fn conv(
     inputs: &[&TensorType],
     node: &NodeProto,

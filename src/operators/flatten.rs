@@ -39,9 +39,9 @@ fn _flatten<D: Clone>(input: &ArrayD<D>, axis: i64) -> BoxResult<ArrayD<D>> {
 ///
 /// If input tensor has shape (d_0, d_1, … d_n) then the output will have shape (d_0 X d_1 … d_(axis-1), d_axis X d_(axis+1) … X dn).
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_flatten.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_flatten.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Flatten.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Flatten.html)
 pub fn flatten(
     inputs: &[&TensorType],
     node: &NodeProto,

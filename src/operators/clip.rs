@@ -88,9 +88,9 @@ fn clip_11(inputs: &[&TensorType]) -> BoxResult<TensorType> {
 ///
 /// Clip operator limits the given input within an interval. The interval is specified by the inputs 'min' and 'max'. The output tensor has the same shape and data type as the input tensor.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_clip.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_clip.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Clip.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Clip.html)
 pub fn clip(
     inputs: &[&TensorType],
     node: &NodeProto,

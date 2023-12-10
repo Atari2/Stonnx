@@ -98,9 +98,9 @@ fn squeeze_13(inputs: &[&TensorType]) -> BoxResult<TensorType> {
 /// If axes is not provided, all the single dimensions will be removed from the shape.
 /// If an axis is selected with shape entry not equal to one, an error is raised.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_squeeze.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_squeeze.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Squeeze.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Squeeze.html)
 pub fn squeeze(
     inputs: &[&TensorType],
     node: &NodeProto,

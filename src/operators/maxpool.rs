@@ -352,9 +352,9 @@ where
 ///
 /// MaxPool consumes an input tensor X and applies max pooling across the tensor according to kernel sizes, stride sizes, and pad lengths.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_max_pool.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_max_pool.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__MaxPool.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__MaxPool.html)
 pub fn maxpool(
     inputs: &[&TensorType],
     node: &NodeProto,

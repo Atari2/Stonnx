@@ -8,9 +8,9 @@ const _OPSET_VERSIONS: [i64; 4] = [1, 6, 13, 14];
 
 /// Relu takes one input data (Tensor) and produces one output data (Tensor) where the rectified linear function, y = max(0, x), is applied to the tensor elementwise.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_relu.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_relu.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Relu.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Relu.html)
 pub fn relu(
     inputs: &[&TensorType],
     _node: &NodeProto,

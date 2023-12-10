@@ -116,9 +116,9 @@ fn split_impl(
 /// If the tensor is not evenly splittable into num_outputs, the last chunk will be smaller.
 /// If the input ‘split’ is specified, it indicates the sizes of each output in the split.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_split.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_split.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Split.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Split.html)
 pub fn split(
     inputs: &[&TensorType],
     node: &NodeProto,

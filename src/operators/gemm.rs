@@ -233,9 +233,9 @@ fn _gemm_internal(
 ///
 /// A will be transposed before doing the computation if attribute transA is non-zero, same for B and transB.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_gemm.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Gemm.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Gemm.html)
 pub fn gemm(
     inputs: &[&TensorType],
     node: &NodeProto,

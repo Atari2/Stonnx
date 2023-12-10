@@ -35,9 +35,9 @@ impl ReshapeAttrs {
 /// A dimension could also be 0, in which case the actual dimension value is unchanged (i.e. taken from the input tensor).
 /// If ‘allowzero’ is set, and the new shape includes 0, the dimension will be set explicitly to zero (i.e. not taken from input tensor).
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reshape.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_reshape.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Reshape.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Reshape.html)
 pub fn reshape(
     inputs: &[&TensorType],
     node: &NodeProto,

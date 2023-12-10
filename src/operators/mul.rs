@@ -5,9 +5,9 @@ const _OPSET_VERSIONS: [i64; 5] = [1, 6, 7, 13, 14];
 
 /// Performs element-wise binary multiplication (with limited broadcast support).
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_mul.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_mul.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Mul.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Mul.html)
 pub fn mul(
     inputs: &[&TensorType],
     _node: &NodeProto,

@@ -5,9 +5,9 @@ const _OPSET_VERSIONS: [i64; 5] = [1, 6, 7, 13, 14];
 
 /// Performs element-wise binary division (with limited broadcast support).
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_div.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_div.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Div.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Div.html)
 pub fn div(
     inputs: &[&TensorType],
     _node: &NodeProto,

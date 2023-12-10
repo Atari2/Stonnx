@@ -186,9 +186,9 @@ fn slice_10(inputs: &[&TensorType]) -> BoxResult<TensorType> {
 /// Produces a slice of the input tensor along multiple axes. Similar to numpy:
 /// <https://numpy.org/doc/stable/user/basics.indexing.html?highlight=slice#slicing-and-striding>
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_slice.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_slice.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Slice.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Slice.html)
 pub fn slice(
     inputs: &[&TensorType],
     node: &NodeProto,

@@ -101,9 +101,9 @@ fn _concat_f32(inputs: &[&TensorType], attrs: ConcatAttrs) -> BoxResult<TensorTy
 
 /// Concatenate a list of tensors into a single tensor. All input tensors must have the same shape, except for the dimension size of the axis to concatenate on.
 ///
-/// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_concat.py>)
+/// [Python reference](https://github.com/onnx/onnx/blob/main/onnx/reference/ops/op_concat.py)
 ///
-/// [ONNX Documentation](<https://onnx.ai/onnx/operators/onnx__Concat.html>)
+/// [ONNX Documentation](https://onnx.ai/onnx/operators/onnx__Concat.html)
 pub fn concat(
     inputs: &[&TensorType],
     node: &NodeProto,
