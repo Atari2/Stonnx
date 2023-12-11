@@ -8,8 +8,6 @@ import os
 import functools
 import glob
 from pathlib import Path
-from onnx.reference.ops.op_average_pool import AveragePool_11
-from onnx.reference.ops.op_max_pool import MaxPool
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", type=str)
