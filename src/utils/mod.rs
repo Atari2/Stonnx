@@ -12,7 +12,7 @@ use crate::common::*;
 use crate::onnx::tensor_proto::DataType;
 use crate::onnx::{NodeProto, TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
-use crate::FileInputs;
+use crate::common::FileInputs;
 use half::{bf16, f16};
 
 /// Calculates the product of the elements of an iterator, returning 1 if the iterator is empty.
@@ -74,7 +74,7 @@ macro_rules! named_array_to_file {
 /// Creates a directory for intermediate outputs, only if the verbosity level is set to Intermediate or above.
 macro_rules! create_intermediate_output_dir_for {
     ($name:ident) => {{
-        use $crate::VerbosityLevel;
+        use $crate::common::VerbosityLevel;
         let verbose_flag = VERBOSE.get();
         if let Some(VerbosityLevel::Intermediate) = verbose_flag {
             match std::fs::create_dir(concat!(stringify!($name), "_intermediate_outputs")) {
