@@ -24,7 +24,7 @@ pub static UNKNOWN: &str = "<unknown>";
 pub type BoxResult<A> = anyhow::Result<A>;
 
 /// This static variable holds the verbosity level of the program
-pub static VERBOSE: OnceCell<VerbosityLevel> = OnceCell::new();
+pub static VERBOSE: OnceCell<VerbosityLevel> = OnceCell::with_value(VerbosityLevel::Minimal);
 
 #[derive(Parser, Debug)]
 /// Parse and execute inference on pre-trained ONNX models
@@ -151,7 +151,7 @@ impl VerbosityLevel {
 /// This macro prints a message if the verbosity level is high enough
 macro_rules! print_at_level {
     ($level:expr, $($arg:tt)*) => {
-        if $crate::VERBOSE.get() >= Some(&$level) {
+        if $crate::common::VERBOSE.get() >= Some(&$level) {
             println!($($arg)*);
         }
     };

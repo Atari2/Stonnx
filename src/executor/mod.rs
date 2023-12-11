@@ -1,21 +1,25 @@
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
+    sync::mpsc::channel,
 };
 
 use crate::{
-    common::{BoxResult, OperationFn, OperatorResult, TensorType, VerbosityLevel, VERBOSE},
-    onnx,
+    common::{
+        Args, BoxResult, FileInputs, OperationFn, OperatorResult, TensorType, VerbosityLevel,
+        MAX_OPSET_VERSION, VERBOSE,
+    },
+    initialize_nodes, make_initializers, onnx,
     operators::OPERATION_MAP,
     print_at_level,
-    utils::{operator_not_implemented, OutputInfo},
+    protograph::{build_graph_from_proto, GraphOutputType},
+    utils::{make_external_outputs, make_graph_outputs, operator_not_implemented, OutputInfo},
 };
 
 use anyhow::anyhow;
-
 #[derive(Debug, Clone, PartialEq)]
 /// Represent an ONNX execution node, with an ID, the function to execute it and a reference to the internal ONNX node
-pub struct ONNXNode<'a> {
+struct ONNXNode<'a> {
     id: usize,
     op_func: OperationFn,
     node_ref: &'a onnx::NodeProto,
@@ -23,7 +27,7 @@ pub struct ONNXNode<'a> {
 
 impl<'a> ONNXNode<'a> {
     /// Create a new ONNXNode
-    pub fn new(id: usize, op_func: OperationFn, node_ref: &'a onnx::NodeProto) -> Self {
+    fn new(id: usize, op_func: OperationFn, node_ref: &'a onnx::NodeProto) -> Self {
         Self {
             id,
             op_func,
@@ -32,7 +36,7 @@ impl<'a> ONNXNode<'a> {
     }
 
     /// Executes the ONNX node given the inputs map and the opset version
-    pub fn execute(
+    fn execute(
         &self,
         node_inputs: &HashMap<String, TensorType>,
         opset_version: i64,
@@ -88,7 +92,7 @@ impl std::hash::Hash for ONNXNode<'_> {
 impl std::cmp::Eq for ONNXNode<'_> {}
 
 /// Handle the output of an operator, saving it to disk if verbose is VerbosityLevel::Results or higher, and saving it to graph_outputs
-pub fn handle_output<'a>(
+fn handle_output<'a>(
     result: OperatorResult,
     node: &'a ONNXNode,
     outputs_dir: &Path,
@@ -129,7 +133,7 @@ pub fn handle_output<'a>(
 }
 
 /// A dependency graph of ONNX nodes
-pub struct DependencyGraph<'a> {
+struct DependencyGraph<'a> {
     /// A map of ONNX nodes to their input requirements
     pub node_input_requirements: HashMap<ONNXNode<'a>, Vec<&'a str>>,
     /// A map of input names to the nodes that require them
@@ -141,7 +145,7 @@ pub struct DependencyGraph<'a> {
 }
 
 /// Create a dependency graph from an ONNX graph and a map of input names to their corresponding tensors
-pub fn create_links_and_requirements(
+fn create_links_and_requirements(
     graph: &onnx::GraphProto,
     node_inputs: HashMap<String, TensorType>,
 ) -> BoxResult<DependencyGraph> {
@@ -262,6 +266,126 @@ pub fn compare_outputs(
                 }
             }
         }
+    }
+    Ok(())
+}
+
+pub fn execute_model(
+    model: &onnx::ModelProto,
+    args: &Args,
+    fileinputs: &FileInputs,
+    outputs_dir: &Path,
+) -> BoxResult<()> {
+    let opset_version = if let Some(v) = model.opset_import.get(0) {
+        if let Some(v) = v.version {
+            v
+        } else {
+            MAX_OPSET_VERSION
+        }
+    } else {
+        MAX_OPSET_VERSION
+    };
+    if opset_version > MAX_OPSET_VERSION {
+        return Err(anyhow!(
+            "Opset version {} is not supported, max supported version is {}",
+            opset_version,
+            MAX_OPSET_VERSION
+        ));
+    }
+    for graph in model.graph.iter() {
+        if args.gengraph {
+            build_graph_from_proto(
+                graph,
+                &fileinputs.modelpath,
+                match args.graphtype.as_str() {
+                    "json" => GraphOutputType::Json,
+                    "dot" => GraphOutputType::Dot,
+                    _ => return Err(anyhow!("Invalid graph type")),
+                },
+            )?;
+        }
+        let initializers = make_initializers(graph)?;
+        let node_inputs = initialize_nodes(graph, fileinputs, initializers)?;
+        let expected_outputs = make_external_outputs(graph, fileinputs)?;
+        let mut graph_outputs = make_graph_outputs(graph)?;
+        let mut dependency_graph = create_links_and_requirements(graph, node_inputs)?;
+        for vi in graph.value_info.iter() {
+            if let Some(onnx::type_proto::Value::TensorType(_)) = vi.type_.value {
+                // If the type is Tensor, then we are fine because that's implemented
+            } else {
+                unimplemented!("ValueInfoProto type {:?}", vi.type_)
+            }
+        }
+
+        print_at_level!(
+            VerbosityLevel::Informational,
+            "Number of not implemented operators: {}",
+            dependency_graph.not_implemented.len()
+        );
+        for name in dependency_graph.not_implemented.iter() {
+            eprintln!("Model uses operator {} which is not implemented yet", name);
+        }
+        if !dependency_graph.not_implemented.is_empty() && args.failfast {
+            return Err(anyhow!("Not implemented operators found"));
+        }
+        let (tx, rx) = channel();
+        loop {
+            let mut nodes_ready = vec![];
+            for (node, inputs) in dependency_graph.node_input_requirements.iter() {
+                if inputs.is_empty() {
+                    nodes_ready.push(node.clone());
+                }
+            }
+            dependency_graph
+                .node_input_requirements
+                .retain(|_, v| !v.is_empty());
+            let node_inputs_ref = &dependency_graph.node_inputs;
+            rayon::scope(|s| {
+                for node in nodes_ready {
+                    let tx = tx.clone();
+                    s.spawn(move |_| {
+                        let result = node.execute(node_inputs_ref, opset_version);
+                        tx.send((node, result)).unwrap();
+                    })
+                }
+            });
+
+            let node_inputs = &mut dependency_graph.node_inputs;
+            loop {
+                match rx.try_recv() {
+                    Ok((node, result)) => {
+                        let result = result?;
+                        let outputs = handle_output(
+                            result,
+                            &node,
+                            outputs_dir,
+                            node_inputs,
+                            &mut graph_outputs,
+                        )?;
+                        for output in outputs {
+                            if let Some(n) = dependency_graph.input_link_map.remove(output) {
+                                for node in n {
+                                    dependency_graph
+                                        .node_input_requirements
+                                        .entry(node)
+                                        .and_modify(|v| {
+                                            v.retain(|x| *x != output);
+                                        });
+                                }
+                            }
+                        }
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        return Err(anyhow!("Channel disconnected"));
+                    }
+                }
+            }
+            if dependency_graph.node_input_requirements.is_empty() {
+                break;
+            }
+        }
+        compare_outputs(expected_outputs, &mut graph_outputs)?;
     }
     Ok(())
 }
