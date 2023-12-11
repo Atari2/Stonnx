@@ -9,6 +9,13 @@ build = "build.rs"
 [profile.release]
 debug = 1
 
+[lib]
+name = "libonnxrust_proto"
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "onnxrust_proto"
+
 [dependencies]
 anyhow = { version = "1.0.75", features = ["backtrace"] }
 bytemuck = { version = "1.14.0", features = ["derive"] }
