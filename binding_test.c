@@ -2,8 +2,13 @@
 #include "bindings/c/onnxrust_proto.h"
 
 int main() {
-    const char *model_path = "models/GPT2/model.onnx";
-    ModelProto *model = read_onnx_model(model_path);
-    printf("Model opset version: %lld\n", get_opset_version(model));
-    free_onnx_model(model);
+    int result = run_model("GPT2", VERBOSITY_MINIMAL, GRAPH_FORMAT_NONE, EXECUTION_FAILFAST);
+    if (result) {
+        printf("Model execution succeeded\n");
+        return EXIT_SUCCESS;
+    } else {
+        printf("Model execution failed\n");
+        printf("Error: %s\n", last_error());
+        return EXIT_FAILURE;
+    }
 }

@@ -9,10 +9,12 @@ use crate::{
         Args, BoxResult, FileInputs, OperationFn, OperatorResult, TensorType, VerbosityLevel,
         MAX_OPSET_VERSION, VERBOSE,
     },
-    initialize_nodes, make_initializers, onnx,
+    onnx,
     operators::OPERATION_MAP,
     print_at_level,
     protograph::{build_graph_from_proto, GraphOutputType},
+    read_model,
+    utils::{initialize_nodes, make_initializers},
     utils::{make_external_outputs, make_graph_outputs, operator_not_implemented, OutputInfo},
 };
 
@@ -270,12 +272,31 @@ pub fn compare_outputs(
     Ok(())
 }
 
-pub fn execute_model(
-    model: &onnx::ModelProto,
-    args: &Args,
-    fileinputs: &FileInputs,
-    outputs_dir: &Path,
-) -> BoxResult<()> {
+pub fn execute_model(args: &Args) -> BoxResult<()> {
+    VERBOSE
+        .set(VerbosityLevel::new(args.verbose as usize))
+        .map_err(|_| anyhow!("Failed to set verbosity"))?;
+    print_at_level!(
+        VerbosityLevel::Minimal,
+        "Running model: {}",
+        args.model.display()
+    );
+    let inputspath = if args.model.is_relative() {
+        Path::new("models").join(&args.model).join("inputs.json")
+    } else {
+        args.model.join("inputs.json")
+    };
+    let inputs_file = std::fs::File::open(inputspath)?;
+    let mut fileinputs: FileInputs = serde_json::from_reader(inputs_file)?;
+    fileinputs.extend_paths(&args.model);
+    let model = read_model(Path::new(&fileinputs.modelpath))?;
+    let outputs_dir = Path::new("outputs").join(&args.model);
+    if VERBOSE
+        .get()
+        .map_or(false, |&v| v >= VerbosityLevel::Results)
+    {
+        std::fs::create_dir_all(&outputs_dir)?;
+    }
     let opset_version = if let Some(v) = model.opset_import.get(0) {
         if let Some(v) = v.version {
             v
@@ -305,8 +326,8 @@ pub fn execute_model(
             )?;
         }
         let initializers = make_initializers(graph)?;
-        let node_inputs = initialize_nodes(graph, fileinputs, initializers)?;
-        let expected_outputs = make_external_outputs(graph, fileinputs)?;
+        let node_inputs = initialize_nodes(graph, &fileinputs, initializers)?;
+        let expected_outputs = make_external_outputs(graph, &fileinputs)?;
         let mut graph_outputs = make_graph_outputs(graph)?;
         let mut dependency_graph = create_links_and_requirements(graph, node_inputs)?;
         for vi in graph.value_info.iter() {
@@ -358,7 +379,7 @@ pub fn execute_model(
                         let outputs = handle_output(
                             result,
                             &node,
-                            outputs_dir,
+                            &outputs_dir,
                             node_inputs,
                             &mut graph_outputs,
                         )?;

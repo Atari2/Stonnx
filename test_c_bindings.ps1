@@ -6,7 +6,7 @@ if ($moduleAlreadyLoaded) {
     if ($assemblyPresent) {
         Write-Output "DevShell assembly is already loaded, skipping."
     } else {
-        if (Test-Path "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe") {
+        if (!(Test-Path "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe")) {
             Write-Error "Visual Studio is not installed, please install it first."
             return
         }

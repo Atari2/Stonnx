@@ -24,7 +24,7 @@ pub static UNKNOWN: &str = "<unknown>";
 pub type BoxResult<A> = anyhow::Result<A>;
 
 /// This static variable holds the verbosity level of the program
-pub static VERBOSE: OnceCell<VerbosityLevel> = OnceCell::with_value(VerbosityLevel::Minimal);
+pub static VERBOSE: OnceCell<VerbosityLevel> = OnceCell::new();
 
 #[derive(Parser, Debug)]
 /// Parse and execute inference on pre-trained ONNX models
@@ -47,6 +47,8 @@ pub struct Args {
     /// Set verbosity level
     ///
     /// 0 - No output except basic logging
+    /// 
+    /// 1 - Outputs information about each operator that is executed
     ///
     /// 2 - Output all results from operators into .npy files
     ///
@@ -63,12 +65,25 @@ pub struct Args {
     /// Type of graph to generate, either json or dot, only used if `gengraph` is true
     ///
     /// Default is json
-    #[arg(short, long, default_value = "json")]
+    #[arg(long, default_value = "json")]
     pub graphtype: String,
 
     /// Fail immediately if an operator is not implemented yet, otherwise continue and execute the model until panic
     #[arg(short, long, default_value = "false")]
     pub failfast: bool,
+}
+
+impl Args {
+    #[allow(dead_code)] /// Only used in the library version of the program
+    pub fn from_parts(model: PathBuf, verbose: u64, gengraph: bool, graphtype: String, failfast: bool) -> Self {
+        Self {
+            model,
+            verbose,
+            gengraph,
+            graphtype,
+            failfast,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
