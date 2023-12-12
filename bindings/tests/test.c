@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include "bindings/c/onnxrust_proto.h"
+#include "../c/onnxrust_proto.h"
 
 int main() {
-    int result = run_model("GPT2", VERBOSITY_MINIMAL, GRAPH_FORMAT_NONE, EXECUTION_FAILFAST);
-    if (result) {
+    bool ok = run_model("GPT2", Minimal, None, FailFast);
+    if (ok) {
         printf("Model execution succeeded\n");
         return EXIT_SUCCESS;
     } else {

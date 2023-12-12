@@ -4,9 +4,10 @@
 .idea
 .vscode
 *.bin
-test.py
+./test.py
 output.txt
 outputs
 graph.json
 graph.dot
 *.svg
+__pycache__

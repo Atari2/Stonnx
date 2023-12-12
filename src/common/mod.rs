@@ -47,7 +47,7 @@ pub struct Args {
     /// Set verbosity level
     ///
     /// 0 - No output except basic logging
-    /// 
+    ///
     /// 1 - Outputs information about each operator that is executed
     ///
     /// 2 - Output all results from operators into .npy files
@@ -74,8 +74,15 @@ pub struct Args {
 }
 
 impl Args {
-    #[allow(dead_code)] /// Only used in the library version of the program
-    pub fn from_parts(model: PathBuf, verbose: u64, gengraph: bool, graphtype: String, failfast: bool) -> Self {
+    #[allow(dead_code)]
+    /// Only used in the library version of the program
+    pub fn from_parts(
+        model: PathBuf,
+        verbose: u64,
+        gengraph: bool,
+        graphtype: String,
+        failfast: bool,
+    ) -> Self {
         Self {
             model,
             verbose,

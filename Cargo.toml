@@ -10,7 +10,7 @@ build = "build.rs"
 debug = 1
 
 [lib]
-name = "libonnxrust_proto"
+name = "onnxrust_proto_api"
 crate-type = ["cdylib"]
 
 [[bin]]

@@ -3,28 +3,31 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define VERBOSITY_MINIMAL 0
-
-#define VERBOSITY_INFORMATIONAL 1
-
-#define VERBOSITY_RESULTS 2
-
-#define VERBOSITY_INTERMEDIATE 4
-
-#define GRAPH_FORMAT_NONE 0
-
-#define GRAPH_FORMAT_JSON 1
-
-#define GRAPH_FORMAT_DOT 2
-
-#define EXECUTION_FAILFAST 1
-
-#define EXECUTION_CONTINUE 0
-
 /**
  * Maximum supported opset version
  */
 #define MAX_OPSET_VERSION 20
+
+enum ExecutionMode {
+  FailFast = 1,
+  Continue = 0,
+};
+typedef int64_t ExecutionMode;
+
+enum GraphFormat {
+  None = 0,
+  Json = 1,
+  Dot = 2,
+};
+typedef int64_t GraphFormat;
+
+enum Verbosity {
+  Minimal = 0,
+  Informational = 1,
+  Results = 2,
+  Intermediate = 4,
+};
+typedef int64_t Verbosity;
 
 typedef struct ModelProto ModelProto;
 
@@ -53,8 +56,14 @@ int64_t get_opset_version(const struct ModelProto *model);
  * # Safety
  *
  * Should take a valid path to a model directory as a C string
+ * Should take a valid verbosity level
+ * Should take a valid graph format
+ * Should take a valid execution mode
  */
-int run_model(const char *model_path, int verbosity, int graph_format, bool failfast);
+bool run_model(const char *model_path,
+               Verbosity verbosity,
+               GraphFormat graph_format,
+               ExecutionMode failfast);
 
 /**
  * # Safety

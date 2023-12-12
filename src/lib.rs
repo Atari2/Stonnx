@@ -1,47 +1,81 @@
 #![allow(dead_code)]
 mod common;
-mod onnxparser;
-mod utils;
 mod executor;
+mod onnxparser;
 mod operators;
 mod protograph;
+mod utils;
 
-use std::path::Path;
-use common::Args;
-use once_cell::sync::OnceCell;
-use crate::executor::execute_model;
 use crate::common::MAX_OPSET_VERSION;
+use crate::executor::execute_model;
 use crate::onnxparser::onnx;
 use crate::utils::read_model;
+use common::Args;
+use once_cell::sync::OnceCell;
+use std::path::Path;
 
 static LAST_ERROR: OnceCell<Box<std::ffi::CString>> = OnceCell::new();
 
-pub const VERBOSITY_MINIMAL: std::os::raw::c_int = 0;
-pub const VERBOSITY_INFORMATIONAL: std::os::raw::c_int = 1;
-pub const VERBOSITY_RESULTS: std::os::raw::c_int = 2;
-pub const VERBOSITY_INTERMEDIATE: std::os::raw::c_int = 4;
-pub const GRAPH_FORMAT_NONE: std::os::raw::c_int = 0;
-pub const GRAPH_FORMAT_JSON: std::os::raw::c_int = 1;
-pub const GRAPH_FORMAT_DOT: std::os::raw::c_int = 2;
-pub const EXECUTION_FAILFAST: std::os::raw::c_int = 1;
-pub const EXECUTION_CONTINUE: std::os::raw::c_int = 0;
+#[repr(i64)]
+pub enum Verbosity {
+    Minimal = 0,
+    Informational = 1,
+    Results = 2,
+    Intermediate = 4,
+}
+
+#[repr(i64)]
+#[derive(PartialEq)]
+pub enum GraphFormat {
+    None = 0,
+    Json = 1,
+    Dot = 2,
+}
+
+#[repr(i64)]
+#[derive(PartialEq)]
+pub enum ExecutionMode {
+    FailFast = 1,
+    Continue = 0,
+}
 
 #[no_mangle]
 /// # Safety
-/// 
+///
 /// Should take a valid path as a C string
-pub unsafe extern "C" fn read_onnx_model(model_path: *const std::os::raw::c_char) -> *mut onnx::ModelProto {
+pub unsafe extern "C" fn read_onnx_model(
+    model_path: *const std::os::raw::c_char,
+) -> *mut onnx::ModelProto {
     let model_path = unsafe { std::ffi::CStr::from_ptr(model_path) };
-    let model_path = model_path.to_str().unwrap();
-    let model = read_model(Path::new(model_path)).unwrap();
+    let model_path = match model_path.to_str() {
+        Ok(s) => s,
+        Err(e) => {
+            LAST_ERROR
+                .set(Box::new(std::ffi::CString::new(e.to_string()).unwrap()))
+                .unwrap();
+            return std::ptr::null_mut();
+        }
+    };
+    let model = match read_model(Path::new(model_path)) {
+        Ok(m) => m,
+        Err(e) => {
+            LAST_ERROR
+                .set(Box::new(std::ffi::CString::new(e.to_string()).unwrap()))
+                .unwrap();
+            return std::ptr::null_mut();
+        }
+    };
     Box::into_raw(Box::new(model))
 }
 
 #[no_mangle]
 /// # Safety
-/// 
+///
 /// Should take a valid pointer to a model
 pub unsafe extern "C" fn free_onnx_model(model: *mut onnx::ModelProto) {
+    if model.is_null() {
+        return;
+    }
     unsafe {
         drop(Box::from_raw(model));
     }
@@ -49,9 +83,17 @@ pub unsafe extern "C" fn free_onnx_model(model: *mut onnx::ModelProto) {
 
 #[no_mangle]
 /// # Safety
-/// 
+///
 /// Should take a valid pointer to a model
 pub unsafe extern "C" fn get_opset_version(model: *const onnx::ModelProto) -> i64 {
+    if model.is_null() {
+        LAST_ERROR
+            .set(Box::new(
+                std::ffi::CString::new("NULL pointer passed to get_opset_version").unwrap(),
+            ))
+            .unwrap();
+        return MAX_OPSET_VERSION;
+    }
     unsafe {
         if let Some(v) = (*model).opset_import.get(0) {
             if let Some(v) = v.version {
@@ -67,44 +109,53 @@ pub unsafe extern "C" fn get_opset_version(model: *const onnx::ModelProto) -> i6
 
 #[no_mangle]
 /// # Safety
-/// 
+///
 /// Should take a valid path to a model directory as a C string
+/// Should take a valid verbosity level
+/// Should take a valid graph format
+/// Should take a valid execution mode
 pub unsafe extern "C" fn run_model(
-    model_path: *const std::os::raw::c_char, 
-    verbosity: std::os::raw::c_int,
-    graph_format: std::os::raw::c_int,
-    failfast: bool
-) -> std::os::raw::c_int {
+    model_path: *const std::os::raw::c_char,
+    verbosity: Verbosity,
+    graph_format: GraphFormat,
+    failfast: ExecutionMode,
+) -> bool {
     let model_path = unsafe { std::ffi::CStr::from_ptr(model_path) };
-    let model_path = model_path.to_str().unwrap();
-    let gf = match graph_format {
-        GRAPH_FORMAT_NONE => std::ffi::CStr::from_ptr(b"\0" as *const u8 as *const i8),
-        GRAPH_FORMAT_JSON => std::ffi::CStr::from_ptr(b"json\0" as *const u8 as *const i8),
-        GRAPH_FORMAT_DOT => std::ffi::CStr::from_ptr(b"dot\0" as *const u8 as *const i8),
-        _ => {
-            LAST_ERROR.set(Box::new(std::ffi::CString::new("Invalid graph format").unwrap())).unwrap();
-            return 0;
+    let model_path = match model_path.to_str() {
+        Ok(s) => s,
+        Err(e) => {
+            LAST_ERROR
+                .set(Box::new(std::ffi::CString::new(e.to_string()).unwrap()))
+                .unwrap();
+            return false;
         }
+    };
+    let gf = match graph_format {
+        GraphFormat::None => "".to_owned(),
+        GraphFormat::Json => "json".to_owned(),
+        GraphFormat::Dot => "dot".to_owned(),
     };
     let args = Args::from_parts(
         model_path.into(),
         verbosity as u64,
-        graph_format != GRAPH_FORMAT_NONE,
-        gf.to_owned().into_string().unwrap(),
-        failfast
+        graph_format != GraphFormat::None,
+        gf,
+        failfast != ExecutionMode::Continue,
     );
     match crate::execute_model(&args) {
-        Ok(_) => 1,
+        Ok(_) => true,
         Err(e) => {
-            LAST_ERROR.set(Box::new(std::ffi::CString::new(e.to_string()).unwrap())).unwrap();
-            0
+            LAST_ERROR
+                .set(Box::new(std::ffi::CString::new(e.to_string()).unwrap()))
+                .unwrap();
+            false
         }
     }
 }
 
 #[no_mangle]
 /// # Safety
-/// 
+///
 /// Safe, returns a pointer to a C string, null if no error
 /// Valid until the next call to run_model
 pub unsafe extern "C" fn last_error() -> *const std::os::raw::c_char {

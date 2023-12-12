@@ -12,7 +12,10 @@ pub use utils::{initialize_nodes, make_initializers, read_model, read_tensor};
 
 use clap::Parser;
 
-use crate::{common::{Args, VerbosityLevel}, executor::execute_model};
+use crate::{
+    common::{Args, VerbosityLevel},
+    executor::execute_model,
+};
 
 fn main() -> BoxResult<()> {
     let args = Args::parse();

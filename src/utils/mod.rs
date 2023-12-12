@@ -8,11 +8,11 @@ use std::{collections::HashMap, io, path::Path};
 use ndarray::{ArrayD, IxDyn};
 use protobuf::Enum;
 
+use crate::common::FileInputs;
 use crate::common::*;
 use crate::onnx::tensor_proto::DataType;
 use crate::onnx::{NodeProto, TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
-use crate::common::FileInputs;
 use half::{bf16, f16};
 
 /// Calculates the product of the elements of an iterator, returning 1 if the iterator is empty.
