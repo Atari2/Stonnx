@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
-    sync::mpsc::channel,
 };
 
 use crate::{
@@ -19,6 +18,7 @@ use crate::{
 };
 
 use anyhow::anyhow;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 #[derive(Debug, Clone, PartialEq)]
 /// Represent an ONNX execution node, with an ID, the function to execute it and a reference to the internal ONNX node
 struct ONNXNode<'a> {
@@ -349,7 +349,6 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
         if !dependency_graph.not_implemented.is_empty() && args.failfast {
             return Err(anyhow!("Not implemented operators found"));
         }
-        let (tx, rx) = channel();
         loop {
             let mut nodes_ready = vec![];
             for (node, inputs) in dependency_graph.node_input_requirements.iter() {
@@ -361,47 +360,40 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                 .node_input_requirements
                 .retain(|_, v| !v.is_empty());
             let node_inputs_ref = &dependency_graph.node_inputs;
-            rayon::scope(|s| {
-                for node in nodes_ready {
-                    let tx = tx.clone();
-                    s.spawn(move |_| {
-                        let result = node.execute(node_inputs_ref, opset_version);
-                        tx.send((node, result)).unwrap();
-                    })
-                }
-            });
+            let mut results = vec![];
+            nodes_ready
+                .into_par_iter()
+                .map(|n| {
+                    let r = n.execute(node_inputs_ref, opset_version);
+                    (r, n)
+                })
+                .collect_into_vec(&mut results);
 
             let node_inputs = &mut dependency_graph.node_inputs;
-            loop {
-                match rx.try_recv() {
-                    Ok((node, result)) => {
-                        let result = result?;
-                        let outputs = handle_output(
-                            result,
-                            &node,
-                            &outputs_dir,
-                            node_inputs,
-                            &mut graph_outputs,
-                        )?;
-                        for output in outputs {
-                            if let Some(n) = dependency_graph.input_link_map.remove(output) {
-                                for node in n {
-                                    dependency_graph
-                                        .node_input_requirements
-                                        .entry(node)
-                                        .and_modify(|v| {
-                                            v.retain(|x| *x != output);
-                                        });
-                                }
+            results
+                .into_iter()
+                .try_for_each(|(result, node)| -> Result<(), anyhow::Error> {
+                    let outputs = handle_output(
+                        result?,
+                        &node,
+                        &outputs_dir,
+                        node_inputs,
+                        &mut graph_outputs,
+                    )?;
+                    for output in outputs {
+                        if let Some(n) = dependency_graph.input_link_map.remove(output) {
+                            for node in n {
+                                dependency_graph
+                                    .node_input_requirements
+                                    .entry(node)
+                                    .and_modify(|v| {
+                                        v.retain(|x| *x != output);
+                                    });
                             }
                         }
                     }
-                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
-                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                        return Err(anyhow!("Channel disconnected"));
-                    }
-                }
-            }
+                    Ok(())
+                })?;
             if dependency_graph.node_input_requirements.is_empty() {
                 break;
             }
