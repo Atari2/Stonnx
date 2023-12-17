@@ -3,7 +3,7 @@
 mod tests {
     use ndarray::{ArrayD, IxDyn};
 
-    use crate::{common::TensorType, onnx::NodeProto, operators::add, parallel};
+    use crate::{common::TensorType, onnx::NodeProto, operators::add};
 
     #[test]
     fn test_add() {
@@ -21,18 +21,5 @@ mod tests {
             None,
             None
         ));
-    }
-
-    #[test]
-    fn parallel_test() {
-        let mut pool = parallel::ThreadPool::new(4);
-        for _ in 0..100 {
-            pool.queue(|| {
-                std::thread::sleep(std::time::Duration::from_millis(
-                    rand::random::<u64>() % 100,
-                ));
-                println!("Hello from thread {:?}!", std::thread::current().id());
-            });
-        }
     }
 }

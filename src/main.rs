@@ -7,14 +7,9 @@ mod protograph;
 mod test;
 mod utils;
 
-use anyhow::anyhow;
 use common::BoxResult;
 pub use onnxparser::onnx;
-use parallel::ThreadPool;
-use std::{
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::time::Instant;
 pub use utils::{initialize_nodes, make_initializers, read_model, read_tensor};
 
 use clap::Parser;

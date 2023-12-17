@@ -53,7 +53,7 @@ impl ThreadPool {
             let mut queue = self.queue.0.lock().unwrap();
             queue.push((Box::new(f), Box::new(callback)));
         }
-        self.queue.1.notify_one();
+        self.queue.1.notify_all();
     }
 
     pub fn wait(&mut self) {

@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Condvar, Mutex, RwLock},
 };
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     },
     onnx,
     operators::OPERATION_MAP,
-    parallel, print_at_level,
+    print_at_level,
     protograph::{build_graph_from_proto, GraphOutputType},
     read_model,
     utils::{initialize_nodes, make_initializers},
@@ -19,8 +19,6 @@ use crate::{
 };
 
 use anyhow::anyhow;
-use petgraph::graph;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 #[derive(Debug, Clone, PartialEq)]
 /// Represent an ONNX execution node, with an ID, the function to execute it and a reference to the internal ONNX node
 pub struct ONNXNode {
@@ -362,6 +360,7 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
             return Err(anyhow!("Not implemented operators found"));
         }
         let dependency_graph = Arc::new(RwLock::new(dependency_graph));
+        let operation_completed = Arc::new((Mutex::new(false), Condvar::new()));
         loop {
             let mut nodes_ready = vec![];
             for (node, inputs) in dependency_graph
@@ -374,6 +373,9 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                     nodes_ready.push(node.clone());
                 }
             }
+            if nodes_ready.is_empty() {
+                continue;
+            }
             dependency_graph
                 .write()
                 .unwrap()
@@ -385,6 +387,7 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                 let outputs_dir = outputs_dir.clone();
                 let graph_outputs = graph_outputs.clone();
                 let dependency_graph = dependency_graph.clone();
+                let operation_completed = operation_completed.clone();
                 pool.queue(
                     move || {
                         let r = node.execute(&node_inputs_ref.read().unwrap(), opset_version);
@@ -412,9 +415,18 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                                 }
                             }
                         }
+                        let (lock, cvar) = &*operation_completed;
+                        let mut completed = lock.lock().unwrap();
+                        *completed = true;
+                        cvar.notify_all();
                     },
                 );
             }
+            let (lock, cvar) = &*operation_completed;
+            let mut _completed = lock.lock().unwrap();
+            _completed = cvar
+                .wait_while(_completed, |completed| !*completed)
+                .unwrap();
             if dependency_graph
                 .read()
                 .unwrap()
