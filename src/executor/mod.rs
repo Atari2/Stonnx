@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
-    sync::{Arc, Condvar, Mutex, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use crate::{
@@ -336,10 +336,9 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
         let initializers = make_initializers(graph)?;
         let node_inputs = initialize_nodes(graph, &fileinputs, initializers)?;
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
-        let graph_outputs = make_graph_outputs(graph)?;
-        let dependency_graph = create_links_and_requirements(graph, &node_inputs)?;
+        let mut graph_outputs = make_graph_outputs(graph)?;
+        let mut dependency_graph = create_links_and_requirements(graph, &node_inputs)?;
         let node_inputs = Arc::new(RwLock::new(node_inputs));
-        let graph_outputs = Arc::new(RwLock::new(graph_outputs));
         for vi in graph.value_info.iter() {
             if let Some(onnx::type_proto::Value::TensorType(_)) = vi.type_.value {
                 // If the type is Tensor, then we are fine because that's implemented
@@ -359,16 +358,9 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
         if !dependency_graph.not_implemented.is_empty() && args.failfast {
             return Err(anyhow!("Not implemented operators found"));
         }
-        let dependency_graph = Arc::new(RwLock::new(dependency_graph));
-        let operation_completed = Arc::new((Mutex::new(false), Condvar::new()));
         loop {
             let mut nodes_ready = vec![];
-            for (node, inputs) in dependency_graph
-                .read()
-                .unwrap()
-                .node_input_requirements
-                .iter()
-            {
+            for (node, inputs) in dependency_graph.node_input_requirements.iter() {
                 if inputs.is_empty() {
                     nodes_ready.push(node.clone());
                 }
@@ -377,70 +369,46 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                 continue;
             }
             dependency_graph
-                .write()
-                .unwrap()
                 .node_input_requirements
                 .retain(|_, v| !v.is_empty());
+            let results = Arc::new(Mutex::new(vec![]));
             for node in nodes_ready {
-                let node_inputs = node_inputs.clone();
                 let node_inputs_ref = node_inputs.clone();
-                let outputs_dir = outputs_dir.clone();
-                let graph_outputs = graph_outputs.clone();
-                let dependency_graph = dependency_graph.clone();
-                let operation_completed = operation_completed.clone();
-                pool.queue(
-                    move || {
-                        let r = node.execute(&node_inputs_ref.read().unwrap(), opset_version);
-                        (r, node)
-                    },
-                    move |(result, node)| {
-                        let outputs = handle_output(
-                            result.unwrap(),
-                            &node,
-                            &outputs_dir,
-                            &mut node_inputs.write().unwrap(),
-                            &mut graph_outputs.write().unwrap(),
-                        )
-                        .unwrap();
-                        let mut dependency_graph = dependency_graph.write().unwrap();
-                        for output in outputs {
-                            if let Some(n) = dependency_graph.input_link_map.remove(&output) {
-                                for node in n {
-                                    dependency_graph
-                                        .node_input_requirements
-                                        .entry(node)
-                                        .and_modify(|v| {
-                                            v.retain(|x| *x != output);
-                                        });
-                                }
-                            }
-                        }
-                        let (lock, cvar) = &*operation_completed;
-                        let mut completed = lock.lock().unwrap();
-                        *completed = true;
-                        cvar.notify_all();
-                    },
-                );
+                let results = results.clone();
+                pool.queue(move || {
+                    let r = node.execute(&node_inputs_ref.read().unwrap(), opset_version);
+                    results.lock().unwrap().push((r, node));
+                });
             }
-            let (lock, cvar) = &*operation_completed;
-            let mut _completed = lock.lock().unwrap();
-            _completed = cvar
-                .wait_while(_completed, |completed| !*completed)
-                .unwrap();
-            if dependency_graph
-                .read()
-                .unwrap()
-                .node_input_requirements
-                .is_empty()
-            {
+            pool.wait();
+            let results = Arc::into_inner(results)
+                .ok_or(anyhow!("Failed to unwrap results"))?
+                .into_inner()?;
+            for (result, node) in results {
+                let outputs = handle_output(
+                    result?,
+                    &node,
+                    &outputs_dir,
+                    &mut node_inputs.write().unwrap(),
+                    &mut graph_outputs,
+                )?;
+                for output in outputs {
+                    if let Some(n) = dependency_graph.input_link_map.remove(&output) {
+                        for node in n {
+                            dependency_graph
+                                .node_input_requirements
+                                .entry(node)
+                                .and_modify(|v| {
+                                    v.retain(|x| *x != output);
+                                });
+                        }
+                    }
+                }
+            }
+            if dependency_graph.node_input_requirements.is_empty() {
                 break;
             }
         }
-        pool.wait();
-        let mut graph_outputs = Arc::try_unwrap(graph_outputs)
-            .map_err(|_| anyhow!("Failed to unwrap graph outputs"))?
-            .into_inner()
-            .map_err(|_| anyhow!("Failed to unwrap graph outputs"))?;
         compare_outputs(expected_outputs, &mut graph_outputs)?;
     }
     Ok(())

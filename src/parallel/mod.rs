@@ -1,14 +1,6 @@
 use std::sync::{Arc, Condvar, Mutex};
-
-use crate::{
-    common::{BoxResult, OperatorResult},
-    executor::ONNXNode,
-};
-
-type ResultType = (BoxResult<OperatorResult>, ONNXNode);
-type WorkFnType = Box<dyn FnOnce() -> ResultType + Send>;
-type CallbackFnType = Box<dyn FnOnce(ResultType) + Send>;
-type QueueType = Arc<(Mutex<Vec<(WorkFnType, CallbackFnType)>>, Condvar)>;
+type WorkFnType = Box<dyn FnOnce() + Send>;
+type QueueType = Arc<(Mutex<Vec<WorkFnType>>, Condvar)>;
 
 struct Worker {
     _thread: std::thread::JoinHandle<()>,
@@ -26,8 +18,8 @@ impl Worker {
             let mut queue = worker_fn.lock().unwrap();
             loop {
                 queue = cond.wait_while(queue, |q| q.is_empty()).unwrap();
-                let (f, cb) = { queue.pop().unwrap() };
-                cb(f());
+                let f = { queue.pop().unwrap() };
+                f();
             }
         });
         Self { _thread }
@@ -44,14 +36,13 @@ impl ThreadPool {
         Self { queue, _workers }
     }
 
-    pub fn queue<F, CF>(&mut self, f: F, callback: CF)
+    pub fn queue<F>(&mut self, f: F)
     where
-        F: FnOnce() -> ResultType + Send + 'static,
-        CF: FnOnce(ResultType) + Send + 'static,
+        F: FnOnce() + Send + 'static,
     {
         {
             let mut queue = self.queue.0.lock().unwrap();
-            queue.push((Box::new(f), Box::new(callback)));
+            queue.push(Box::new(f));
         }
         self.queue.1.notify_all();
     }
