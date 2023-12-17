@@ -12,10 +12,11 @@ use crate::executor::execute_model;
 use crate::onnxparser::onnx;
 use crate::utils::read_model;
 use common::Args;
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
+use std::ffi::CString;
 use std::path::Path;
 
-static LAST_ERROR: OnceCell<Box<std::ffi::CString>> = OnceCell::new();
+static mut LAST_ERROR: Lazy<CString> = Lazy::new(|| CString::new(b"").unwrap()); 
 
 #[repr(i64)]
 pub enum Verbosity {
@@ -51,18 +52,26 @@ pub unsafe extern "C" fn read_onnx_model(
     let model_path = match model_path.to_str() {
         Ok(s) => s,
         Err(e) => {
-            LAST_ERROR
-                .set(Box::new(std::ffi::CString::new(e.to_string()).unwrap()))
-                .unwrap();
+            let e = match CString::new(e.to_string()) {
+                Ok(s) => s,
+                Err(_) => {
+                    return std::ptr::null_mut();
+                }
+            };
+            *LAST_ERROR = e;
             return std::ptr::null_mut();
         }
     };
     let model = match read_model(Path::new(model_path)) {
         Ok(m) => m,
         Err(e) => {
-            LAST_ERROR
-                .set(Box::new(std::ffi::CString::new(e.to_string()).unwrap()))
-                .unwrap();
+            let e = match CString::new(e.to_string()) {
+                Ok(s) => s,
+                Err(_) => {
+                    return std::ptr::null_mut();
+                }
+            };
+            *LAST_ERROR = e;
             return std::ptr::null_mut();
         }
     };
@@ -88,11 +97,7 @@ pub unsafe extern "C" fn free_onnx_model(model: *mut onnx::ModelProto) {
 /// Should take a valid pointer to a model
 pub unsafe extern "C" fn get_opset_version(model: *const onnx::ModelProto) -> i64 {
     if model.is_null() {
-        LAST_ERROR
-            .set(Box::new(
-                std::ffi::CString::new("NULL pointer passed to get_opset_version").unwrap(),
-            ))
-            .unwrap();
+        *LAST_ERROR = CString::new("NULL pointer passed to get_opset_version").unwrap();
         return MAX_OPSET_VERSION;
     }
     unsafe {
@@ -125,9 +130,13 @@ pub unsafe extern "C" fn run_model(
     let model_path = match model_path.to_str() {
         Ok(s) => s,
         Err(e) => {
-            LAST_ERROR
-                .set(Box::new(std::ffi::CString::new(e.to_string()).unwrap()))
-                .unwrap();
+            let e = match CString::new(e.to_string()) {
+                Ok(s) => s,
+                Err(_) => {
+                    return false;
+                }
+            };
+            *LAST_ERROR = e;
             return false;
         }
     };
@@ -146,9 +155,13 @@ pub unsafe extern "C" fn run_model(
     match crate::execute_model(&args) {
         Ok(_) => true,
         Err(e) => {
-            LAST_ERROR
-                .set(Box::new(std::ffi::CString::new(e.to_string()).unwrap()))
-                .unwrap();
+            let e = match CString::new(e.to_string()) {
+                Ok(s) => s,
+                Err(_) => {
+                    return false;
+                }
+            };
+            *LAST_ERROR = e;
             false
         }
     }
@@ -160,5 +173,5 @@ pub unsafe extern "C" fn run_model(
 /// Safe, returns a pointer to a C string, null if no error
 /// Valid until the next call to run_model
 pub unsafe extern "C" fn last_error() -> *const std::os::raw::c_char {
-    LAST_ERROR.get().map_or(std::ptr::null(), |s| s.as_ptr())
+    LAST_ERROR.as_ptr()
 }

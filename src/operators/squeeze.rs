@@ -36,7 +36,7 @@ fn _squeeze_generic<A: Clone + Copy + Zero>(
     data: ArrayViewD<A>,
     new_shape: &[usize],
 ) -> BoxResult<ArrayD<A>> {
-    Ok(data.to_shape(new_shape).unwrap().to_owned())
+    Ok(data.to_shape(new_shape)?.to_owned())
 }
 
 fn squeeze_11(inputs: &[&TensorType], attrs: SqueezeAttrs) -> BoxResult<TensorType> {
@@ -58,8 +58,8 @@ fn squeeze_11(inputs: &[&TensorType], attrs: SqueezeAttrs) -> BoxResult<TensorTy
     };
 
     match input {
-        TensorType::F32(a) => Ok(TensorType::F32(_squeeze_generic(a.view(), &shape).unwrap())),
-        TensorType::I64(a) => Ok(TensorType::I64(_squeeze_generic(a.view(), &shape).unwrap())),
+        TensorType::F32(a) => Ok(TensorType::F32(_squeeze_generic(a.view(), &shape)?)),
+        TensorType::I64(a) => Ok(TensorType::I64(_squeeze_generic(a.view(), &shape)?)),
         _ => todo!("Squeeze for type {}", input),
     }
 }
@@ -86,8 +86,8 @@ fn squeeze_13(inputs: &[&TensorType]) -> BoxResult<TensorType> {
         shape.remove(axis);
     }
     match input {
-        TensorType::F32(a) => Ok(TensorType::F32(_squeeze_generic(a.view(), &shape).unwrap())),
-        TensorType::I64(a) => Ok(TensorType::I64(_squeeze_generic(a.view(), &shape).unwrap())),
+        TensorType::F32(a) => Ok(TensorType::F32(_squeeze_generic(a.view(), &shape)?)),
+        TensorType::I64(a) => Ok(TensorType::I64(_squeeze_generic(a.view(), &shape)?)),
         _ => todo!("Squeeze for type {}", input),
     }
 }
@@ -109,8 +109,8 @@ pub fn squeeze(
 ) -> BoxResult<OperatorResult> {
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     if target_version > 11 {
-        Ok(squeeze_13(inputs).unwrap().into())
+        Ok(squeeze_13(inputs)?.into())
     } else {
-        Ok(squeeze_11(inputs, SqueezeAttrs::new(node)).unwrap().into())
+        Ok(squeeze_11(inputs, SqueezeAttrs::new(node))?.into())
     }
 }

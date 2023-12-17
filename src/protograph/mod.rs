@@ -96,7 +96,7 @@ pub fn build_graph_from_proto(
             if !graph.contains_node(input) {
                 inputs.push(graph.add_node(input));
             } else {
-                inputs.push(graph.nodes().find(|x| *x == input).unwrap());
+                inputs.push(graph.nodes().find(|x| *x == input).ok_or(anyhow!("Node not found"))?);
             }
         }
         for output in node.output.iter() {
@@ -113,7 +113,7 @@ pub fn build_graph_from_proto(
             if !graph.contains_node(output) {
                 outputs.push(graph.add_node(output));
             } else {
-                outputs.push(graph.nodes().find(|x| *x == output).unwrap());
+                outputs.push(graph.nodes().find(|x| *x == output).ok_or(anyhow!("Node not found"))?);
             }
         }
         for input in inputs {

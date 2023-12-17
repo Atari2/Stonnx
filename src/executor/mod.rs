@@ -376,8 +376,13 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                 let node_inputs_ref = node_inputs.clone();
                 let results = results.clone();
                 pool.queue(move || {
-                    let r = node.execute(&node_inputs_ref.read().unwrap(), opset_version);
-                    results.lock().unwrap().push((r, node));
+                    let r = { 
+                        let node_inputs_lock = node_inputs_ref.read().expect("Failed to lock node inputs");
+                        node.execute(&node_inputs_lock, opset_version) 
+                    };
+                    {
+                        results.lock().expect("Failed to lock results").push((r, node));
+                    }
                 });
             }
             pool.wait();
@@ -385,13 +390,15 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                 .ok_or(anyhow!("Failed to unwrap results"))?
                 .into_inner()?;
             for (result, node) in results {
+                let mut node_inputs_lock = node_inputs.write().expect("Failed to lock node inputs");
                 let outputs = handle_output(
                     result?,
                     &node,
                     &outputs_dir,
-                    &mut node_inputs.write().unwrap(),
+                    &mut node_inputs_lock,
                     &mut graph_outputs,
                 )?;
+                drop(node_inputs_lock);
                 for output in outputs {
                     if let Some(n) = dependency_graph.input_link_map.remove(&output) {
                         for node in n {

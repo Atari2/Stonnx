@@ -49,14 +49,14 @@ pub struct CommonPoolAttrs {
 }
 
 fn _get_pad_shape(
-    auto_pad: PoolAutoPad,
+    auto_pad: Option<PoolAutoPad>,
     input_spatial_shape: &[usize],
     kernel_spatial_shape: &[i64],
     strides_spatial: &[i64],
     output_spatial_shape: &[usize],
 ) -> BoxResult<Vec<usize>> {
     let mut pad_shape = vec![0, input_spatial_shape.len()];
-    if auto_pad == PoolAutoPad::SameLower || auto_pad == PoolAutoPad::SameUpper {
+    if auto_pad == Some(PoolAutoPad::SameLower) || auto_pad == Some(PoolAutoPad::SameUpper) {
         for i in 0..input_spatial_shape.len() {
             pad_shape[i] = (output_spatial_shape[i] - 1) * strides_spatial[i] as usize
                 + kernel_spatial_shape[i] as usize
@@ -401,7 +401,7 @@ where
             F32IntoType::as_(0.0)
         };
         out_shape = _get_output_shape(
-            auto_pad, // safe to unwrap, verified above
+            auto_pad,
             &x_shape,
             &kernel_shape,
             &strides,
@@ -409,7 +409,7 @@ where
             attrs.ceil_mode,
         )?;
         pad_shape = _get_pad_shape(
-            auto_pad.unwrap(),
+            auto_pad,
             &x_shape,
             &kernel_shape,
             &strides,
