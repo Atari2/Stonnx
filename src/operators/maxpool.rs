@@ -10,7 +10,7 @@ use crate::{
 use anyhow::anyhow;
 
 use super::_commonpool::{
-    CommonPoolAttrs, PoolAutoPad, PoolOutput, PoolingType, _commn_pool_generic,
+    CommonPoolAttrs, PoolAutoPad, PoolOutput, PoolingType, _common_pool_generic,
 };
 
 const _OPSET_VERSIONS: [i64; 5] = [1, 8, 10, 11, 12];
@@ -344,7 +344,7 @@ where
     if b1 || b2 {
         _maxpool_internal_generic(input, attrs, output_len)
     } else {
-        _commn_pool_generic(input, PoolingType::Max, 0, attrs.into(), output_len)
+        _common_pool_generic(input, PoolingType::Max, 0, attrs.into(), output_len)
     }
 }
 

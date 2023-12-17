@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
+    sync::{Arc, Mutex, RwLock},
 };
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
     },
     onnx,
     operators::OPERATION_MAP,
-    print_at_level,
+    parallel, print_at_level,
     protograph::{build_graph_from_proto, GraphOutputType},
     read_model,
     utils::{initialize_nodes, make_initializers},
@@ -18,22 +19,23 @@ use crate::{
 };
 
 use anyhow::anyhow;
+use petgraph::graph;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 #[derive(Debug, Clone, PartialEq)]
 /// Represent an ONNX execution node, with an ID, the function to execute it and a reference to the internal ONNX node
-struct ONNXNode<'a> {
+pub struct ONNXNode {
     id: usize,
     op_func: OperationFn,
-    node_ref: &'a onnx::NodeProto,
+    node_ref: Arc<onnx::NodeProto>,
 }
 
-impl<'a> ONNXNode<'a> {
+impl ONNXNode {
     /// Create a new ONNXNode
-    fn new(id: usize, op_func: OperationFn, node_ref: &'a onnx::NodeProto) -> Self {
+    fn new(id: usize, op_func: OperationFn, node_ref: onnx::NodeProto) -> Self {
         Self {
             id,
             op_func,
-            node_ref,
+            node_ref: Arc::new(node_ref),
         }
     }
 
@@ -73,40 +75,42 @@ impl<'a> ONNXNode<'a> {
             .collect::<Vec<&str>>();
         print_at_level!(
             VerbosityLevel::Informational,
-            "Running {} operator (id: {}, thread: {}) between {:?} to get {:?}",
+            "Running {} operator (id: {}, thread: {:?}) between {:?} to get {:?}",
             self.node_ref.op_type(),
             self.id,
-            rayon::current_thread_index()
-                .map_or_else(|| "(no thread)".to_string(), |i| i.to_string()),
+            std::thread::current().id(),
+            // rayon::current_thread_index()
+            //     .map_or_else(|| "(no thread)".to_string(), |i| i.to_string()),
             input_names,
             output_names
         );
-        (self.op_func)(&inputs, self.node_ref, opset_version, output_names.len())
+        (self.op_func)(
+            &inputs,
+            self.node_ref.as_ref(),
+            opset_version,
+            output_names.len(),
+        )
     }
 }
 
-impl std::hash::Hash for ONNXNode<'_> {
+impl std::hash::Hash for ONNXNode {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 
-impl std::cmp::Eq for ONNXNode<'_> {}
+impl std::cmp::Eq for ONNXNode {}
 
 /// Handle the output of an operator, saving it to disk if verbose is VerbosityLevel::Results or higher, and saving it to graph_outputs
-fn handle_output<'a>(
+fn handle_output(
     result: OperatorResult,
-    node: &'a ONNXNode,
+    node: &ONNXNode,
     outputs_dir: &Path,
     node_inputs: &mut HashMap<String, TensorType>,
     graph_outputs: &mut HashMap<String, OutputInfo>,
-) -> BoxResult<Vec<&'a str>> {
-    let node = node.node_ref;
-    let outputs = node
-        .output
-        .iter()
-        .map(|s| s.as_str())
-        .collect::<Vec<&str>>();
+) -> BoxResult<Vec<String>> {
+    let node = node.node_ref.clone();
+    let outputs = node.output.to_vec();
     let result = result.result; // we love rust
     assert_eq!(outputs.len(), result.len());
     for (output_name, res) in outputs.iter().zip(result.into_iter()) {
@@ -125,8 +129,8 @@ fn handle_output<'a>(
         node_inputs.insert(output_name.to_string(), res);
     }
     for output_name in outputs.iter() {
-        if let Some(gout) = graph_outputs.get_mut(*output_name) {
-            if let Some(produced) = node_inputs.get(*output_name) {
+        if let Some(gout) = graph_outputs.get_mut(output_name) {
+            if let Some(produced) = node_inputs.get(output_name) {
                 gout.data = Some(produced.clone());
             }
         }
@@ -135,24 +139,24 @@ fn handle_output<'a>(
 }
 
 /// A dependency graph of ONNX nodes
-struct DependencyGraph<'a> {
+struct DependencyGraph {
     /// A map of ONNX nodes to their input requirements
-    pub node_input_requirements: HashMap<ONNXNode<'a>, Vec<&'a str>>,
+    pub node_input_requirements: HashMap<ONNXNode, Vec<String>>,
     /// A map of input names to the nodes that require them
-    pub input_link_map: HashMap<&'a str, Vec<ONNXNode<'a>>>,
+    pub input_link_map: HashMap<String, Vec<ONNXNode>>,
     /// A set of not implemented operators
-    pub not_implemented: HashSet<&'a str>,
-    /// A map of input names to their corresponding tensors
-    pub node_inputs: HashMap<String, TensorType>,
+    pub not_implemented: HashSet<String>,
+    // /// A map of input names to their corresponding tensors
+    // pub node_inputs:,
 }
 
 /// Create a dependency graph from an ONNX graph and a map of input names to their corresponding tensors
 fn create_links_and_requirements(
     graph: &onnx::GraphProto,
-    node_inputs: HashMap<String, TensorType>,
+    node_inputs: &HashMap<String, TensorType>,
 ) -> BoxResult<DependencyGraph> {
-    let mut node_input_requirements: HashMap<ONNXNode, Vec<&str>> = HashMap::new();
-    let mut input_link_map: HashMap<&str, Vec<ONNXNode>> = HashMap::new();
+    let mut node_input_requirements: HashMap<ONNXNode, Vec<String>> = HashMap::new();
+    let mut input_link_map: HashMap<String, Vec<ONNXNode>> = HashMap::new();
     let mut not_implemented = HashSet::new();
     for (counter, node) in graph.node.iter().enumerate() {
         let input_names = node
@@ -162,31 +166,36 @@ fn create_links_and_requirements(
                 if node_inputs.contains_key(s.as_str()) {
                     None
                 } else {
-                    Some(s.as_str())
+                    Some(s.clone())
                 }
             })
-            .collect::<Vec<&str>>();
+            .collect::<Vec<String>>();
         if let Some(name) = node.op_type.as_deref() {
             for input_name in input_names.iter() {
                 input_link_map
-                    .entry(input_name)
+                    .entry(input_name.to_string())
                     .or_default()
                     .push(ONNXNode::new(
                         counter,
                         *OPERATION_MAP
                             .get(name)
                             .unwrap_or(&(operator_not_implemented as OperationFn)),
-                        node,
+                        node.clone(),
                     ));
             }
             if let Some(op_func) = OPERATION_MAP.get(name) {
-                node_input_requirements.insert(ONNXNode::new(counter, *op_func, node), input_names);
+                node_input_requirements
+                    .insert(ONNXNode::new(counter, *op_func, node.clone()), input_names);
             } else {
                 node_input_requirements.insert(
-                    ONNXNode::new(counter, operator_not_implemented as OperationFn, node),
+                    ONNXNode::new(
+                        counter,
+                        operator_not_implemented as OperationFn,
+                        node.clone(),
+                    ),
                     input_names,
                 );
-                not_implemented.insert(name);
+                not_implemented.insert(name.to_string());
             }
         }
     }
@@ -194,7 +203,6 @@ fn create_links_and_requirements(
         node_input_requirements,
         input_link_map,
         not_implemented,
-        node_inputs,
     })
 }
 
@@ -291,6 +299,7 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
     fileinputs.extend_paths(&args.model);
     let model = read_model(Path::new(&fileinputs.modelpath))?;
     let outputs_dir = Path::new("outputs").join(&args.model);
+    let mut pool = crate::parallel::ThreadPool::new(std::thread::available_parallelism()?.into());
     if VERBOSE
         .get()
         .map_or(false, |&v| v >= VerbosityLevel::Results)
@@ -313,7 +322,8 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
             MAX_OPSET_VERSION
         ));
     }
-    for graph in model.graph.iter() {
+    let graph = model.graph.get_or_default();
+    {
         if args.gengraph {
             build_graph_from_proto(
                 graph,
@@ -328,8 +338,10 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
         let initializers = make_initializers(graph)?;
         let node_inputs = initialize_nodes(graph, &fileinputs, initializers)?;
         let expected_outputs = make_external_outputs(graph, &fileinputs)?;
-        let mut graph_outputs = make_graph_outputs(graph)?;
-        let mut dependency_graph = create_links_and_requirements(graph, node_inputs)?;
+        let graph_outputs = make_graph_outputs(graph)?;
+        let dependency_graph = create_links_and_requirements(graph, &node_inputs)?;
+        let node_inputs = Arc::new(RwLock::new(node_inputs));
+        let graph_outputs = Arc::new(RwLock::new(graph_outputs));
         for vi in graph.value_info.iter() {
             if let Some(onnx::type_proto::Value::TensorType(_)) = vi.type_.value {
                 // If the type is Tensor, then we are fine because that's implemented
@@ -349,55 +361,74 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
         if !dependency_graph.not_implemented.is_empty() && args.failfast {
             return Err(anyhow!("Not implemented operators found"));
         }
+        let dependency_graph = Arc::new(RwLock::new(dependency_graph));
         loop {
             let mut nodes_ready = vec![];
-            for (node, inputs) in dependency_graph.node_input_requirements.iter() {
+            for (node, inputs) in dependency_graph
+                .read()
+                .unwrap()
+                .node_input_requirements
+                .iter()
+            {
                 if inputs.is_empty() {
                     nodes_ready.push(node.clone());
                 }
             }
             dependency_graph
+                .write()
+                .unwrap()
                 .node_input_requirements
                 .retain(|_, v| !v.is_empty());
-            let node_inputs_ref = &dependency_graph.node_inputs;
-            let mut results = vec![];
-            nodes_ready
-                .into_par_iter()
-                .map(|n| {
-                    let r = n.execute(node_inputs_ref, opset_version);
-                    (r, n)
-                })
-                .collect_into_vec(&mut results);
-
-            let node_inputs = &mut dependency_graph.node_inputs;
-            results
-                .into_iter()
-                .try_for_each(|(result, node)| -> Result<(), anyhow::Error> {
-                    let outputs = handle_output(
-                        result?,
-                        &node,
-                        &outputs_dir,
-                        node_inputs,
-                        &mut graph_outputs,
-                    )?;
-                    for output in outputs {
-                        if let Some(n) = dependency_graph.input_link_map.remove(output) {
-                            for node in n {
-                                dependency_graph
-                                    .node_input_requirements
-                                    .entry(node)
-                                    .and_modify(|v| {
-                                        v.retain(|x| *x != output);
-                                    });
+            for node in nodes_ready {
+                let node_inputs = node_inputs.clone();
+                let node_inputs_ref = node_inputs.clone();
+                let outputs_dir = outputs_dir.clone();
+                let graph_outputs = graph_outputs.clone();
+                let dependency_graph = dependency_graph.clone();
+                pool.queue(
+                    move || {
+                        let r = node.execute(&node_inputs_ref.read().unwrap(), opset_version);
+                        (r, node)
+                    },
+                    move |(result, node)| {
+                        let outputs = handle_output(
+                            result.unwrap(),
+                            &node,
+                            &outputs_dir,
+                            &mut node_inputs.write().unwrap(),
+                            &mut graph_outputs.write().unwrap(),
+                        )
+                        .unwrap();
+                        let mut dependency_graph = dependency_graph.write().unwrap();
+                        for output in outputs {
+                            if let Some(n) = dependency_graph.input_link_map.remove(&output) {
+                                for node in n {
+                                    dependency_graph
+                                        .node_input_requirements
+                                        .entry(node)
+                                        .and_modify(|v| {
+                                            v.retain(|x| *x != output);
+                                        });
+                                }
                             }
                         }
-                    }
-                    Ok(())
-                })?;
-            if dependency_graph.node_input_requirements.is_empty() {
+                    },
+                );
+            }
+            if dependency_graph
+                .read()
+                .unwrap()
+                .node_input_requirements
+                .is_empty()
+            {
                 break;
             }
         }
+        pool.wait();
+        let mut graph_outputs = Arc::try_unwrap(graph_outputs)
+            .map_err(|_| anyhow!("Failed to unwrap graph outputs"))?
+            .into_inner()
+            .map_err(|_| anyhow!("Failed to unwrap graph outputs"))?;
         compare_outputs(expected_outputs, &mut graph_outputs)?;
     }
     Ok(())

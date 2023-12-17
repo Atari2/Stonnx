@@ -3,6 +3,7 @@ mod common;
 mod executor;
 mod onnxparser;
 mod operators;
+mod parallel;
 mod protograph;
 mod utils;
 

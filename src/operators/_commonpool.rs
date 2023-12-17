@@ -242,13 +242,10 @@ where
                 (strides_shape[i] as usize * shape[i + 2])
                     ..(strides_shape[i] as usize * shape[i + 2] + kernel_shape[i] as usize)
             })
-            .collect::<Vec<_>>();
-        let listi2 = listi
-            .into_iter()
             .multi_cartesian_product()
             .collect::<Vec<_>>();
         let mut values = vec![];
-        for iv in listi2 {
+        for iv in listi {
             let wsi = (0..window.ndim())
                 .map(|j| {
                     if j < iv.len() {
@@ -320,7 +317,7 @@ where
 }
 
 /// [Python reference](<https://github.com/onnx/onnx/blob/main/onnx/reference/ops/_op_common_pool.py>
-pub fn _commn_pool_generic<A: ArrayElement>(
+pub fn _common_pool_generic<A: ArrayElement>(
     input: &ArrayD<A>,
     pooling_type: PoolingType,
     count_include_pad: i64,

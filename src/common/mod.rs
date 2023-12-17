@@ -445,6 +445,8 @@ pub trait ArrayElement:
     + MinMax
     + std::iter::Sum
     + HasSqrt
+    + std::marker::Sync
+    + std::marker::Send
     + 'static
 {
 }
@@ -463,6 +465,8 @@ impl<T> ArrayElement for T where
         + MinMax
         + std::iter::Sum
         + HasSqrt
+        + std::marker::Sync
+        + std::marker::Send
         + 'static
 {
 }
@@ -833,4 +837,95 @@ impl TensorType {
             TensorType::Bool(_) => DataType::BOOL,
         }
     }
+
+    /// Compares two TensorTypes for equality, implementing numpy's `allclose` function
+    pub fn allclose(
+        &self,
+        other: &Self,
+        rtol: Option<f32>,
+        atol: Option<f32>,
+        equal_nan: Option<bool>,
+    ) -> bool {
+        match (self, other) {
+            (TensorType::I8(a), TensorType::I8(b)) => allclose(a, b, rtol, atol, equal_nan),
+            (TensorType::I16(a), TensorType::I16(b)) => allclose(a, b, rtol, atol, equal_nan),
+            (TensorType::I32(a), TensorType::I32(b)) => allclose(a, b, rtol, atol, equal_nan),
+            (TensorType::I64(a), TensorType::I64(b)) => allclose(a, b, rtol, atol, equal_nan),
+            (TensorType::U8(a), TensorType::U8(b)) => {
+                allclose_unsigned(a, b, rtol, atol, equal_nan)
+            }
+            (TensorType::U16(a), TensorType::U16(b)) => {
+                allclose_unsigned(a, b, rtol, atol, equal_nan)
+            }
+            (TensorType::U32(a), TensorType::U32(b)) => {
+                allclose_unsigned(a, b, rtol, atol, equal_nan)
+            }
+            (TensorType::U64(a), TensorType::U64(b)) => {
+                allclose_unsigned(a, b, rtol, atol, equal_nan)
+            }
+            (TensorType::F16(_), TensorType::F16(_)) => {
+                todo!("Half precision data type not supported")
+            }
+            (TensorType::BF16(_), TensorType::BF16(_)) => {
+                todo!("BFloat16 data type not supported")
+            }
+            (TensorType::F32(a), TensorType::F32(b)) => allclose(a, b, rtol, atol, equal_nan),
+            (TensorType::F64(a), TensorType::F64(b)) => allclose(a, b, rtol, atol, equal_nan),
+            (TensorType::C64(_), TensorType::C64(_)) => {
+                todo!("Complex64 data type not supported")
+            }
+            (TensorType::C128(_), TensorType::C128(_)) => {
+                todo!("Complex128 data type not supported")
+            }
+            (TensorType::Str(a), TensorType::Str(b)) => a.iter().zip(b.iter()).all(|(a, b)| a == b),
+            (TensorType::Bool(a), TensorType::Bool(b)) => {
+                a.iter().zip(b.iter()).all(|(a, b)| a == b)
+            }
+            _ => false,
+        }
+    }
+}
+
+fn allclose<A: ArrayElement + num::Signed>(
+    lhs: &ArrayD<A>,
+    rhs: &ArrayD<A>,
+    rtol: Option<f32>,
+    atol: Option<f32>,
+    equal_nan: Option<bool>,
+) -> bool
+where
+    f32: F32IntoType<A>,
+{
+    let rtol: A = F32IntoType::as_(rtol.unwrap_or(1e-5));
+    let atol: A = F32IntoType::as_(atol.unwrap_or(1e-8));
+    let equal_nan = equal_nan.unwrap_or(false);
+    lhs.iter().zip(rhs.iter()).all(|(&l, &r)| {
+        if l.is_nan() && r.is_nan() {
+            equal_nan
+        } else {
+            (l - r).abs() <= atol + rtol * r.abs()
+        }
+    })
+}
+
+fn allclose_unsigned<A: ArrayElement>(
+    lhs: &ArrayD<A>,
+    rhs: &ArrayD<A>,
+    rtol: Option<f32>,
+    atol: Option<f32>,
+    equal_nan: Option<bool>,
+) -> bool
+where
+    f32: F32IntoType<A>,
+{
+    let rtol: A = F32IntoType::as_(rtol.unwrap_or(1e-5));
+    let atol: A = F32IntoType::as_(atol.unwrap_or(1e-8));
+    let equal_nan = equal_nan.unwrap_or(false);
+    lhs.iter().zip(rhs.iter()).all(|(&l, &r)| {
+        if l.is_nan() && r.is_nan() {
+            equal_nan
+        } else {
+            (l - r) <= atol + rtol * r
+        }
+    })
 }

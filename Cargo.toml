@@ -23,7 +23,7 @@ clap = { version = "4.4.8", features = ["derive"] }
 half = "2.3.1"
 itertools = "0.12.0"
 lazy_static = "1.4.0"
-ndarray = "0.15.6"
+ndarray = { version = "0.15.6", features = ["rayon"] }
 ndarray-ndimage = "0.4.0"
 ndarray-npy = "0.8.1"
 ndarray-stats = "0.5.1"
