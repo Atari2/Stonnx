@@ -371,24 +371,35 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
             dependency_graph
                 .node_input_requirements
                 .retain(|_, v| !v.is_empty());
-            let results = Arc::new(Mutex::new(vec![]));
-            for node in nodes_ready {
-                let node_inputs_ref = node_inputs.clone();
-                let results = results.clone();
-                pool.queue(move || {
-                    let r = { 
-                        let node_inputs_lock = node_inputs_ref.read().expect("Failed to lock node inputs");
-                        node.execute(&node_inputs_lock, opset_version) 
-                    };
-                    {
-                        results.lock().expect("Failed to lock results").push((r, node));
-                    }
-                });
-            }
-            pool.wait();
-            let results = Arc::into_inner(results)
-                .ok_or(anyhow!("Failed to unwrap results"))?
-                .into_inner()?;
+            let results = if nodes_ready.len() == 1 {
+                let node = nodes_ready.pop().expect("Failed to pop node");
+                let node_inputs_lock = node_inputs.read().expect("Failed to lock node inputs");
+                let output = node.execute(&node_inputs_lock, opset_version);
+                vec![(output, node)]
+            } else {
+                let results = Arc::new(Mutex::new(vec![]));
+                for node in nodes_ready {
+                    let node_inputs_ref = node_inputs.clone();
+                    let results = results.clone();
+                    pool.queue(move || {
+                        let r = {
+                            let node_inputs_lock =
+                                node_inputs_ref.read().expect("Failed to lock node inputs");
+                            node.execute(&node_inputs_lock, opset_version)
+                        };
+                        {
+                            results
+                                .lock()
+                                .expect("Failed to lock results")
+                                .push((r, node));
+                        }
+                    });
+                }
+                pool.wait();
+                Arc::into_inner(results)
+                    .ok_or(anyhow!("Failed to unwrap results"))?
+                    .into_inner()?
+            };
             for (result, node) in results {
                 let mut node_inputs_lock = node_inputs.write().expect("Failed to lock node inputs");
                 let outputs = handle_output(
