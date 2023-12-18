@@ -31,6 +31,8 @@ pub static VERBOSE: OnceCell<VerbosityLevel> = OnceCell::new();
 pub struct Args {
     /// Path to the folder containing the model to run
     ///
+    /// If this path is relative, it will be assumed to be relative to $cwd/models, where $cwd is the current working directory
+    ///
     /// This folder should contain the model's `inputs.json`
     ///
     /// This file should contain a "modelpath" property which indicates the path to the model's `.onnx` file
@@ -56,9 +58,10 @@ pub struct Args {
     #[arg(short, long, default_value = "0")]
     pub verbose: u64,
 
-    /// Generate json file representing the graph of the model
+    /// Generate json/dot file representing the graph of the model
     ///
     /// This JSON file is meant to be parsed and printed by the C# program `ONNXGraphLayout`
+    /// The dot file can be converted to an image using the `dot` program from graphviz
     #[arg(short, long, default_value = "false")]
     pub gengraph: bool,
 
