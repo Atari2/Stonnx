@@ -1,11 +1,12 @@
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+#![cfg(feature = "custom-threadpool")]
+use std::sync::{atomic::AtomicUsize, Arc, Condvar, Mutex, MutexGuard};
 
 /// Type alias for a function that can be queued to a thread pool.
 type WorkFnType = Box<dyn FnOnce() + Send>;
 /// Type alias for the queue used by the thread pool.
 type QueueType = Arc<(Mutex<Vec<WorkerMessage>>, Condvar)>;
 /// Type alias for the queue state used by the thread pool.
-type QueueStateType = Arc<(Mutex<usize>, Condvar)>;
+type QueueStateType = Arc<AtomicUsize>;
 
 /// Enum representing the messages that can be sent to a worker thread.
 enum WorkerMessage {
@@ -80,12 +81,7 @@ impl Worker {
                 };
                 drop(queue);
                 f();
-                let (worker_state, worker_cond) = &*queuestate;
-                {
-                    let mut state = ylock(worker_state);
-                    *state -= 1;
-                    worker_cond.notify_all();
-                }
+                queuestate.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
                 queue = ylock(worker_fn);
             }
         });
@@ -98,7 +94,7 @@ impl ThreadPool {
     pub fn new(size: usize) -> Self {
         let mut workers = Vec::with_capacity(size);
         let queue = Arc::new((Mutex::new(vec![]), Condvar::new()));
-        let queuestate = Arc::new((Mutex::new(0), Condvar::new()));
+        let queuestate = Arc::new(AtomicUsize::new(0));
         for _ in 0..size {
             workers.push(Worker::new(queue.clone(), queuestate.clone()));
         }
@@ -110,29 +106,23 @@ impl ThreadPool {
     }
 
     /// Queues a function to be executed by the thread pool.
-    pub fn queue<F>(&mut self, f: F)
+    pub fn spawn<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
     {
         {
             let mut queue = ylock(&self.queue.0);
-            {
-                let mut queuestate = ylock(&self.queuestate.0);
-                *queuestate += 1;
-            }
+            self.queuestate
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             queue.push(WorkerMessage::Work(Box::new(f)));
         }
         self.queue.1.notify_all();
     }
 
     /// Waits for all queued functions to be executed.
-    pub fn wait(&mut self) {
-        let (queuestate, cond) = &*self.queuestate;
-        let mut state = ylock(queuestate);
-        while *state > 0 {
-            state = cond
-                .wait_while(state, |s| *s > 0)
-                .expect("Waiting on worker queue state failed");
+    pub fn wait(&self) {
+        while self.queuestate.load(std::sync::atomic::Ordering::Relaxed) > 0 {
+            std::thread::yield_now();
         }
     }
 
