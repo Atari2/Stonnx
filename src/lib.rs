@@ -16,7 +16,7 @@ use once_cell::sync::Lazy;
 use std::ffi::CString;
 use std::path::Path;
 
-static mut LAST_ERROR: Lazy<CString> = Lazy::new(|| CString::new(b"").unwrap());
+static mut LAST_ERROR: Lazy<CString> = Lazy::new(|| CString::new(*b"").unwrap());
 
 #[repr(i64)]
 pub enum Verbosity {

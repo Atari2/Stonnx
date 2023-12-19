@@ -4,21 +4,21 @@ using System.Text;
 
 namespace StonnxCLR {
     public static unsafe class StonnxAPI {
-        [DllImport("onnxrust_proto_api", EntryPoint = "read_onnx_model", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("stonnx_api", EntryPoint = "read_onnx_model", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern IntPtr _read_onnx_model(string model_path);
 
-        [DllImport("onnxrust_proto_api", EntryPoint = "free_onnx_model", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("stonnx_api", EntryPoint = "free_onnx_model", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern void _free_onnx_model(IntPtr model);
 
-        [DllImport("onnxrust_proto_api", EntryPoint = "get_opset_version", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("stonnx_api", EntryPoint = "get_opset_version", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         [return: MarshalAs(UnmanagedType.I8)]
         private static extern Int64 _get_opset_version(IntPtr model);
 
-        [DllImport("onnxrust_proto_api", EntryPoint = "run_model", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("stonnx_api", EntryPoint = "run_model", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool _run_model(string model_path, Int64 verbosity, Int64 graph_format, Int64 failfast);
 
-        [DllImport("onnxrust_proto_api", EntryPoint = "last_error", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport("stonnx_api", EntryPoint = "last_error", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern sbyte* _last_error();
 
         public abstract class PointerInternalBase : IDisposable
