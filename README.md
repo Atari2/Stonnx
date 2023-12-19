@@ -14,6 +14,8 @@ Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il li
 
 ### Modalità di utilizzo:
 - Eseguire il comando `cargo build --release` per compilare il progetto;
+  - di default il progetto viene compilato utilizzando il parallelismo con `rayon` (per compilare con il parallelismo da noi implementato utilizzare il comando `cargo build --features custom-threadpool --release`);
+
 - Eseguire il comando `cargo run --release -- --model <modelname>`
 - Nel caso in cui si volesse visualizzare l'esecuzione degli operatori è possibile aggiungere l'opzione `--verbose` al comando precedente (di default verbose è 0).
   - Esempio: `cargo run --release -- --model <modelname> --verbose 1`
