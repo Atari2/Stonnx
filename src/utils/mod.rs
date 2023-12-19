@@ -3,16 +3,17 @@ use num::traits::AsPrimitive;
 use std::io::Read;
 use std::os::raw::c_uchar;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::{collections::HashMap, io, path::Path};
 
 use ndarray::{ArrayD, IxDyn};
 use protobuf::Enum;
 
 use crate::common::FileInputs;
-use crate::common::*;
 use crate::onnx::tensor_proto::DataType;
 use crate::onnx::{NodeProto, TensorProto, ValueInfoProto};
 use crate::onnxparser::onnx;
+use crate::{common::*, print_at_level};
 use half::{bf16, f16};
 
 /// Calculates the product of the elements of an iterator, returning 1 if the iterator is empty.
@@ -663,7 +664,7 @@ pub fn make_tensor_from_raw(
                 Ok(TensorType::F32(a))
             }
             Err(e) => {
-                println!("Copying data of tensor as f32 because {}", e);
+                eprintln!("Copying data of tensor as f32 because {}", e);
                 let mut copied_data = vec![];
                 for float_slice in bytedata.chunks_exact(std::mem::size_of::<f32>()) {
                     copied_data.push(f32::from_le_bytes(float_slice.try_into()?));
@@ -707,7 +708,7 @@ pub fn make_initializers(graph: &onnx::GraphProto) -> BoxResult<HashMap<String, 
     for tensor in graph.initializer.iter() {
         let tensor_name = tensor.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
         if !tensor.has_data_type() {
-            println!("  Tensor: {} has no data type", tensor_name);
+            eprintln!("  Tensor: {} has no data type", tensor_name);
         } else {
             initializers.insert(tensor_name.to_string(), make_tensor_from_proto(tensor)?);
         }
@@ -720,7 +721,7 @@ fn make_input_tensors_from_files(
     graph: &onnx::GraphProto,
     files: &[PathBuf],
     mut initializers: HashMap<String, TensorType>,
-) -> BoxResult<HashMap<String, TensorType>> {
+) -> BoxResult<HashMap<String, Arc<TensorType>>> {
     let mut map = HashMap::new();
     let mut external_inputs_map = HashMap::new();
     for input in files.iter() {
@@ -737,21 +738,23 @@ fn make_input_tensors_from_files(
         let input_name = input.name.as_ref().map_or(UNKNOWN, |v| v.as_str());
         if let Some(input_from_file) = external_inputs_map.get(input_name) {
             let tensor = make_tensor_from_proto(input_from_file)?;
-            println!(
+            print_at_level!(
+                VerbosityLevel::Informational,
                 "  Input {} from file has shape {:?} and type {:?}",
                 input_name,
                 tensor.shape(),
                 tensor.value_type()
             );
-            map.insert(input_name.to_string(), tensor);
+            map.insert(input_name.to_string(), Arc::new(tensor));
         } else if let Some((_, init)) = initializers.remove_entry(input_name) {
-            println!(
+            print_at_level!(
+                VerbosityLevel::Informational,
                 "  Input {} from initializer has shape {:?} and type {:?}",
                 input_name,
                 init.shape(),
                 init.value_type()
             );
-            map.insert(input_name.to_string(), init);
+            map.insert(input_name.to_string(), Arc::new(init));
         } else {
             return Err(anyhow!(
                 "Input {} not found in inputs file or graph initializers",
@@ -760,7 +763,7 @@ fn make_input_tensors_from_files(
         }
     }
     for (k, v) in initializers {
-        map.insert(k, v);
+        map.insert(k, Arc::new(v));
     }
     Ok(map)
 }
@@ -801,7 +804,7 @@ pub fn initialize_nodes(
     graph: &onnx::GraphProto,
     fileinputs: &FileInputs,
     initializers: HashMap<String, TensorType>,
-) -> BoxResult<HashMap<String, TensorType>> {
+) -> BoxResult<HashMap<String, Arc<TensorType>>> {
     if fileinputs.inputs.is_empty() {
         return Ok(HashMap::new());
     }

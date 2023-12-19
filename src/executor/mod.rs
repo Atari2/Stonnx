@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock, RwLockReadGuard},
 };
 
 use crate::{
@@ -19,6 +19,7 @@ use crate::{
 };
 
 use anyhow::anyhow;
+use smallvec::SmallVec;
 #[derive(Debug, Clone, PartialEq)]
 /// Represent an ONNX execution node, with an ID, the function to execute it and a reference to the internal ONNX node
 pub struct ONNXNode {
@@ -40,7 +41,7 @@ impl ONNXNode {
     /// Executes the ONNX node given the inputs map and the opset version
     fn execute(
         &self,
-        node_inputs: &HashMap<String, TensorType>,
+        node_inputs: RwLockReadGuard<HashMap<String, Arc<TensorType>>>,
         opset_version: i64,
     ) -> BoxResult<OperatorResult> {
         let mut inputs = vec![];
@@ -48,11 +49,12 @@ impl ONNXNode {
         let mut all_nodes_have_init = true;
         for input in self.node_ref.input.iter() {
             if let Some(k) = node_inputs.get(input) {
-                inputs.push(k);
+                inputs.push(k.clone());
             } else {
                 all_nodes_have_init = false;
             }
         }
+        drop(node_inputs); // drop the rwlock as soon as possible
         for output in self.node_ref.output.iter() {
             outputs.push(output);
         }
@@ -77,11 +79,11 @@ impl ONNXNode {
             self.node_ref.op_type(),
             self.id,
             std::thread::current().id(),
-            // rayon::current_thread_index()
-            //     .map_or_else(|| "(no thread)".to_string(), |i| i.to_string()),
             input_names,
             output_names
         );
+        // most operators have 2/3 inputs, so we use a smallvec to avoid heap allocations
+        let inputs: SmallVec<[&TensorType; 4]> = inputs.iter().map(|x| x.as_ref()).collect();
         (self.op_func)(
             &inputs,
             self.node_ref.as_ref(),
@@ -104,7 +106,7 @@ fn handle_output(
     result: OperatorResult,
     node: &ONNXNode,
     outputs_dir: &Path,
-    node_inputs: &mut HashMap<String, TensorType>,
+    node_inputs: &mut HashMap<String, Arc<TensorType>>,
     graph_outputs: &mut HashMap<String, OutputInfo>,
 ) -> BoxResult<Vec<String>> {
     let node = node.node_ref.clone();
@@ -124,12 +126,12 @@ fn handle_output(
         {
             res.to_file(outputs_dir, output_name)?;
         }
-        node_inputs.insert(output_name.to_string(), res);
+        node_inputs.insert(output_name.to_string(), Arc::new(res));
     }
     for output_name in outputs.iter() {
         if let Some(gout) = graph_outputs.get_mut(output_name) {
             if let Some(produced) = node_inputs.get(output_name) {
-                gout.data = Some(produced.clone());
+                gout.data = Some(produced.as_ref().clone());
             }
         }
     }
@@ -151,7 +153,7 @@ struct DependencyGraph {
 /// Create a dependency graph from an ONNX graph and a map of input names to their corresponding tensors
 fn create_links_and_requirements(
     graph: &onnx::GraphProto,
-    node_inputs: &HashMap<String, TensorType>,
+    node_inputs: &HashMap<String, Arc<TensorType>>,
 ) -> BoxResult<DependencyGraph> {
     let mut node_input_requirements: HashMap<ONNXNode, Vec<String>> = HashMap::new();
     let mut input_link_map: HashMap<String, Vec<ONNXNode>> = HashMap::new();
@@ -278,6 +280,28 @@ pub fn compare_outputs(
     Ok(())
 }
 
+#[cfg(feature = "custom-threadpool")]
+fn create_pool(parallelism: usize) -> BoxResult<crate::parallel::ThreadPool> {
+    Ok(crate::parallel::ThreadPool::new(parallelism / 3 * 2)) // use 2/3rds of the available threads/cores
+}
+
+#[cfg(feature = "custom-threadpool")]
+fn wait_pool(pool: &crate::parallel::ThreadPool) {
+    pool.wait()
+}
+
+#[cfg(not(feature = "custom-threadpool"))]
+fn create_pool(parallelism: usize) -> BoxResult<rayon::ThreadPool> {
+    Ok(rayon::ThreadPoolBuilder::new()
+        .num_threads(parallelism / 3 * 2)
+        .build()?)
+}
+
+#[cfg(not(feature = "custom-threadpool"))]
+fn wait_pool(_pool: &rayon::ThreadPool) {
+    // do nothing
+}
+
 pub fn execute_model(args: &Args) -> BoxResult<()> {
     VERBOSE
         .set(VerbosityLevel::new(args.verbose as usize))
@@ -297,7 +321,8 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
     fileinputs.extend_paths(&args.model);
     let model = read_model(Path::new(&fileinputs.modelpath))?;
     let outputs_dir = Path::new("outputs").join(&args.model);
-    let mut pool = crate::parallel::ThreadPool::new(std::thread::available_parallelism()?.into());
+    let parallelism: usize = std::thread::available_parallelism()?.into();
+    let pool = create_pool(parallelism)?;
     if VERBOSE
         .get()
         .map_or(false, |&v| v >= VerbosityLevel::Results)
@@ -339,6 +364,7 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
         let mut graph_outputs = make_graph_outputs(graph)?;
         let mut dependency_graph = create_links_and_requirements(graph, &node_inputs)?;
         let node_inputs = Arc::new(RwLock::new(node_inputs));
+        let (tx, rx) = std::sync::mpsc::channel();
         for vi in graph.value_info.iter() {
             if let Some(onnx::type_proto::Value::TensorType(_)) = vi.type_.value {
                 // If the type is Tensor, then we are fine because that's implemented
@@ -365,61 +391,83 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                     nodes_ready.push(node.clone());
                 }
             }
-            if nodes_ready.is_empty() {
-                continue;
-            }
             dependency_graph
                 .node_input_requirements
                 .retain(|_, v| !v.is_empty());
-            let results = if nodes_ready.len() == 1 {
-                let node = nodes_ready.pop().expect("Failed to pop node");
-                let node_inputs_lock = node_inputs.read().expect("Failed to lock node inputs");
-                let output = node.execute(&node_inputs_lock, opset_version);
-                vec![(output, node)]
-            } else {
-                let results = Arc::new(Mutex::new(vec![]));
-                for node in nodes_ready {
-                    let node_inputs_ref = node_inputs.clone();
-                    let results = results.clone();
-                    pool.queue(move || {
-                        let r = {
-                            let node_inputs_lock =
-                                node_inputs_ref.read().expect("Failed to lock node inputs");
-                            node.execute(&node_inputs_lock, opset_version)
-                        };
-                        {
-                            results
-                                .lock()
-                                .expect("Failed to lock results")
-                                .push((r, node));
+            for node in nodes_ready {
+                let node_inputs_ref = node_inputs.clone();
+                let tx = tx.clone();
+                pool.spawn(move || {
+                    let r = {
+                        let node_inputs_lock =
+                            node_inputs_ref.read().expect("Failed to lock node inputs");
+                        node.execute(node_inputs_lock, opset_version)
+                    };
+                    tx.send((r, node)).expect("Failed to send result");
+                });
+            }
+            // first, block until we get a result
+            match rx.recv() {
+                Ok((r, node)) => {
+                    let outputs = {
+                        let mut node_inputs_lock =
+                            node_inputs.write().expect("Failed to lock node inputs");
+                        handle_output(
+                            r?,
+                            &node,
+                            &outputs_dir,
+                            &mut node_inputs_lock,
+                            &mut graph_outputs,
+                        )?
+                    };
+                    for output in outputs {
+                        if let Some(n) = dependency_graph.input_link_map.remove(&output) {
+                            for node in n {
+                                dependency_graph
+                                    .node_input_requirements
+                                    .entry(node)
+                                    .and_modify(|v| {
+                                        v.retain(|x| *x != output);
+                                    });
+                            }
                         }
-                    });
+                    }
                 }
-                pool.wait();
-                Arc::into_inner(results)
-                    .ok_or(anyhow!("Failed to unwrap results"))?
-                    .into_inner()?
-            };
-            for (result, node) in results {
-                let mut node_inputs_lock = node_inputs.write().expect("Failed to lock node inputs");
-                let outputs = handle_output(
-                    result?,
-                    &node,
-                    &outputs_dir,
-                    &mut node_inputs_lock,
-                    &mut graph_outputs,
-                )?;
-                drop(node_inputs_lock);
-                for output in outputs {
-                    if let Some(n) = dependency_graph.input_link_map.remove(&output) {
-                        for node in n {
-                            dependency_graph
-                                .node_input_requirements
-                                .entry(node)
-                                .and_modify(|v| {
-                                    v.retain(|x| *x != output);
-                                });
+                Err(e) => {
+                    return Err(anyhow!("Failed to receive result: {:?}", e));
+                }
+            }
+            // then, check if we have more results
+            loop {
+                match rx.try_recv() {
+                    Ok((r, node)) => {
+                        let outputs = {
+                            let mut node_inputs_lock =
+                                node_inputs.write().expect("Failed to lock node inputs");
+                            handle_output(
+                                r?,
+                                &node,
+                                &outputs_dir,
+                                &mut node_inputs_lock,
+                                &mut graph_outputs,
+                            )?
+                        };
+                        for output in outputs {
+                            if let Some(n) = dependency_graph.input_link_map.remove(&output) {
+                                for node in n {
+                                    dependency_graph
+                                        .node_input_requirements
+                                        .entry(node)
+                                        .and_modify(|v| {
+                                            v.retain(|x| *x != output);
+                                        });
+                                }
+                            }
                         }
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                    Err(e) => {
+                        return Err(anyhow!("Failed to receive result: {:?}", e));
                     }
                 }
             }
@@ -427,6 +475,7 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                 break;
             }
         }
+        wait_pool(&pool);
         compare_outputs(expected_outputs, &mut graph_outputs)?;
     }
     Ok(())
