@@ -38,15 +38,15 @@ if (!(Get-Command cbindgen -ErrorAction SilentlyContinue)) {
 }
 
 cargo build --release
-cbindgen --config .\cbindgen.toml --crate onnxrust_proto --output bindings/c/onnxrust_proto.h --lang c
-cbindgen --config .\cbindgen.toml --crate onnxrust_proto --output bindings/cpp/onnxrust_proto.hpp --lang c++
-cl /nologo /W4 /O2 /Fe: c_test.exe .\bindings\tests\test.c .\target\release\onnxrust_proto_api.dll.lib
-cl /nologo /EHsc /std:c++20 /W4 /O2 /Fe: cpp_test.exe .\bindings\tests\test.cpp .\target\release\onnxrust_proto_api.dll.lib
-csc /nologo /t:library /unsafe /out:onnxrust_proto_api_cs.dll .\bindings\cs\onnxrust_proto.cs
-csc /nologo /t:exe /out:cs_test.exe /r:onnxrust_proto_api_cs.dll .\bindings\tests\test.cs
-Copy-Item .\bindings\py\onnxrust_proto.py .
+cbindgen --config .\cbindgen.toml --crate stonnx --output bindings/c/stonnx.h --lang c
+cbindgen --config .\cbindgen.toml --crate stonnx --output bindings/cpp/stonnx.hpp --lang c++
+cl /nologo /W4 /O2 /Fe: c_test.exe .\bindings\tests\test.c .\target\release\stonnx_api.dll.lib
+cl /nologo /EHsc /std:c++20 /W4 /O2 /Fe: cpp_test.exe .\bindings\tests\test.cpp .\target\release\stonnx_api.dll.lib
+csc /nologo /t:library /unsafe /out:stonnx_api_cs.dll .\bindings\cs\stonnx.cs
+csc /nologo /t:exe /out:cs_test.exe /r:stonnx_api_cs.dll .\bindings\tests\test.cs
+Copy-Item .\bindings\py\stonnx.py .
 Copy-Item .\bindings\tests\test.py .
-Copy-Item .\target\release\onnxrust_proto_api.dll .
+Copy-Item .\target\release\stonnx_api.dll .
 Write-Output "Running C test..."
 & .\c_test.exe | Out-Null
 if ($LASTEXITCODE -ne 0) {
@@ -81,6 +81,6 @@ else {
 }
 Remove-Item .\*.exe
 Remove-Item .\*.obj
-Remove-Item .\onnxrust_proto.py
+Remove-Item .\stonnx.py
 Remove-Item .\test.py
 Remove-Item .\*.dll

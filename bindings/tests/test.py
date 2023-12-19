@@ -1,12 +1,12 @@
-import onnxrust_proto
+import stonnx
 
-ok = onnxrust_proto.run_model("GPT2", 
-                              onnxrust_proto.Verbosity.Minimal,
-                              onnxrust_proto.GraphFormat.NONE,
-                              onnxrust_proto.ExecutionMode.FailFast)
+ok = stonnx.run_model("GPT2", 
+                        stonnx.Verbosity.Minimal,
+                        stonnx.GraphFormat.NONE,
+                        stonnx.ExecutionMode.FailFast)
 if ok:
     print("Model execution succeeded")
     exit(0)
 else:
-    print(f"Model execution failed\nError: {onnxrust_proto.last_error()}")
+    print(f"Model execution failed\nError: {stonnx.last_error()}")
     exit(1)

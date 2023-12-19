@@ -1,15 +1,15 @@
 using System;
-using ONNXRustProtoCLR;
+using StonnxCLR;
 
 public class HelloWorld {
     public static int Main() 
     {
-        if (ONNXRustProtoAPI.ONNXModel.Run("GPT2", ONNXRustProtoAPI.Verbosity.Minimal, ONNXRustProtoAPI.GraphFormat.None, ONNXRustProtoAPI.ExecutionMode.FailFast)) {
+        if (StonnxAPI.ONNXModel.Run("GPT2", StonnxAPI.Verbosity.Minimal, StonnxAPI.GraphFormat.None, StonnxAPI.ExecutionMode.FailFast)) {
             Console.WriteLine("Model execution succeeded");
             return 0;
         } else {
             Console.WriteLine("Model execution failed");
-            Console.WriteLine("Error: " + ONNXRustProtoAPI.LastError());
+            Console.WriteLine("Error: " + StonnxAPI.LastError());
             return 1;
         }
     }

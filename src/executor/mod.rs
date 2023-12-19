@@ -146,8 +146,6 @@ struct DependencyGraph {
     pub input_link_map: HashMap<String, Vec<ONNXNode>>,
     /// A set of not implemented operators
     pub not_implemented: HashSet<String>,
-    // /// A map of input names to their corresponding tensors
-    // pub node_inputs:,
 }
 
 /// Create a dependency graph from an ONNX graph and a map of input names to their corresponding tensors
@@ -346,68 +344,99 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
         ));
     }
     let graph = model.graph.get_or_default();
-    {
-        if args.gengraph {
-            build_graph_from_proto(
-                graph,
-                &fileinputs.modelpath,
-                match args.graphtype.as_str() {
-                    "json" => GraphOutputType::Json,
-                    "dot" => GraphOutputType::Dot,
-                    _ => return Err(anyhow!("Invalid graph type")),
-                },
-            )?;
+    if args.gengraph {
+        build_graph_from_proto(
+            graph,
+            &fileinputs.modelpath,
+            match args.graphtype.as_str() {
+                "json" => GraphOutputType::Json,
+                "dot" => GraphOutputType::Dot,
+                _ => return Err(anyhow!("Invalid graph type")),
+            },
+        )?;
+    }
+    let initializers = make_initializers(graph)?;
+    let node_inputs = initialize_nodes(graph, &fileinputs, initializers)?;
+    let expected_outputs = make_external_outputs(graph, &fileinputs)?;
+    let mut graph_outputs = make_graph_outputs(graph)?;
+    let mut dependency_graph = create_links_and_requirements(graph, &node_inputs)?;
+    let node_inputs = Arc::new(RwLock::new(node_inputs));
+    let (tx, rx) = std::sync::mpsc::channel();
+    for vi in graph.value_info.iter() {
+        if let Some(onnx::type_proto::Value::TensorType(_)) = vi.type_.value {
+            // If the type is Tensor, then we are fine because that's implemented
+        } else {
+            unimplemented!("ValueInfoProto type {:?}", vi.type_)
         }
-        let initializers = make_initializers(graph)?;
-        let node_inputs = initialize_nodes(graph, &fileinputs, initializers)?;
-        let expected_outputs = make_external_outputs(graph, &fileinputs)?;
-        let mut graph_outputs = make_graph_outputs(graph)?;
-        let mut dependency_graph = create_links_and_requirements(graph, &node_inputs)?;
-        let node_inputs = Arc::new(RwLock::new(node_inputs));
-        let (tx, rx) = std::sync::mpsc::channel();
-        for vi in graph.value_info.iter() {
-            if let Some(onnx::type_proto::Value::TensorType(_)) = vi.type_.value {
-                // If the type is Tensor, then we are fine because that's implemented
-            } else {
-                unimplemented!("ValueInfoProto type {:?}", vi.type_)
+    }
+
+    print_at_level!(
+        VerbosityLevel::Informational,
+        "Number of not implemented operators: {}",
+        dependency_graph.not_implemented.len()
+    );
+    for name in dependency_graph.not_implemented.iter() {
+        eprintln!("Model uses operator {} which is not implemented yet", name);
+    }
+    if !dependency_graph.not_implemented.is_empty() && args.failfast {
+        return Err(anyhow!("Not implemented operators found"));
+    }
+    loop {
+        let mut nodes_ready = vec![];
+        for (node, inputs) in dependency_graph.node_input_requirements.iter() {
+            if inputs.is_empty() {
+                nodes_ready.push(node.clone());
             }
         }
-
-        print_at_level!(
-            VerbosityLevel::Informational,
-            "Number of not implemented operators: {}",
-            dependency_graph.not_implemented.len()
-        );
-        for name in dependency_graph.not_implemented.iter() {
-            eprintln!("Model uses operator {} which is not implemented yet", name);
+        dependency_graph
+            .node_input_requirements
+            .retain(|_, v| !v.is_empty());
+        for node in nodes_ready {
+            let node_inputs_ref = node_inputs.clone();
+            let tx = tx.clone();
+            pool.spawn(move || {
+                let r = {
+                    let node_inputs_lock =
+                        node_inputs_ref.read().expect("Failed to lock node inputs");
+                    node.execute(node_inputs_lock, opset_version)
+                };
+                tx.send((r, node)).expect("Failed to send result");
+            });
         }
-        if !dependency_graph.not_implemented.is_empty() && args.failfast {
-            return Err(anyhow!("Not implemented operators found"));
-        }
-        loop {
-            let mut nodes_ready = vec![];
-            for (node, inputs) in dependency_graph.node_input_requirements.iter() {
-                if inputs.is_empty() {
-                    nodes_ready.push(node.clone());
+        // first, block until we get a result
+        match rx.recv() {
+            Ok((r, node)) => {
+                let outputs = {
+                    let mut node_inputs_lock =
+                        node_inputs.write().expect("Failed to lock node inputs");
+                    handle_output(
+                        r?,
+                        &node,
+                        &outputs_dir,
+                        &mut node_inputs_lock,
+                        &mut graph_outputs,
+                    )?
+                };
+                for output in outputs {
+                    if let Some(n) = dependency_graph.input_link_map.remove(&output) {
+                        for node in n {
+                            dependency_graph
+                                .node_input_requirements
+                                .entry(node)
+                                .and_modify(|v| {
+                                    v.retain(|x| *x != output);
+                                });
+                        }
+                    }
                 }
             }
-            dependency_graph
-                .node_input_requirements
-                .retain(|_, v| !v.is_empty());
-            for node in nodes_ready {
-                let node_inputs_ref = node_inputs.clone();
-                let tx = tx.clone();
-                pool.spawn(move || {
-                    let r = {
-                        let node_inputs_lock =
-                            node_inputs_ref.read().expect("Failed to lock node inputs");
-                        node.execute(node_inputs_lock, opset_version)
-                    };
-                    tx.send((r, node)).expect("Failed to send result");
-                });
+            Err(e) => {
+                return Err(anyhow!("Failed to receive result: {:?}", e));
             }
-            // first, block until we get a result
-            match rx.recv() {
+        }
+        // then, check if we have more results
+        loop {
+            match rx.try_recv() {
                 Ok((r, node)) => {
                     let outputs = {
                         let mut node_inputs_lock =
@@ -433,50 +462,17 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
                         }
                     }
                 }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
                 Err(e) => {
                     return Err(anyhow!("Failed to receive result: {:?}", e));
                 }
             }
-            // then, check if we have more results
-            loop {
-                match rx.try_recv() {
-                    Ok((r, node)) => {
-                        let outputs = {
-                            let mut node_inputs_lock =
-                                node_inputs.write().expect("Failed to lock node inputs");
-                            handle_output(
-                                r?,
-                                &node,
-                                &outputs_dir,
-                                &mut node_inputs_lock,
-                                &mut graph_outputs,
-                            )?
-                        };
-                        for output in outputs {
-                            if let Some(n) = dependency_graph.input_link_map.remove(&output) {
-                                for node in n {
-                                    dependency_graph
-                                        .node_input_requirements
-                                        .entry(node)
-                                        .and_modify(|v| {
-                                            v.retain(|x| *x != output);
-                                        });
-                                }
-                            }
-                        }
-                    }
-                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
-                    Err(e) => {
-                        return Err(anyhow!("Failed to receive result: {:?}", e));
-                    }
-                }
-            }
-            if dependency_graph.node_input_requirements.is_empty() {
-                break;
-            }
         }
-        wait_pool(&pool);
-        compare_outputs(expected_outputs, &mut graph_outputs)?;
+        if dependency_graph.node_input_requirements.is_empty() {
+            break;
+        }
     }
+    wait_pool(&pool);
+    compare_outputs(expected_outputs, &mut graph_outputs)?;
     Ok(())
 }

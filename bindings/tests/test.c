@@ -1,12 +1,16 @@
 #include <stdio.h>
-#include "../c/onnxrust_proto.h"
+#include "../c/stonnx.h"
 
-int main() {
+int main()
+{
     bool ok = run_model("GPT2", Minimal, None, FailFast);
-    if (ok) {
+    if (ok)
+    {
         printf("Model execution succeeded\n");
         return EXIT_SUCCESS;
-    } else {
+    }
+    else
+    {
         printf("Model execution failed\n");
         printf("Error: %s\n", last_error());
         return EXIT_FAILURE;

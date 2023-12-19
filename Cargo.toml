@@ -1,5 +1,5 @@
 [package]
-name = "onnxrust_proto"
+name = "stonnx"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
@@ -12,11 +12,11 @@ custom-threadpool = []
 debug = 1
 
 [lib]
-name = "onnxrust_proto_api"
+name = "stonnx_api"
 crate-type = ["cdylib"]
 
 [[bin]]
-name = "onnxrust_proto"
+name = "stonnx"
 
 [dependencies]
 anyhow = { version = "1.0.75", features = ["backtrace"] }

@@ -1,4 +1,4 @@
-#include "../cpp/onnxrust_proto.hpp"
+#include "../cpp/stonnx.hpp"
 #include <iostream>
 
 int main() {

@@ -2,8 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace ONNXRustProtoCLR {
-    public static unsafe class ONNXRustProtoAPI {
+namespace StonnxCLR {
+    public static unsafe class StonnxAPI {
         [DllImport("onnxrust_proto_api", EntryPoint = "read_onnx_model", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern IntPtr _read_onnx_model(string model_path);
 

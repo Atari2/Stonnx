@@ -28,20 +28,31 @@ pub enum Verbosity {
 
 #[repr(i64)]
 #[derive(PartialEq)]
+/// Graph format
 pub enum GraphFormat {
+    /// No graph output
     None = 0,
+    /// Graph output in JSON format, saved to graph.json
     Json = 1,
+    /// Graph output in DOT format, saved to graph.dot
     Dot = 2,
 }
 
 #[repr(i64)]
 #[derive(PartialEq)]
+/// Execution mode
 pub enum ExecutionMode {
+    /// Fails immediately if it encounters an operator that is not implemented
     FailFast = 1,
+    /// Continues execution if it encounters an operator that is not implemented, simply panicking when it encounters that operator
     Continue = 0,
 }
 
 #[no_mangle]
+/// Reads an ONNX model from a file
+///
+/// Returns a pointer to a model, null if error, check last_error
+///
 /// # Safety
 ///
 /// Should take a valid path as a C string
@@ -79,6 +90,10 @@ pub unsafe extern "C" fn read_onnx_model(
 }
 
 #[no_mangle]
+/// Frees a model
+///
+/// Returns nothing, does nothing if given a null pointer
+///
 /// # Safety
 ///
 /// Should take a valid pointer to a model
@@ -92,6 +107,12 @@ pub unsafe extern "C" fn free_onnx_model(model: *mut onnx::ModelProto) {
 }
 
 #[no_mangle]
+/// Returns the opset version of a model
+///
+/// Returns MAX_OPSET_VERSION if no opset version is found
+///
+/// Returns MAX_OPSET_VERSION if given a null pointer and sets last_error
+///
 /// # Safety
 ///
 /// Should take a valid pointer to a model
@@ -114,11 +135,20 @@ pub unsafe extern "C" fn get_opset_version(model: *const onnx::ModelProto) -> i6
 }
 
 #[no_mangle]
+/// Runs a model given a path to a model directory, verbosity level (0-4), graph format (json / dot), and execution mode (failfast / continue)
+///
+/// Returns true if successful, false if not
+///
+/// Sets last_error if an error occurs
+///
 /// # Safety
 ///
 /// Should take a valid path to a model directory as a C string
+///
 /// Should take a valid verbosity level
+///
 /// Should take a valid graph format
+///
 /// Should take a valid execution mode
 pub unsafe extern "C" fn run_model(
     model_path: *const std::os::raw::c_char,
@@ -168,10 +198,18 @@ pub unsafe extern "C" fn run_model(
 }
 
 #[no_mangle]
+/// Returns a pointer to a C string containing the last error
+///
+/// Returns a null pointer if no error is present
+///
 /// # Safety
 ///
 /// Safe, returns a pointer to a C string, null if no error
+///
 /// Valid until the next call to run_model
 pub unsafe extern "C" fn last_error() -> *const std::os::raw::c_char {
+    if LAST_ERROR.is_empty() {
+        return std::ptr::null();
+    }
     LAST_ERROR.as_ptr()
 }
