@@ -17,8 +17,8 @@ struct LRNAttrs {
 }
 
 impl LRNAttrs {
-    fn new(node: &NodeProto) -> Self {
-        Self {
+    fn new(node: &NodeProto) -> BoxResult<Self> {
+        Ok(Self {
             alpha: node
                 .attribute
                 .iter()
@@ -38,8 +38,10 @@ impl LRNAttrs {
                 .attribute
                 .iter()
                 .find(|a| a.name() == "size")
-                .map_or(1, |a| a.i.unwrap_or(1)),
-        }
+                .ok_or(anyhow!("size attribute is required"))?
+                .i
+                .ok_or(anyhow!("size attribute must be an integer"))?,
+        })
     }
 }
 
@@ -48,11 +50,11 @@ fn lrn_f32(input: &ArrayD<f32>, attrs: LRNAttrs) -> BoxResult<ArrayD<f32>> {
         return Err(anyhow!("Input must be 4D"));
     }
     let mut square_sum = ArrayD::<f32>::zeros(input.shape());
-    let minc = input.shape()[1];
-    let c1 = (((attrs.size - 1) as f32) / 2f32).floor() as usize;
-    let c2 = (((attrs.size - 1) as f32) / 2f32).ceil() as usize + 1;
-    for c in 0..input.shape()[0] {
-        let begin = c.saturating_sub(c1);
+    let minc = input.shape()[1] as isize;
+    let c1 = (((attrs.size - 1) as f32) / 2f32).floor() as isize;
+    let c2 = (((attrs.size - 1) as f32) / 2f32).ceil() as isize + 1;
+    for c in 0..input.shape()[0] as isize {
+        let begin = (c - c1).max(0);
         let end = (c + c2).min(minc);
         let sumpow = input
             .slice(s![.., begin..end, .., ..])
@@ -79,7 +81,7 @@ pub fn lrn(
     _opset_version: i64,
     _output_len: usize,
 ) -> BoxResult<OperatorResult> {
-    let attrs = LRNAttrs::new(node);
+    let attrs = LRNAttrs::new(node)?;
     match inputs.get(0) {
         Some(TensorType::F32(input)) => {
             let output = lrn_f32(input, attrs)?;
