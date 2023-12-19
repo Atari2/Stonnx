@@ -51,7 +51,7 @@ pub fn constantofshape(
     _opset_version: i64,
     _output_len: usize,
 ) -> BoxResult<OperatorResult> {
-    let shape = if let Some(TensorType::I64(shape)) = input.get(0) {
+    let shape = if let Some(TensorType::I64(shape)) = input.first() {
         shape.iter().map(|v| *v as usize).collect::<Vec<_>>()
     } else {
         return Err(anyhow!("ConstantOfShape: shape must be i64"));

@@ -82,11 +82,11 @@ pub fn lrn(
     _output_len: usize,
 ) -> BoxResult<OperatorResult> {
     let attrs = LRNAttrs::new(node)?;
-    match inputs.get(0) {
+    match inputs.first() {
         Some(TensorType::F32(input)) => {
             let output = lrn_f32(input, attrs)?;
             Ok(TensorType::F32(output).into())
         }
-        _ => todo!("LRN for type {:?}", inputs.get(0)),
+        _ => todo!("LRN for type {:?}", inputs.first()),
     }
 }

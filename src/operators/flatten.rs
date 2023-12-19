@@ -49,7 +49,7 @@ pub fn flatten(
     _output_len: usize,
 ) -> BoxResult<OperatorResult> {
     let attrs = FlattenAttrs::new(node);
-    let input = inputs.get(0).ok_or(anyhow!("No input"))?;
+    let input = inputs.first().ok_or(anyhow!("No input"))?;
     let axis = if attrs.axis < 0 {
         input.ndim() as i64 + attrs.axis
     } else {

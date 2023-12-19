@@ -329,7 +329,7 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
     {
         std::fs::create_dir_all(&outputs_dir)?;
     }
-    let opset_version = if let Some(v) = model.opset_import.get(0) {
+    let opset_version = if let Some(v) = model.opset_import.first() {
         if let Some(v) = v.version {
             v
         } else {

@@ -245,7 +245,7 @@ pub fn gemm(
     let target_version = pick_opset_version(opset_version, &OPSET_VERSIONS);
     let attrs = GemmAttrs::new(node);
 
-    match (inputs.get(0), inputs.get(1), inputs.get(2)) {
+    match (inputs.first(), inputs.get(1), inputs.get(2)) {
         (Some(a), Some(b), Some(c)) => {
             Ok(_gemm_internal(a, b, Some(c), attrs, target_version)?.into())
         }
