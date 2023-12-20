@@ -15,28 +15,31 @@ fn main() {
         "caffenet-12",
         "bvlcalexnet-12",
     ];
-
-    if modelnames
-        .iter()
-        .all(|modelname| std::path::Path::new("models").join(modelname).exists())
-    {
-        println!("models already downloaded");
-    } else {
-        println!("downloading models");
-        let mut easy = Easy::new();
-        easy.url("https://www.atarismwc.com/models.zip").unwrap();
-        let file = std::fs::File::create("models/models.zip").unwrap();
-        let mut writer = std::io::BufWriter::new(file);
-        easy.write_function(move |data| {
-            writer.write_all(data).unwrap();
-            Ok(data.len())
-        })
-        .unwrap();
-        easy.perform().unwrap();
-        let archive_file: PathBuf = "models/models.zip".into();
-        let target_dir: PathBuf = "models".into();
-        zip_extract(&archive_file, &target_dir).unwrap();
-        std::fs::remove_file("models/models.zip").unwrap();
+    let in_ci = env::var("CI").is_ok_and(|x| x == "true");
+    if !in_ci {
+        // if not on CI, download models
+        if modelnames
+            .iter()
+            .all(|modelname| std::path::Path::new("models").join(modelname).exists())
+        {
+            println!("models already downloaded");
+        } else {
+            println!("downloading models");
+            let mut easy = Easy::new();
+            easy.url("https://www.atarismwc.com/models.zip").unwrap();
+            let file = std::fs::File::create("models/models.zip").unwrap();
+            let mut writer = std::io::BufWriter::new(file);
+            easy.write_function(move |data| {
+                writer.write_all(data).unwrap();
+                Ok(data.len())
+            })
+            .unwrap();
+            easy.perform().unwrap();
+            let archive_file: PathBuf = "models/models.zip".into();
+            let target_dir: PathBuf = "models".into();
+            zip_extract(&archive_file, &target_dir).unwrap();
+            std::fs::remove_file("models/models.zip").unwrap();
+        }
     }
 
     env::set_var("OUT_DIR", "src");
