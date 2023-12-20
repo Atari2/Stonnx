@@ -14,6 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if std::path::Path::new("models").exists() {
             println!("models already downloaded");
         } else {
+            println!("cargo:warning=Downloading ONNX models, this may take a while");
             println!("downloading models");
             std::fs::create_dir("models")?;
             let file = std::fs::File::create("models/models.zip")?;
@@ -38,9 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             zip_extract(&archive_file, &target_dir)?;
             std::fs::remove_file("models/models.zip")?;
         }
+    } else {
+        println!("cargo:warning=Not downloading models because we are on CI or building for package registry");
     }
 
-    env::set_var("OUT_DIR", "src");
     println!("cargo:rerun-if-changed=src/protos/onnx.proto");
     protobuf_codegen::Codegen::new()
         // Use `protoc` parser, optional.
@@ -51,7 +53,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .includes(["src/protos"])
         // Inputs must reside in some of include paths.
         .input("src/protos/onnx.proto")
-        // Specify output directory relative to Cargo output directory.
         .cargo_out_dir("onnxparser")
         .customize(Customize::default().lite_runtime(false))
         .run_from_script();
