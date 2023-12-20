@@ -7,25 +7,15 @@ use protobuf_codegen::Customize;
 fn main() {
     // Use this in build.rs
 
-    // models contained in models.zip
-    let modelnames = [
-        "vgg19-7",
-        "GPT2",
-        "zfnet512-12",
-        "caffenet-12",
-        "bvlcalexnet-12",
-    ];
     let in_ci = env::var("CI").is_ok_and(|x| x == "true");
     if !in_ci {
         // if not on CI, download models
-        if modelnames
-            .iter()
-            .all(|modelname| std::path::Path::new("models").join(modelname).exists())
-        {
+        if std::path::Path::new("models").exists() {
             println!("models already downloaded");
         } else {
             println!("downloading models");
             let mut easy = Easy::new();
+            std::fs::create_dir("models").unwrap();
             easy.url("https://www.atarismwc.com/models.zip").unwrap();
             let file = std::fs::File::create("models/models.zip").unwrap();
             let mut writer = std::io::BufWriter::new(file);

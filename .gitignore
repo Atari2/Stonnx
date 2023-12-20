@@ -11,8 +11,4 @@ graph.json
 graph.dot
 *.svg
 __pycache__
-models/vgg19-7
-models/GPT2
-models/zfnet512-12
-models/caffenet-12
-models/bvlcalexnet-12
+models/*
