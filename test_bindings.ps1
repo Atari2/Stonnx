@@ -31,15 +31,8 @@ if (!(Get-Command cargo -ErrorAction SilentlyContinue)) {
     Write-Error "https://www.rust-lang.org/tools/install"
     return
 }
-if (!(Get-Command cbindgen -ErrorAction SilentlyContinue)) {
-    Write-Error "cbindgen is not installed, please install it first."
-    Write-Error "cargo install cbindgen"
-    return
-}
 
 cargo build --release
-cbindgen --config .\cbindgen.toml --crate stonnx --output bindings/c/stonnx.h --lang c
-cbindgen --config .\cbindgen.toml --crate stonnx --output bindings/cpp/stonnx.hpp --lang c++
 cl /nologo /W4 /O2 /Fe: c_test.exe .\bindings\tests\test.c .\target\release\stonnx_api.dll.lib
 cl /nologo /EHsc /std:c++20 /W4 /O2 /Fe: cpp_test.exe .\bindings\tests\test.cpp .\target\release\stonnx_api.dll.lib
 csc /nologo /t:library /unsafe /out:stonnx_api_cs.dll .\bindings\cs\stonnx.cs

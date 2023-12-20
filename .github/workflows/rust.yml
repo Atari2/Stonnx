@@ -20,12 +20,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        lfs: true
     - name: Build
-      run: cargo build --verbose --release
+      run: cargo build --release
     - name: Run tests
-      run: cargo test --verbose --release
-    - name: Run bindings tests
+      run: cargo test --release
+    - name: Run bindings tests (Windows)
       run: ${{ github.workspace }}/test_bindings.ps1
       shell: pwsh
       if: matrix.os == 'windows-latest'
+    - name: Run bindings tests (Linux, macOS)
+      run: ${{ github.workspace }}/test_bindings.sh
+      shell: bash
+      if: matrix.os != 'windows-latest'
     
