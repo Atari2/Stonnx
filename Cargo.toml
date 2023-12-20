@@ -3,10 +3,10 @@ name = "stonnx"
 version = "0.1.1"
 edition = "2021"
 build = "build.rs"
-description = "A Rust library for ONNX"
+description = "A Rust library to run inference on ONNX models"
 license = "MIT"
 documentation = "https://docs.rs/stonnx"
-authors = ["Alessio Rosiello", "Claudiu Constantin Tcaciuc"]
+authors = ["Alessio Rosiello s317659@studenti.polito.it", "Claudiu Constantin Tcaciuc s317661@studenti.polito.it"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
