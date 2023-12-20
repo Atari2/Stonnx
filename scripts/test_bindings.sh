@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+case $(pwd) in *scripts) cd ..;; esac
 if ! command -v cargo &> /dev/null
 then
     echo "Rust is not installed, please install it first."

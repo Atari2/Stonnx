@@ -1,3 +1,6 @@
+if ($pwd.Path.EndsWith("scripts")) {
+    Set-Location ..
+}
 $moduleAlreadyLoaded = Get-Module Microsoft.VisualStudio.DevShell
 if ($moduleAlreadyLoaded) {
     Write-Output "DevShell module is already loaded, skipping."
