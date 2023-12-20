@@ -137,7 +137,7 @@ Il programma ha quattro step principali:
   - Per quanto riguarda il parallelismo all'interno degli operatori, questo è stato implementato solo in alcuni operatori (dove si è ritenuto più conveniente, così da non appesantire l'esecuzione del programma nel caso di calcoli molto semplici e veloci con la gestione dei vari lock, e context switch tra i vari thread), in particolare, tra questi si può trovare `Conv`, `Exp`, `Sqrt`, `Pow`, `MaxPool`, `AveragePool` ma non solo. In particolare il parallelismo è stato introdotto nei punti dove vengono eseguiti loop molto pesanti, come ad esempio il calcolo della convoluzione, all'interno degli operatori, invece che usare il ThreadPool scritto da noi, viene utilizzata principalmente la feature di rayon degli iteratori paralleli;
 - I seguenti screenshot mostrano esempi d'uso dei thread in parallelo (ottenuti con VTune), associato alla porzione del grafico eseguito in quel lasso di tempo (ottenuto con Netron):
 #### Googlenet
-![image](images/vtune_gnet.PNG)
+![image](images/vtune_gnet.png)
 ![image](images/vtune_2_gnet.PNG)
 ![image](images/netron_gnet.PNG)
 #### Inception
