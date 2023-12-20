@@ -19,9 +19,9 @@ jobs:
         os: [ windows-latest, ubuntu-latest, macos-latest ]
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        lfs: true
+    - uses: actions/checkout@v4
+    - name: Clone LFS objects
+      run: git lfs pull --include="models/GPT2/model.onnx" --exclude="*"
     - name: Build
       run: cargo build --release
     - name: Run tests
