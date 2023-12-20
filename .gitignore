@@ -9,5 +9,5 @@ graph.json
 graph.dot
 *.svg
 __pycache__
-models/*
+models
 stonnx_ui

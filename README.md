@@ -18,6 +18,8 @@ Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il li
 
 ### Modalità di utilizzo:
 
+- Scaricare i modelli ONNX utilizzando gli script `download_models.ps1` (windows) o `download_models.sh` (linux/macOS) presenti nella cartella `scripts` oppure scaricarli manualmente da [questo](https://www.atarismwc.com/models.tar.gz) ed estrarli nella root del repository. Originariamente i modelli erano stati inseriti nel repository utilizzando git-lfs ma questo ha causato problemi con il repository fornitoci dal politecnico in quanto la quota di spazio e banda disponibile era troppo bassa;
+
 - Eseguire il comando `cargo build --release` per compilare il progetto;
 
   - di default il progetto viene compilato utilizzando il parallelismo con `rayon` (per compilare con il parallelismo da noi implementato utilizzare il comando `cargo build --features custom-threadpool --release`);

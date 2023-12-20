@@ -9,6 +9,7 @@ import functools
 import glob
 from pathlib import Path
 
+file_path = Path(os.path.dirname(os.path.realpath(__file__))).parent
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", type=str)
 parser.add_argument("-v", "--verbose", type=int, default=4)
@@ -17,7 +18,7 @@ args = parser.parse_args()
 
 pmodel = Path(args.model)
 if not pmodel.is_absolute():
-    jsonfile = f"models/{args.model}/inputs.json"
+    jsonfile = f"{file_path}/models/{args.model}/inputs.json"
 else:
     jsonfile = pmodel.joinpath("inputs.json")
 
@@ -25,17 +26,17 @@ with open(jsonfile, "r") as f:
     information = json.load(f)
 
 modelpath = (
-    f'models/{args.model}/{information["modelpath"]}'
+    f'{file_path}/models/{args.model}/{information["modelpath"]}'
     if not os.path.isabs(information["modelpath"])
     else information["modelpath"]
 )
 
 inputpaths = [
-    f"models/{args.model}/{path}" if not os.path.isabs(path) else path
+    f"{file_path}/models/{args.model}/{path}" if not os.path.isabs(path) else path
     for path in information["inputs"]
 ]
 outputpaths = [
-    f"models/{args.model}/{path}" if not os.path.isabs(path) else path
+    f"{file_path}/models/{args.model}/{path}" if not os.path.isabs(path) else path
     for path in information["outputs"]
 ]
 
@@ -51,7 +52,7 @@ sess = ReferenceEvaluator(model, verbose=4)
 
 modelname = args.model if not pmodel.is_absolute() else pmodel.stem
 
-os.makedirs(f"outputs\\reference\\{modelname}", exist_ok=True)
+os.makedirs(f"{file_path}/outputs/reference/{modelname}", exist_ok=True)
 
 output_info = {}
 
@@ -66,7 +67,7 @@ def _run(og_run, *op_args, **kwargs):
             output_info[o] = (og_run.__self__.op_type, og_run.__self__.input)
             output_exit_order.append(o)
         for name, output in zip(output_names, outputs):
-            np.save(f"outputs\\reference\\{modelname}\\{name}.npy", output)
+            np.save(f"{file_path}/outputs/reference/{modelname}/{name}.npy", output)
     return outputs
 
 
@@ -80,8 +81,8 @@ if len(results) != len(tensor_outputs):
 if args.verbose > 0:
     reference_outputs = {}
     rust_outputs = {}
-    reference_output_files = glob.glob(f"outputs\\reference\\{modelname}\\*.npy")
-    rust_output_files = glob.glob(f"outputs\\{modelname}\\*.npy")
+    reference_output_files = glob.glob(f"outputs/reference/{modelname}/*.npy")
+    rust_output_files = glob.glob(f"{file_path}/outputs/{modelname}/*.npy")
 
     for file in reference_output_files:
         reference_outputs[os.path.basename(file)] = np.load(file)
