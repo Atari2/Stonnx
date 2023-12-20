@@ -3,6 +3,10 @@ name = "stonnx"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
+description = "A Rust library for ONNX"
+license = "MIT"
+documentation = "https://docs.rs/stonnx"
+authors = ["Alessio Rosiello", "Claudiu Constantin Tcaciuc"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
@@ -13,7 +17,7 @@ debug = 1
 
 [lib]
 name = "stonnx_api"
-crate-type = ["cdylib"]
+crate-type = ["rlib", "cdylib"]
 
 [[bin]]
 name = "stonnx"

@@ -11,10 +11,10 @@ use crate::common::MAX_OPSET_VERSION;
 use crate::executor::execute_model;
 use crate::onnxparser::onnx;
 use crate::utils::read_model;
-use common::Args;
+use common::{Args, BoxResult, VerbosityLevel};
 use once_cell::sync::Lazy;
 use std::ffi::CString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 static mut LAST_ERROR: Lazy<CString> = Lazy::new(|| CString::new(*b"").unwrap());
 
@@ -130,6 +130,55 @@ pub unsafe extern "C" fn get_opset_version(model: *const onnx::ModelProto) -> i6
             }
         } else {
             MAX_OPSET_VERSION
+        }
+    }
+}
+
+pub struct Model {
+    path: PathBuf,
+    verbose: u64,
+    graph: bool,
+    graph_format: String,
+    failfast: bool,
+} 
+
+impl Model {
+    pub fn path(&mut self, path: &str) -> &mut Self {
+        self.path = PathBuf::from(path);
+        self
+    }
+    pub fn verbose(&mut self, verbose: VerbosityLevel) -> &mut Self {
+        self.verbose = verbose as u64;
+        self
+    }
+    pub fn graph(&mut self, graph: bool) -> &mut Self {
+        self.graph = graph;
+        self
+    }
+    pub fn graph_format(&mut self, graph_format: &str) -> &mut Self {
+        self.graph_format = graph_format.to_owned();
+        self
+    }
+    pub fn run(&self) -> BoxResult<()> {
+        let args = Args::from_parts(
+            self.path.clone(),
+            self.verbose,
+            self.graph,
+            self.graph_format.clone(),
+            self.failfast,
+        );
+        crate::execute_model(&args)
+    }
+}
+
+impl Default for Model {
+    fn default() -> Self {
+        Self {
+            path: PathBuf::new(),
+            verbose: 0,
+            graph: false,
+            graph_format: "".to_owned(),
+            failfast: false,
         }
     }
 }

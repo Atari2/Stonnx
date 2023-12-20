@@ -12,3 +12,4 @@ graph.dot
 *.svg
 __pycache__
 models/*
+stonnx_ui
