@@ -167,7 +167,6 @@ impl VerbosityLevel {
             1 => VerbosityLevel::Informational,
             2 | 3 => VerbosityLevel::Results,
             4.. => VerbosityLevel::Intermediate,
-            #[cfg(windows)]
             _ => unreachable!(),
         }
     }
