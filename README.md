@@ -1,6 +1,7 @@
 # Stonnx
 
 ### Main Contributors:
+
 - [s317659 Rosiello Alessio](https://github.com/Atari2)
 - [s317661 Tcaciuc Claudiu Constantin](https://github.com/ClaudiuTcaciuc)
 
@@ -9,18 +10,21 @@ Il nome deriva dalla fusione di [Steelix](https://wiki.pokemoncentral.it/Steelix
 ### Descrizione progetto:
 
 Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il linguaggio Rust. Le richieste da rispettare sono le seguenti:
+
 - Creazione di un parser per estrarre dal file ONNX l'informazione necessaria per la creazione della rete;
 - Implementazione di un sotto-set di operatori ONNX;
 - Utilizzo di parallelismo per l'esecuzione della rete;
 - (Opzionale) binding con altri linguaggi.
 
 ### Modalità di utilizzo:
+
 - Eseguire il comando `cargo build --release` per compilare il progetto;
+
   - di default il progetto viene compilato utilizzando il parallelismo con `rayon` (per compilare con il parallelismo da noi implementato utilizzare il comando `cargo build --features custom-threadpool --release`);
 
 - Eseguire il comando `cargo run --release -- --model <modelname>` oppure `cargo run --release --features custom-threadpool -- --model <modelname>`
 
-  - `modelname` è il percorso alla cartella contenente il modello. Nel caso il percorso sia relativo, verrà assunto relativo a `$pwd/models` dove `$pwd` rappresenta la cartella in cui risiede l'eseguibile. Nella cartello contenente il modello ci dovrà essere un file `inputs.json` con il seguente schema: 
+  - `modelname` è il percorso alla cartella contenente il modello. Nel caso il percorso sia relativo, verrà assunto relativo a `$pwd/models` dove `$pwd` rappresenta la cartella in cui risiede l'eseguibile. Nella cartello contenente il modello ci dovrà essere un file `inputs.json` con il seguente schema:
 
     ```json
     {
@@ -37,9 +41,11 @@ Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il li
     ```
 
     tutti i percorsi all'interno di questo file possono essere relativi o assoluti, se relativi, saranno assunti relativi a `$pwd/models/$modelname`.
+
   - Dopo aver clonato il repository, ci saranno dei modelli non presenti all'interno della cartella `models`, questi verranno scaricati automaticamente da internet durante la prima build del progetto.
 
 - Nel caso in cui si volesse visualizzare l'esecuzione degli operatori è possibile aggiungere l'opzione `--verbose` al comando precedente (di default verbose è 0).
+
   - Esempio: `cargo run --release -- --model <modelname> --verbose 1`
   - `verbose = 0`: non visualizza nulla
   - `verbose = 1`: visualizza informazioni riguardanti l'esecuzione degli operatori
@@ -53,7 +59,9 @@ Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il li
 - Eseguire il comando `cargo doc --open` per visualizzare la documentazione del progetto.
 
 ### Modelli supportati:
+
 I modelli testati fanno riferimento a quelli presenti nella sezione [archive](https://github.com/onnx/models/tree/main/archive) del [repository ufficiale di ONNX](https://github.com/onnx/models), in quanto a inizio Dicembre 2023 sono stati aggiornati e aggiunti nuovi modelli, ma lo sviluppo di questo programma è cominciato molto prima dell'aggiornamento del Model Zoo. I modelli testati sono i seguenti:
+
 - [AlexNet](https://github.com/onnx/models/tree/main/archive/vision/classification/alexnet)
 - [MobileNet](https://github.com/onnx/models/tree/main/archive/vision/classification/mobilenet)
 - [GoogleNet](https://github.com/onnx/models/tree/main/archive/vision/classification/inception_and_googlenet/googlenet)
@@ -72,7 +80,9 @@ I modelli testati fanno riferimento a quelli presenti nella sezione [archive](ht
 Nota: durante la scelta dei modelli è stato selezionata la versione più recente presente nella sezione [archive](https://github.com/onnx/models/tree/main/archive) del repository di ONNX.
 
 ### Crate più importanti utilizzati:
+
 Sono state utilizzate le seguenti crate:
+
 - [ndarray](https://crates.io/crates/ndarray): utilizzato per la gestione degli array multidimensionali;
 - [anyhow](https://crates.io/crates/anyhow): utilizzato per la gestione degli errori;
 - [clap](https://crates.io/crates/clap): utilizzato per la gestione degli argomenti da linea di comando;
@@ -82,11 +92,13 @@ Sono state utilizzate le seguenti crate:
 - [protobuf](https://crates.io/crates/protobuf): utilizzato per la gestione dei file protobuf;
 
 ### Descrizione varie parti del progetto:
+
 - `src/main.rs`: file principale del progetto, contiene la funzione main e la gestione degli argomenti da linea di comando;
 - `src/operators`: contiene i file con le implementazioni degli operatori ONNX;
   - tra gli operatori implementati si possono trovare (ma non solo): `Add`, `AveragePool`, `BatchNormalization`, `Concat`, `Conv`, `Dropout`, `Flatten`, `Gemm`, `GlobalAveragePool`, `MaxPool`, `MatMul`, `Mul`, `Relu`, `Reshape`, `Softmax`, `Sum`, `Transpose`;
 - `src/onnxparser`: contiene i file con l'implementazione del parser per estrarre le informazioni dal file ONNX;
-  - I file in questa cartella vengono generati a tempo di build (vedere `build.rs`) dal compilatore di protobuf utilizzando la libreria `protobuf_codegen`. 
+
+  - I file in questa cartella vengono generati a tempo di build (vedere `build.rs`) dal compilatore di protobuf utilizzando la libreria `protobuf_codegen`.
 
 - `src/executor`: contiene l'implementazione per l'esecuzione della rete, sono presenti:
   - logica per la creazione del grafo e l'esecuzione degli operatori;
@@ -117,13 +129,20 @@ Sono state utilizzate le seguenti crate:
 Il programma ha quattro step principali:
 
 - Parsing e lettura del file .onnx, dei suoi input provenienti dall'esterno e inizializzazione dei tensori iniziali con questi ultimi.
-- Creazione di 2 grafi, rappresentati da due HashMap, uno che connette ogni operatore ai suoi input e uno che connette ogni input (tensore) agli operatori in cui viene usato, praticamente l'inverso del primo. Avere queste due rappresentazioni ci permette quindi di avere un grafo delle dipendenze di ciascun operatore, che verrà poi usato nell'esecuzione del modello stesso. Infatti, quando un operatore avrà soddisfatto tutte le sue dipendenze (e.g. i suoi input verranno prodotti da un operatore precedente), esso potrà essere messo in coda per l'esecuzione nel thread pool. 
+- Creazione di 2 grafi, rappresentati da due HashMap, uno che connette ogni operatore ai suoi input e uno che connette ogni input (tensore) agli operatori in cui viene usato, praticamente l'inverso del primo. Avere queste due rappresentazioni ci permette quindi di avere un grafo delle dipendenze di ciascun operatore, che verrà poi usato nell'esecuzione del modello stesso. Infatti, quando un operatore avrà soddisfatto tutte le sue dipendenze (e.g. i suoi input verranno prodotti da un operatore precedente), esso potrà essere messo in coda per l'esecuzione nel thread pool.
 - Esecuzione dell'inferenza: il modello viene eseguito in parallelo, partendo dagli operatori che non hanno dipendenze o che hanno dipendenze già completamente soddisfatte, questi verranno messi in coda nel thread pool, ogni volta che un operatore viene portato a termine, il risultato di quest'ultimo verrà comunicato al thread principale che aggiornerà il grafo delle dipendenze e farà partire gli operatori che grazie a questo risultato hanno soddisfatto ora le loro dipendenze e così via, finchè il grafo delle dipendenze non sarà vuoto, e avremo quindi ottenuto il risultato finale.
-- Implementazione del *thread pool*: La struttura principale che rappresenta il thread pool è composta da una `queue` (una coda sincronizzata per la gestione dei compiti), `workers` (una collezione di thread) e una `queuestate`(un contatore per tracciare il numero di operazioni in coda);
-  - Quando un thread viene creato, esso inizia a ciclare in attesa di un'operazione da eseguire, quando un'operazione diventa disponibile perché le sue dipendenze sono state risolte, il thread che lo aggiunge, notifica un thread in attesa che c'è un'operazione da eseguire, il thread in attesa, prende l'operazione e la esegue, quando questa viene completata, il thread notifica il thread principale che il compito è stato eseguito, il thread principale aggiorna il grafo delle dipendenze e aggiunge alla coda le operazioni che ora possono essere eseguiti, e così via, finchè non ci sono più compiti da eseguire;
+- Implementazione del _thread pool_: La struttura principale che rappresenta il thread pool è composta da una `queue` (una coda sincronizzata per la gestione dei compiti), `workers` (una collezione di thread) e una `queuestate`(un contatore per tracciare il numero di operazioni in coda);
+  - Quando un thread viene creato, esso inizia a ciclare in attesa di un'operazione da eseguire, quando un'operazione diventa disponibile perché le sue dipendenze sono state risolte, il thread che la aggiunge, notifica la queue dei workers tramite una `Condvar`, di conseguenza, uno dei thread liberi prende l'operazione e la esegue, quando questa viene completata, il thread notifica il thread principale che il compito è stato eseguito, il thread principale aggiorna il grafo delle dipendenze e aggiunge alla coda le operazioni che ora possono essere eseguiti, e così via, finchè non ci sono più compiti da eseguire;
   - Il codice utilizza `Mutex` e `Condvar` per l'accesso sincronizzato alla coda e per la comunicazione tra i thread;
-  - Per quanto riguarda il parallelismo all'interno degli operatori, questo è stato implementato solo in alcuni operatori (dove si è ritenuto più conveniente, così da non appesantire l'esecuzione del programma nel caso di calcoli molto semplici e veloci con la gestione dei vari lock, e context switch tra di essi), in particolare, tra questi si può trovare `Conv`, `Exp`, `Sqrt`, `Pow`, ma non solo. In particolare il parallelismo è stato introdotto nei punti dove vengono eseguiti loop molto pesanti, come ad esempio il calcolo della convoluzione;
-- **TODO**: inserire qualche immagine del grafo 
+  - Per quanto riguarda il parallelismo all'interno degli operatori, questo è stato implementato solo in alcuni operatori (dove si è ritenuto più conveniente, così da non appesantire l'esecuzione del programma nel caso di calcoli molto semplici e veloci con la gestione dei vari lock, e context switch tra i vari thread), in particolare, tra questi si può trovare `Conv`, `Exp`, `Sqrt`, `Pow`, `MaxPool`, `AveragePool` ma non solo. In particolare il parallelismo è stato introdotto nei punti dove vengono eseguiti loop molto pesanti, come ad esempio il calcolo della convoluzione, all'interno degli operatori, invece che usare il ThreadPool scritto da noi, viene utilizzata principalmente la feature di rayon degli iteratori paralleli;
+- I seguenti screenshot mostrano esempi d'uso dei thread in parallelo (ottenuti con VTune), associato alla porzione del grafico eseguito in quel lasso di tempo (ottenuto con Netron):
+#### Googlenet
+![image](images/vtune_gnet.PNG)
+![image](images/vtune_2_gnet.PNG)
+![image](images/netron_gnet.PNG)
+#### Inception
+![image](images/vtune_inception.PNG)
+![image](images/netron_inception.PNG)
 - Comparazione degli output: il programma legge inoltre anche gli output "di reference" che dovrebbero essere ottenuti dall'esecuzione del modello e li confronta con quelli effettivamente ottenuti, controllando che la differenza tra i singoli valori dei due risultati sia massimo 10e-4 e stampando qualche statistica del confronto.
 
 ### Utilizzare Stonnx come libreria
