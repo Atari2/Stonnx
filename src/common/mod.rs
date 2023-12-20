@@ -1,6 +1,7 @@
 use std::ops::AddAssign;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicUsize;
 
 use anyhow::anyhow;
 use clap::Parser;
@@ -9,7 +10,6 @@ use ndarray::ArrayD;
 use ndarray::ScalarOperand;
 use num::traits::AsPrimitive;
 use num::Complex;
-use once_cell::sync::OnceCell;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -24,7 +24,7 @@ pub static UNKNOWN: &str = "<unknown>";
 pub type BoxResult<A> = anyhow::Result<A>;
 
 /// This static variable holds the verbosity level of the program
-pub static VERBOSE: OnceCell<VerbosityLevel> = OnceCell::new();
+pub static VERBOSE: AtomicUsize = AtomicUsize::new(VerbosityLevel::Minimal as usize);
 
 #[derive(Parser, Debug)]
 /// Parse and execute inference on pre-trained ONNX models
@@ -148,16 +148,17 @@ impl FileInputs {
 pub const MAX_OPSET_VERSION: i64 = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(usize)]
 /// Indicates the verbosity level of the program
 pub enum VerbosityLevel {
     /// No output except basic logging
-    Minimal,
+    Minimal = 0,
     /// Outputs information about each operator that is executed
-    Informational,
+    Informational = 1,
     /// Output all results from operators into .npy files
-    Results,
+    Results = 2,
     /// Output intermediate results from operators into .npy files (only supported by conv for now)
-    Intermediate,
+    Intermediate = 3,
 }
 
 impl VerbosityLevel {
@@ -172,11 +173,35 @@ impl VerbosityLevel {
     }
 }
 
+impl std::cmp::PartialEq<usize> for VerbosityLevel {
+    fn eq(&self, other: &usize) -> bool {
+        *self as usize == *other
+    }
+}
+
+impl std::cmp::PartialOrd<usize> for VerbosityLevel {
+    fn partial_cmp(&self, other: &usize) -> Option<std::cmp::Ordering> {
+        (*self as usize).partial_cmp(other)
+    }
+}
+
+impl std::cmp::PartialEq<VerbosityLevel> for usize {
+    fn eq(&self, other: &VerbosityLevel) -> bool {
+        *self == *other as usize
+    }
+}
+
+impl std::cmp::PartialOrd<VerbosityLevel> for usize {
+    fn partial_cmp(&self, other: &VerbosityLevel) -> Option<std::cmp::Ordering> {
+        self.partial_cmp(&(*other as usize))
+    }
+}
+
 #[macro_export]
 /// This macro prints a message if the verbosity level is high enough
 macro_rules! print_at_level {
     ($level:expr, $($arg:tt)*) => {
-        if $crate::common::VERBOSE.get() >= Some(&$level) {
+        if VerbosityLevel::new($crate::common::VERBOSE.load(std::sync::atomic::Ordering::Relaxed)) >= $level {
             println!($($arg)*);
         }
     };

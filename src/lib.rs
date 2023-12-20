@@ -1,11 +1,11 @@
 #![allow(dead_code)]
-mod common;
-mod executor;
-mod onnxparser;
-mod operators;
-mod parallel;
-mod protograph;
-mod utils;
+pub mod common;
+pub mod executor;
+pub mod onnxparser;
+pub mod operators;
+pub mod parallel;
+pub mod protograph;
+pub mod utils;
 
 use crate::common::MAX_OPSET_VERSION;
 use crate::executor::execute_model;

@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
-    sync::{Arc, RwLock, RwLockReadGuard},
+    sync::{Arc, RwLock, RwLockReadGuard, atomic::Ordering},
 };
 
 use crate::{
@@ -120,9 +120,7 @@ fn handle_output(
             output_name,
             res.shape()
         );
-        if VERBOSE
-            .get()
-            .map_or(false, |&v| v >= VerbosityLevel::Results)
+        if VERBOSE.load(Ordering::Relaxed) >= VerbosityLevel::Results
         {
             res.to_file(outputs_dir, output_name)?;
         }
@@ -302,8 +300,7 @@ fn wait_pool(_pool: &rayon::ThreadPool) {
 
 pub fn execute_model(args: &Args) -> BoxResult<()> {
     VERBOSE
-        .set(VerbosityLevel::new(args.verbose as usize))
-        .map_err(|_| anyhow!("Failed to set verbosity"))?;
+        .store(VerbosityLevel::new(args.verbose as usize) as usize, Ordering::Relaxed);
     print_at_level!(
         VerbosityLevel::Minimal,
         "Running model: {}",
@@ -322,8 +319,7 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
     let parallelism: usize = std::thread::available_parallelism()?.into();
     let pool = create_pool(parallelism)?;
     if VERBOSE
-        .get()
-        .map_or(false, |&v| v >= VerbosityLevel::Results)
+        .load(Ordering::Relaxed) >= VerbosityLevel::Results
     {
         std::fs::create_dir_all(&outputs_dir)?;
     }
