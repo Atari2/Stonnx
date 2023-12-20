@@ -41,7 +41,11 @@ trait_set! {
 fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
     lhs: ArrayViewD<'a, A>,
     rhs: ArrayViewD<'a, A>,
-) -> BoxResult<ArrayD<A>> {
+) -> BoxResult<ArrayD<A>>
+where
+    for<'b> ndarray::ArrayView2<'b, A>:
+        ndarray::linalg::Dot<ndarray::ArrayView2<'b, A>, Output = ndarray::Array2<A>>,
+{
     let lhs_shape = lhs.shape();
     let rhs_shape = rhs.shape();
     let lhs_shape_len = lhs_shape.len();
@@ -55,15 +59,8 @@ fn dot_product<'a, A: ArrayNumericValueTrait<A>>(
         if lhs_shape[1] != rhs_shape[0] {
             return Err(anyhow!("Gemm: a and b must have compatible shapes"));
         }
-        let mut res = ArrayD::zeros(ndarray::IxDyn(&[lhs_shape[0], rhs_shape[1]]));
-        for i in 0..lhs_shape[0] {
-            for j in 0..rhs_shape[1] {
-                for k in 0..lhs_shape[1] {
-                    res[[i, j]] += lhs[[i, k]] * rhs[[k, j]];
-                }
-            }
-        }
-        Ok(res)
+        let res = lhs.dot(&rhs);
+        Ok(res.into_dyn())
     } else {
         Err(anyhow!("Gemm: a and b must be 2D matrices"))
     }

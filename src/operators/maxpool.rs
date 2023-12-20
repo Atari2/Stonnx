@@ -1,4 +1,6 @@
 #![allow(unused_variables)]
+use std::sync::{Arc, Mutex};
+
 use ndarray::{s, Array2, ArrayD, Ix1, Ix2, IxDyn};
 use num::traits::AsPrimitive;
 
@@ -152,65 +154,82 @@ fn _max_pool_generic_2d<A: ArrayElement>(
         return Err(anyhow!("Dilations not set"));
     };
     let x_data = input.to_shape(Ix1(shape_safe_product(input.shape())))?;
-    let mut y_data = y.to_shape(Ix1(shape_safe_product(y.shape())))?;
-    let mut i_data = indices.to_shape(Ix1(shape_safe_product(indices.shape())))?;
+    let y_data = Arc::new(Mutex::new(y.to_shape(Ix1(shape_safe_product(y.shape())))?));
+    let i_data = Arc::new(Mutex::new(
+        indices.to_shape(Ix1(shape_safe_product(indices.shape())))?,
+    ));
 
-    let mut iteration = |c: usize| {
-        let x_d = c * x_step;
-        let y_d = c * y_step;
-        for ph in 0..pooled_height {
-            let hstart = ph * stride_h as usize - new_pads[[0, 0]];
-            let hend = hstart + (attrs.kernel_shape[0] * dilation_h) as usize;
-            for pw in 0..pooled_width {
-                let wstart = pw * stride_w as usize - new_pads[[1, 0]];
-                let wend = wstart + (attrs.kernel_shape[1] * dilation_w) as usize;
-                let pool_index = ph * pooled_width + pw;
-                let mut y_h = None;
-                let mut h_index = -1;
-                let mut w_index = -1;
-                for h in (hstart..hend).step_by(dilation_h as usize) {
-                    if h >= height {
-                        continue;
-                    }
-                    for w in (wstart..wend).step_by(dilation_w as usize) {
-                        if w >= width {
-                            continue;
-                        }
-                        let input_index = h * width + w;
-                        if input_index > x_data.shape()[0] {
-                            continue;
-                        }
-                        if y_h.is_none() {
-                            let y_hv = x_data[x_d + input_index];
-                            y_h = Some(y_hv);
-                            h_index = h as i64;
-                            w_index = w as i64;
-                        } else if let Some(ref mut y_h) = y_h {
-                            if x_data[x_d + input_index] > *y_h {
-                                *y_h = x_data[x_d + input_index];
-                                h_index = h as i64;
-                                w_index = w as i64;
+    rayon::scope(|s| {
+        for c in 0..total_channels {
+            let new_pads = &new_pads;
+            let kernel_shape = &attrs.kernel_shape;
+            let x_data = &x_data;
+            let y_data = Arc::clone(&y_data);
+            let i_data = Arc::clone(&i_data);
+            s.spawn(move |_| {
+                let x_d = c * x_step;
+                let y_d = c * y_step;
+                for ph in 0..pooled_height {
+                    let hstart = ph * stride_h as usize - new_pads[[0, 0]];
+                    let hend = hstart + (kernel_shape[0] * dilation_h) as usize;
+                    for pw in 0..pooled_width {
+                        let wstart = pw * stride_w as usize - new_pads[[1, 0]];
+                        let wend = wstart + (kernel_shape[1] * dilation_w) as usize;
+                        let pool_index = ph * pooled_width + pw;
+                        let mut y_h = None;
+                        let mut h_index = -1;
+                        let mut w_index = -1;
+                        for h in (hstart..hend).step_by(dilation_h as usize) {
+                            if h >= height {
+                                continue;
+                            }
+                            for w in (wstart..wend).step_by(dilation_w as usize) {
+                                if w >= width {
+                                    continue;
+                                }
+                                let input_index = h * width + w;
+                                if input_index > x_data.shape()[0] {
+                                    continue;
+                                }
+                                if y_h.is_none() {
+                                    let y_hv = x_data[x_d + input_index];
+                                    y_h = Some(y_hv);
+                                    h_index = h as i64;
+                                    w_index = w as i64;
+                                } else if let Some(ref mut y_h) = y_h {
+                                    if x_data[x_d + input_index] > *y_h {
+                                        *y_h = x_data[x_d + input_index];
+                                        h_index = h as i64;
+                                        w_index = w as i64;
+                                    }
+                                }
                             }
                         }
+                        if y_h.is_none() {
+                            continue;
+                        } else if let Some(ref mut y_h) = y_h {
+                            let mut y_data = y_data.lock().expect("Mutex lock for y_data failed");
+                            let mut i_data = i_data.lock().expect("Mutex lock for i_data failed");
+                            y_data[y_d + pool_index] = *y_h;
+                            i_data[y_d + pool_index] = if attrs.storage_order == 0 {
+                                c * x_step + h_index as usize * width + w_index as usize
+                            } else {
+                                c * x_step + h_index as usize + w_index as usize * height
+                            } as i64;
+                        }
                     }
                 }
-                if y_h.is_none() {
-                    continue;
-                } else if let Some(ref mut y_h) = y_h {
-                    y_data[y_d + pool_index] = *y_h;
-                    i_data[y_d + pool_index] = if attrs.storage_order == 0 {
-                        c * x_step + h_index as usize * width + w_index as usize
-                    } else {
-                        c * x_step + h_index as usize + w_index as usize * height
-                    } as i64;
-                }
-            }
+            });
         }
-    };
-
-    for c in 0..total_channels {
-        iteration(c);
-    }
+    });
+    let y_data = Arc::into_inner(y_data)
+        .ok_or(anyhow!("Arc into_inner for y_data failed"))?
+        .into_inner()
+        .map_err(|e| anyhow!("Mutex into_inner for y_data failed: {}", e))?;
+    let indices = Arc::into_inner(i_data)
+        .ok_or(anyhow!("Arc into_inner for i_data failed"))?
+        .into_inner()
+        .map_err(|e| anyhow!("Mutex into_inner for i_data failed: {}", e))?;
     if output_len == 1 {
         Ok((y_data.to_shape(y_dims)?.to_owned(), None))
     } else {

@@ -45,7 +45,7 @@ fn _softmax_f32(input: &ArrayD<f32>, axis: usize) -> BoxResult<TensorType> {
         .map_axis(Axis(axis), |a| a.iter().fold(f32::MIN, |a, &b| a.max(b)))
         .into_shape(new_shape)?;
     let mut y = input - &tmpmax;
-    y.mapv_inplace(|a| a.exp());
+    y.par_mapv_inplace(|a| a.exp());
     let ynewshape = y
         .shape()
         .iter()

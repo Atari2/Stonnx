@@ -17,7 +17,11 @@ pub fn sqrt(
     let data = inputs[0].to_owned();
 
     match data {
-        TensorType::F32(x) => Ok(TensorType::F32(x.mapv(|v| v.sqrt())).into()),
+        TensorType::F32(x) => {
+            let mut x = x.clone();
+            x.par_mapv_inplace(|v| v.sqrt());
+            Ok(TensorType::F32(x).into())
+        }
         x => {
             todo!("Sqrt for type {}", x);
         }

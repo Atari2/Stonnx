@@ -1,3 +1,5 @@
+use std::sync::Mutex;
+
 use crate::{
     common::{ArrayElement, BoxResult, F32IntoType, OperatorResult, TensorType},
     onnx::NodeProto,
@@ -6,6 +8,7 @@ use anyhow::anyhow;
 use itertools::Itertools;
 use ndarray::{Array0, Array1, ArrayD, Ix0, SliceInfoElem};
 use num::traits::AsPrimitive;
+use rayon::iter::{IntoParallelIterator, ParallelBridge, ParallelIterator};
 
 use super::_commonpool::{CommonPoolAttrs, PoolAutoPad, PoolOutput};
 
@@ -218,7 +221,7 @@ where
         .into_iter()
         .chain(out_shape.iter().map(|v| *v as usize))
         .collect::<Vec<_>>();
-    let mut y = ArrayD::<A>::zeros(y_shape);
+    let y = Mutex::new(ArrayD::<A>::zeros(y_shape));
     let dilations = dilations
         .clone()
         .map_or_else(|| Array1::ones(spatial_size), Array1::from_vec);
@@ -241,71 +244,85 @@ where
                 + 1;
             0..r
         }));
-    for shape in siter.multi_cartesian_product() {
-        let slice = [shape[0], shape[1]]
-            .into_iter()
-            .map(|i| (i as usize).into())
-            .chain((0..padded.ndim() - 2).map(|_| (0..).into()))
-            .collect::<Vec<SliceInfoElem>>();
-        let window = padded.slice(slice.as_slice());
-        let window_vals = (0..spatial_size)
-            .map(|i| {
-                let b = strides[i] * shape[i + 2];
-                let e = strides[i] * shape[i + 2] + (1 + (kernel[i] - 1) * dilations[i]);
-                (b..e).step_by(dilations[i] as usize)
-            })
-            .multi_cartesian_product()
-            .map(|shape| {
-                let shape_len = shape.len();
-                let remaining = spatial_size - shape_len;
-                let mut slicer = shape
-                    .into_iter()
-                    .map(|i| (i as usize).into())
-                    .collect::<Vec<SliceInfoElem>>();
-                if remaining > 0 {
-                    slicer.extend((0..remaining).map(|_| SliceInfoElem::Slice {
-                        start: 0,
-                        end: None,
-                        step: 1,
-                    }));
-                }
-                window.slice(slicer.as_slice())
-            })
-            .collect_vec();
-        let window_vals_shape = [window_vals.len()]
-            .into_iter()
-            .chain(window_vals[0].shape().iter().copied())
-            .collect::<Vec<_>>();
-        let window_vals = ArrayD::<A>::from_shape_vec(
-            window_vals_shape,
-            window_vals
+    siter
+        .multi_cartesian_product()
+        .par_bridge()
+        .into_par_iter()
+        .for_each(|shape| {
+            let slice = [shape[0], shape[1]]
                 .into_iter()
-                .flatten()
-                .copied()
-                .collect::<Vec<_>>(),
-        )?;
-        let shape = shape
-            .into_iter()
-            .map(|i| (i as usize).into())
-            .collect::<Vec<SliceInfoElem>>();
-        if count_include_pad == 1 {
-            let avg = Array0::from_elem(
-                Ix0(),
-                window_vals.iter().copied().sum::<A>() / window_vals.len().as_(),
-            );
-            y.slice_mut(shape.as_slice()).assign(&avg);
-        } else {
-            let window_vals_no_nan = window_vals
+                .map(|i| (i as usize).into())
+                .chain((0..padded.ndim() - 2).map(|_| (0..).into()))
+                .collect::<Vec<SliceInfoElem>>();
+            let window = padded.slice(slice.as_slice());
+            let window_vals = (0..spatial_size)
+                .map(|i| {
+                    let b = strides[i] * shape[i + 2];
+                    let e = strides[i] * shape[i + 2] + (1 + (kernel[i] - 1) * dilations[i]);
+                    (b..e).step_by(dilations[i] as usize)
+                })
+                .multi_cartesian_product()
+                .map(|shape| {
+                    let shape_len = shape.len();
+                    let remaining = spatial_size - shape_len;
+                    let mut slicer = shape
+                        .into_iter()
+                        .map(|i| (i as usize).into())
+                        .collect::<Vec<SliceInfoElem>>();
+                    if remaining > 0 {
+                        slicer.extend((0..remaining).map(|_| SliceInfoElem::Slice {
+                            start: 0,
+                            end: None,
+                            step: 1,
+                        }));
+                    }
+                    window.slice(slicer.as_slice())
+                })
+                .collect_vec();
+            let window_vals_shape = [window_vals.len()]
                 .into_iter()
-                .filter(|v| !v.is_nan())
+                .chain(window_vals[0].shape().iter().copied())
                 .collect::<Vec<_>>();
-            let avg = Array0::from_elem(
-                Ix0(),
-                window_vals_no_nan.iter().copied().sum::<A>() / window_vals_no_nan.len().as_(),
-            );
-            y.slice_mut(shape.as_slice()).assign(&avg);
-        }
-    }
+            let window_vals = ArrayD::<A>::from_shape_vec(
+                window_vals_shape,
+                window_vals
+                    .into_iter()
+                    .flatten()
+                    .copied()
+                    .collect::<Vec<_>>(),
+            )
+            .expect("Window vals shape");
+            let shape = shape
+                .into_iter()
+                .map(|i| (i as usize).into())
+                .collect::<Vec<SliceInfoElem>>();
+            if count_include_pad == 1 {
+                let avg = Array0::from_elem(
+                    Ix0(),
+                    window_vals.iter().copied().sum::<A>() / window_vals.len().as_(),
+                );
+                {
+                    let mut y = y.lock().expect("Mutex lock for y failed");
+                    y.slice_mut(shape.as_slice()).assign(&avg);
+                }
+            } else {
+                let window_vals_no_nan = window_vals
+                    .into_iter()
+                    .filter(|v| !v.is_nan())
+                    .collect::<Vec<_>>();
+                let avg = Array0::from_elem(
+                    Ix0(),
+                    window_vals_no_nan.iter().copied().sum::<A>() / window_vals_no_nan.len().as_(),
+                );
+                {
+                    let mut y = y.lock().expect("Mutex lock for y failed");
+                    y.slice_mut(shape.as_slice()).assign(&avg);
+                }
+            }
+        });
+    let y = y
+        .into_inner()
+        .map_err(|e| anyhow!("Mutex lock for y failed {e}"))?;
     Ok((y, None))
 }
 

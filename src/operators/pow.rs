@@ -28,8 +28,16 @@ pub fn pow(
     };
 
     match data {
-        TensorType::F32(x) => Ok(TensorType::F32(x.mapv(|v| v.powf(pow))).into()),
-        TensorType::I64(x) => Ok(TensorType::I64(x.mapv(|v| v.pow(pow as u32))).into()),
+        TensorType::F32(x) => {
+            let mut x = x.clone();
+            x.par_mapv_inplace(|v| v.powf(pow));
+            Ok(TensorType::F32(x).into())
+        }
+        TensorType::I64(x) => {
+            let mut x = x.clone();
+            x.par_mapv_inplace(|v| v.pow(pow as u32));
+            Ok(TensorType::I64(x).into())
+        }
         x => {
             todo!("Pow for type {:?}", x);
         }

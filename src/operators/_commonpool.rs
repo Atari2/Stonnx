@@ -1,4 +1,6 @@
 #![allow(clippy::too_many_arguments)]
+use std::sync::Mutex;
+
 use crate::{
     common::{ArrayElement, BoxResult, F32IntoType},
     onnx::AttributeProto,
@@ -8,6 +10,7 @@ use itertools::Itertools;
 use ndarray::{s, Array0, Array1, Array2, ArrayD, ArrayView1, Ix0, Ix2, SliceInfoElem};
 use ndarray_stats::QuantileExt;
 use num::traits::AsPrimitive;
+use rayon::iter::{IntoParallelIterator, ParallelBridge, ParallelIterator};
 
 #[derive(Debug, PartialEq)]
 pub enum PoolingType {
@@ -191,13 +194,13 @@ where
         },
     };
     let spatial_size = x_shape.len() - 2;
-    let mut y = ndarray::ArrayD::<A>::zeros(
+    let y = ndarray::ArrayD::<A>::zeros(
         [x_shape[0], x_shape[1]]
             .into_iter()
             .chain(out_shape.iter().copied())
             .collect::<Vec<_>>(),
     );
-    let mut z = if indices {
+    let z = if indices {
         Some(ndarray::ArrayD::<i64>::from_elem(y.shape(), -1))
     } else {
         None
@@ -207,7 +210,7 @@ where
     } else {
         f32::floor
     };
-    let loop_range = || {
+    let loop_iter = {
         let getrange = |i| {
             let div1 = (x_shape[i + 2] + pad_shape[i] - kernel_shape[i] as usize) as f32;
             let div2 = strides_shape[i] as f32;
@@ -216,103 +219,121 @@ where
         };
         (0..spatial_size).map(getrange)
     };
-    let loop_iter = loop_range();
     let loop_vec = [(0..x_shape[0]), (0..x_shape[1])]
         .into_iter()
         .chain(loop_iter)
         .collect::<Vec<_>>();
-    for shape in loop_vec.into_iter().multi_cartesian_product() {
-        let shape: Vec<usize> = shape;
-        let mut sliceinfos = vec![];
-        #[allow(clippy::needless_range_loop)] // bogus warning
-        for i in 0..padded.ndim() {
-            if i < 2 {
-                sliceinfos.push(SliceInfoElem::Index(shape[i] as isize));
-            } else {
-                sliceinfos.push(SliceInfoElem::Slice {
-                    start: 0,
-                    end: None,
-                    step: 1,
-                });
-            }
-        }
-        let window = padded.slice(sliceinfos.as_slice());
-        let listi = (0..spatial_size)
-            .map(|i| {
-                (strides_shape[i] as usize * shape[i + 2])
-                    ..(strides_shape[i] as usize * shape[i + 2] + kernel_shape[i] as usize)
-            })
-            .multi_cartesian_product()
-            .collect::<Vec<_>>();
-        let mut values = vec![];
-        for iv in listi {
-            let wsi = (0..window.ndim())
-                .map(|j| {
-                    if j < iv.len() {
-                        SliceInfoElem::Index(iv[j] as isize)
-                    } else {
-                        SliceInfoElem::Slice {
-                            start: 0,
-                            end: None,
-                            step: 1,
-                        }
-                    }
-                })
-                .collect::<Vec<_>>();
-            values.push(window.slice(wsi.as_slice()));
-        }
-        let values = values.iter().flatten().copied().collect::<Vec<_>>();
-        let window_vals = ndarray::Array1::<A>::from_vec(values);
-        if count_include_pad == Some(1) && pooling_type == PoolingType::Average {
-            let shapeidx = (0..y.ndim())
-                .map(|i| {
-                    if i < shape.len() {
-                        SliceInfoElem::Index(shape[i] as isize)
-                    } else {
-                        SliceInfoElem::Slice {
-                            start: 0,
-                            end: None,
-                            step: 1,
-                        }
-                    }
-                })
-                .collect::<Vec<_>>();
-            let pooled = fpool(window_vals.view());
-            y.slice_mut(shapeidx.as_slice()).assign(&pooled);
-        } else {
-            let no_nan = window_vals
-                .iter()
-                .filter(|v| !v.is_nan())
-                .copied()
-                .collect::<Vec<_>>();
-            let no_nan = ndarray::Array1::<A>::from_vec(no_nan);
-            let pooled = fpool(no_nan.view());
-            let shapeidx = (0..y.ndim())
-                .map(|i| {
-                    if i < shape.len() {
-                        SliceInfoElem::Index(shape[i] as isize)
-                    } else {
-                        SliceInfoElem::Slice {
-                            start: 0,
-                            end: None,
-                            step: 1,
-                        }
-                    }
-                })
-                .collect::<Vec<_>>();
-            y.slice_mut(shapeidx.as_slice()).assign(&pooled);
-            if let Some(ref mut z) = z {
-                if indices {
-                    let arg = no_nan.argmax()?;
-                    let coordinates = _get_indices(arg, out_shape);
-                    let delta = Array1::from_vec(shape[2..].to_vec()) - pads.slice(s![.., 0]);
-                    let coordinates = coordinates + delta;
-                    let new_arg = _get_index(coordinates, &x_shape[2..]);
-                    z[shape.as_slice()] = new_arg as i64;
+    let yndim = y.ndim();
+    let yz = Mutex::new((y, z));
+    loop_vec
+        .into_iter()
+        .multi_cartesian_product()
+        .par_bridge()
+        .into_par_iter()
+        .for_each(|shape| {
+            let shape: Vec<usize> = shape;
+            let mut sliceinfos = vec![];
+            #[allow(clippy::needless_range_loop)] // bogus warning
+            for i in 0..padded.ndim() {
+                if i < 2 {
+                    sliceinfos.push(SliceInfoElem::Index(shape[i] as isize));
+                } else {
+                    sliceinfos.push(SliceInfoElem::Slice {
+                        start: 0,
+                        end: None,
+                        step: 1,
+                    });
                 }
             }
-        }
-    }
+            let window = padded.slice(sliceinfos.as_slice());
+            let listi = (0..spatial_size)
+                .map(|i| {
+                    (strides_shape[i] as usize * shape[i + 2])
+                        ..(strides_shape[i] as usize * shape[i + 2] + kernel_shape[i] as usize)
+                })
+                .multi_cartesian_product()
+                .collect::<Vec<_>>();
+            let values = listi
+                .into_par_iter()
+                .map(|iv| {
+                    let wsi = (0..window.ndim())
+                        .map(|j| {
+                            if j < iv.len() {
+                                SliceInfoElem::Index(iv[j] as isize)
+                            } else {
+                                SliceInfoElem::Slice {
+                                    start: 0,
+                                    end: None,
+                                    step: 1,
+                                }
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    window.slice(wsi.as_slice())
+                })
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>();
+            let window_vals = ndarray::Array1::<A>::from_vec(values);
+            if count_include_pad == Some(1) && pooling_type == PoolingType::Average {
+                let shapeidx = (0..yndim)
+                    .map(|i| {
+                        if i < shape.len() {
+                            SliceInfoElem::Index(shape[i] as isize)
+                        } else {
+                            SliceInfoElem::Slice {
+                                start: 0,
+                                end: None,
+                                step: 1,
+                            }
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let pooled = fpool(window_vals.view());
+                {
+                    let mut y = yz.lock().unwrap();
+                    y.0.slice_mut(shapeidx.as_slice()).assign(&pooled);
+                }
+            } else {
+                let no_nan = window_vals
+                    .iter()
+                    .filter(|v| !v.is_nan())
+                    .copied()
+                    .collect::<Vec<_>>();
+                let no_nan = ndarray::Array1::<A>::from_vec(no_nan);
+                let pooled = fpool(no_nan.view());
+                let shapeidx = (0..yndim)
+                    .map(|i| {
+                        if i < shape.len() {
+                            SliceInfoElem::Index(shape[i] as isize)
+                        } else {
+                            SliceInfoElem::Slice {
+                                start: 0,
+                                end: None,
+                                step: 1,
+                            }
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                {
+                    let mut yz = yz.lock().unwrap();
+                    let (ref mut y, ref mut z) = *yz;
+                    y.slice_mut(shapeidx.as_slice()).assign(&pooled);
+                    if let Some(ref mut z) = z {
+                        if indices {
+                            let arg = no_nan.argmax().expect("Argmax failed");
+                            let coordinates = _get_indices(arg, out_shape);
+                            let delta =
+                                Array1::from_vec(shape[2..].to_vec()) - pads.slice(s![.., 0]);
+                            let coordinates = coordinates + delta;
+                            let new_arg = _get_index(coordinates, &x_shape[2..]);
+                            z[shape.as_slice()] = new_arg as i64;
+                        }
+                    }
+                }
+            }
+        });
+    let (y, z) = yz.into_inner().map_err(|e| anyhow!("{}", e))?;
     Ok((y, z))
 }
 
@@ -408,13 +429,7 @@ where
             Some(&pad_shape),
             attrs.ceil_mode,
         )?;
-        pad_shape = _get_pad_shape(
-            auto_pad,
-            &x_shape,
-            &kernel_shape,
-            &strides,
-            &out_shape,
-        )?;
+        pad_shape = _get_pad_shape(auto_pad, &x_shape, &kernel_shape, &strides, &out_shape)?;
         let (pb, pt, pr, pl) = if auto_pad == Some(PoolAutoPad::SameLower) {
             let pb = pad_shape[0] / 2;
             let pr = pad_shape[1] / 2;

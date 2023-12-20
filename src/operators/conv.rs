@@ -7,8 +7,13 @@ use itertools::iproduct;
 use ndarray::Array1;
 use ndarray::Array2;
 use ndarray::ArrayD;
+use ndarray::Axis;
 use ndarray::SliceInfoElem;
 use ndarray::{Ix2, IxDyn};
+use rayon::iter::IndexedParallelIterator;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelBridge;
+use rayon::iter::ParallelIterator;
 
 use crate::common::BoxResult;
 use crate::common::OperatorResult;
@@ -359,22 +364,27 @@ fn im2col_fast<A: ArrayElement>(
         shape_out.push((dx as i64 + pads[i] + pads[i + n_dims] - dim) / strides[i] + 1);
     }
     let mut indices = vec![];
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..shape_out.len() {
-        let kind = _make_ind(i, kernel_shape)?;
-        let iind = _make_ind(i, &shape_out)? * strides[i];
-        // index = np.tile(kind.ravel(), n_C).reshape(-1, 1) + iind.reshape(1, -1)
-        let iind = iind.to_shape(Ix2(1, iind.len()))?;
-        let klen = kind.len();
-        let res = std::iter::repeat(&kind)
-            .take(n_c)
-            .flatten()
-            .copied()
-            .collect::<Vec<_>>();
-        let index = Array2::<i64>::from_shape_vec((n_c * klen, 1), res)?;
-        let index = index + iind;
-        indices.push(index);
-    }
+    (0..shape_out.len())
+        .into_par_iter()
+        .map(|i| {
+            let kind = _make_ind(i, kernel_shape).expect("Failed to make indices");
+            let iind = _make_ind(i, &shape_out).expect("Failed to make indices") * strides[i];
+            // index = np.tile(kind.ravel(), n_C).reshape(-1, 1) + iind.reshape(1, -1)
+            let iind = iind
+                .to_shape(Ix2(1, iind.len()))
+                .expect("Failed to reshape indices");
+            let klen = kind.len();
+            let res = std::iter::repeat(&kind)
+                .take(n_c)
+                .par_bridge()
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>();
+            let index = Array2::<i64>::from_shape_vec((n_c * klen, 1), res)
+                .expect("Failed to make indices");
+            index + iind
+        })
+        .collect_into_vec(&mut indices);
     for (i, index) in indices.iter().enumerate() {
         named_array_to_file!(conv, index, format!("index_{}", i));
     }
@@ -414,7 +424,7 @@ fn im2col_fast<A: ArrayElement>(
     // result seems to have shape (m, x, y, x_padded.shape()[indices.len() + 1:])
     let rows = indices[0].shape()[0];
     let cols = indices[0].shape()[1];
-    let mut cols_shape = vec![m, rows, cols];
+    let mut cols_shape = vec![1, rows, cols];
     if (indices.len() + 1) < x_padded.ndim() {
         cols_shape.extend(x_padded.shape()[(indices.len() + 2)..].iter());
     }
@@ -431,13 +441,19 @@ fn im2col_fast<A: ArrayElement>(
     getitem = (slice(0, m), d, *indices)
     cols = X_padded[getitem]  # type: ignore[index]
      */
-    let mut cols = ArrayD::<A>::zeros(cols_shape.as_slice());
-    for i in 0..m {
-        for (j, k, index) in getitem.clone() {
-            let index = [i].into_iter().chain(index).collect::<Vec<_>>();
-            cols[[i, j, k]] += x_padded[index.as_slice()];
-        }
-    }
+    let single_cols = (0..m)
+        .into_par_iter()
+        .map(|i| {
+            let mut cols = ArrayD::<A>::zeros(cols_shape.as_slice());
+            for (j, k, index) in getitem.clone() {
+                let index = [i].into_iter().chain(index).collect::<Vec<_>>();
+                cols[[0, j, k]] += x_padded[index.as_slice()];
+            }
+            cols
+        })
+        .collect::<Vec<_>>();
+    let single_cols_view = single_cols.iter().map(|x| x.view()).collect::<Vec<_>>();
+    let cols = ndarray::concatenate(Axis(0), single_cols_view.as_slice())?;
     named_array_to_file!(conv, cols);
     let first_dim_len = cols.shape()[0];
     let mut concat_shape = cols.shape()[1..].to_vec();

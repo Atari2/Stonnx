@@ -3,6 +3,8 @@ use crate::{
     onnx::NodeProto,
 };
 use anyhow::anyhow;
+use ndarray::ArrayD;
+use rayon::iter::{ParallelBridge, ParallelIterator};
 
 const _OPSET_VERSIONS: [i64; 4] = [1, 6, 8, 13];
 
@@ -21,7 +23,12 @@ fn _sum_i64(inputs: &[&TensorType]) -> BoxResult<TensorType> {
     let val = inputs_i64
         .iter()
         .skip(1)
-        .fold(inputs_i64[0].to_owned(), |acc, x| acc + x);
+        .par_bridge()
+        .fold(|| inputs_i64[0].to_owned(), |acc, x| acc + x)
+        .reduce(
+            || ArrayD::<i64>::from_elem(inputs_i64[0].shape(), 0),
+            |acc, x| acc + x,
+        );
     Ok(TensorType::I64(val))
 }
 
@@ -40,7 +47,12 @@ fn _sum_f32(inputs: &[&TensorType]) -> BoxResult<TensorType> {
     let val = inputs_f32
         .iter()
         .skip(1)
-        .fold(inputs_f32[0].to_owned(), |acc, x| acc + x);
+        .par_bridge()
+        .fold(|| inputs_f32[0].to_owned(), |acc, x| acc + x)
+        .reduce(
+            || ArrayD::<f32>::from_elem(inputs_f32[0].shape(), 0f32),
+            |acc, x| acc + x,
+        );
     Ok(TensorType::F32(val))
 }
 

@@ -21,8 +21,16 @@ pub fn relu(
         Err(anyhow!("Relu must have 1 input"))
     } else {
         match inputs[0] {
-            TensorType::F32(a) => Ok(TensorType::F32(a.mapv(|v| v.max(0.0))).into()),
-            TensorType::I64(a) => Ok(TensorType::I64(a.mapv(|v| v.max(0))).into()),
+            TensorType::F32(a) => {
+                let mut a = a.clone();
+                a.par_mapv_inplace(|v| v.max(0.0));
+                Ok(TensorType::F32(a).into())
+            }
+            TensorType::I64(a) => {
+                let mut a = a.clone();
+                a.par_mapv_inplace(|v| v.max(0));
+                Ok(TensorType::I64(a).into())
+            }
             _ => Err(anyhow!("Relu: invalid input")),
         }
     }

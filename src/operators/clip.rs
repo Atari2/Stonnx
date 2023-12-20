@@ -33,8 +33,7 @@ impl ClipAttrs {
 fn clip_6(inputs: &[&TensorType], attrs: ClipAttrs) -> BoxResult<TensorType> {
     if let TensorType::F32(a) = &inputs[0] {
         let mut a = a.to_owned();
-        a.mapv_inplace(|v| v.max(attrs.min));
-        a.mapv_inplace(|v| v.min(attrs.max));
+        a.par_mapv_inplace(|v| v.clamp(attrs.min, attrs.max));
         Ok(TensorType::F32(a))
     } else {
         todo!("Clip for type {}", inputs[0])
@@ -72,12 +71,7 @@ fn clip_11(inputs: &[&TensorType]) -> BoxResult<TensorType> {
     };
     if let TensorType::F32(a) = &inputs[0] {
         let mut a = a.to_owned();
-        if let Some(amin) = amin {
-            a.mapv_inplace(|v| v.max(amin));
-        }
-        if let Some(amax) = amax {
-            a.mapv_inplace(|v| v.min(amax));
-        }
+        a.par_mapv_inplace(|v| v.clamp(amin.unwrap_or(f32::MIN), amax.unwrap_or(f32::MAX)));
         Ok(TensorType::F32(a))
     } else {
         todo!("CLIP for type {}", inputs[0])

@@ -1,4 +1,5 @@
 use ndarray::{ArrayD, Axis, CowArray, IxDyn};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     common::{BoxResult, OperatorResult, TensorType, ValueType},
@@ -44,18 +45,18 @@ fn _preprocess<A: Clone>(a: &ArrayD<A>, axis: i64) -> BoxResult<CowArray<'_, A, 
 }
 
 fn _concat_i64(inputs: &[&TensorType], attrs: ConcatAttrs) -> BoxResult<TensorType> {
-    let mut inputs_i64 = vec![];
     let mut cow_array = vec![];
-    for input in inputs.iter() {
-        if let TensorType::I64(x) = input {
-            cow_array.push(_preprocess(x, attrs.axis)?);
-        } else {
-            return Err(anyhow!("Inputs not all of I64"));
-        }
-    }
-    for array in cow_array.iter() {
-        inputs_i64.push(array.view());
-    }
+    inputs
+        .par_iter()
+        .map(|input| match input {
+            TensorType::I64(x) => _preprocess(x, attrs.axis).expect("Preprocess for concat failed"),
+            _ => panic!("Inputs not all of F32"),
+        })
+        .collect_into_vec(&mut cow_array);
+    let inputs_i64 = cow_array
+        .iter()
+        .map(|array| array.view())
+        .collect::<Vec<_>>();
     if inputs_i64.is_empty() {
         return Err(anyhow!("No inputs"));
     }
@@ -72,18 +73,18 @@ fn _concat_i64(inputs: &[&TensorType], attrs: ConcatAttrs) -> BoxResult<TensorTy
 }
 
 fn _concat_f32(inputs: &[&TensorType], attrs: ConcatAttrs) -> BoxResult<TensorType> {
-    let mut inputs_f32 = vec![];
     let mut cow_array = vec![];
-    for input in inputs.iter() {
-        if let TensorType::F32(x) = input {
-            cow_array.push(_preprocess(x, attrs.axis)?);
-        } else {
-            return Err(anyhow!("Inputs not all of F32"));
-        }
-    }
-    for array in cow_array.iter() {
-        inputs_f32.push(array.view());
-    }
+    inputs
+        .par_iter()
+        .map(|input| match input {
+            TensorType::F32(x) => _preprocess(x, attrs.axis).expect("Preprocess for concat failed"),
+            _ => panic!("Inputs not all of F32"),
+        })
+        .collect_into_vec(&mut cow_array);
+    let inputs_f32 = cow_array
+        .iter()
+        .map(|array| array.view())
+        .collect::<Vec<_>>();
     if inputs_f32.is_empty() {
         return Err(anyhow!("No inputs"));
     }

@@ -100,8 +100,9 @@ where
         .into_iter()
         .chain(dim_ones_generator.clone())
         .collect::<Vec<_>>();
-    let v = var.to_shape(vshape.as_slice())?;
-    let y = &s * (x - &m) / (v.mapv(|x| x + epsilon.as_())).mapv(|x| x.sqrt()) + b;
+    let mut v = var.to_shape(vshape.as_slice())?;
+    v.par_mapv_inplace(|x| (x + epsilon.as_()).sqrt());
+    let y = &s * (x - &m) / v + b;
     Ok(y.into())
 }
 
@@ -137,9 +138,19 @@ where
         let sliced = x.slice(sliceinfo.as_slice()).to_owned();
         saved_var[i] = sliced.var((0.0).as_());
     }
-    let output_mean =
-        mean.mapv(|x| x * momentum) + saved_mean.mapv(|x| x * (1.0f32.as_() - momentum));
-    let output_var = var.mapv(|x| x * momentum) + saved_var.mapv(|x| x * (1.0f32.as_() - momentum));
+    let (output_mean, output_var) = {
+        let mut saved_mean = saved_mean.clone();
+        let mut saved_var = saved_var.clone();
+        saved_mean.par_mapv_inplace(|x| x * (1f32.as_() - momentum));
+        saved_var.par_mapv_inplace(|x| x * (1f32.as_() - momentum));
+        let mut vmean = mean.clone();
+        let mut vvar = var.clone();
+        vmean.par_mapv_inplace(|x| x * momentum);
+        vvar.par_mapv_inplace(|x| x * momentum);
+        let output_mean = vmean + saved_mean;
+        let output_var = vvar + saved_var;
+        (output_mean, output_var)
+    };
     let y = _batchnorm_test_mode(x, scale, bias, &output_mean, &output_var, epsilon)?;
     Ok(vec![
         y,
@@ -214,10 +225,14 @@ where
             let sliced = x.slice(sliceinfo.as_slice()).to_owned();
             saved_var[i] = sliced.var((0.0).as_());
         }
-        let output_mean =
-            mean.mapv(|x| x * momentum) + saved_mean.mapv(|x| x * (1f32.as_() - momentum));
-        let output_var =
-            var.mapv(|x| x * momentum) + saved_var.mapv(|x| x * (1f32.as_() - momentum));
+        saved_mean.par_mapv_inplace(|x| x * (1f32.as_() - momentum));
+        saved_var.par_mapv_inplace(|x| x * (1f32.as_() - momentum));
+        let mut vmean = mean.clone();
+        let mut vvar = var.clone();
+        vmean.par_mapv_inplace(|x| x * momentum);
+        vvar.par_mapv_inplace(|x| x * momentum);
+        let output_mean = vmean + saved_mean;
+        let output_var = vvar + saved_var;
         let y = _batchnorm_test_mode(x, scale, bias, &output_mean, &output_var, attrs.epsilon)?;
         Ok(vec![y])
     } else {
