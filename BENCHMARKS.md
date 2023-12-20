@@ -15,8 +15,8 @@ And on the following software:
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model bvlcalexnet-12'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model bvlcalexnet-12
-  Time (mean ± σ):     343.7 ms ±   8.0 ms    [User: 241.6 ms, System: 104.2 ms]
-  Range (min … max):   336.3 ms … 358.4 ms    10 runs
+  Time (mean ± σ):     314.1 ms ±  13.1 ms    [User: 283.1 ms, System: 219.8 ms]
+  Range (min … max):   299.1 ms … 345.5 ms    10 runs
 ```
 
 ### CaffeNet
@@ -24,8 +24,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model bvlcalexnet-12
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model caffenet-12'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model caffenet-12
-  Time (mean ± σ):     345.9 ms ±   2.0 ms    [User: 250.2 ms, System: 98.1 ms]
-  Range (min … max):   343.0 ms … 349.2 ms    10 runs
+  Time (mean ± σ):     325.7 ms ±   3.7 ms    [User: 273.8 ms, System: 235.4 ms]
+  Range (min … max):   320.1 ms … 331.4 ms    10 runs
 ```
 
 ### Emotion Ferplus
@@ -33,8 +33,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model caffenet-12
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model emotion-ferplus-8'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model emotion-ferplus-8
-  Time (mean ± σ):     238.7 ms ±   3.4 ms    [User: 195.5 ms, System: 48.4 ms]
-  Range (min … max):   232.7 ms … 244.5 ms    12 runs
+  Time (mean ± σ):     291.9 ms ±   7.1 ms    [User: 291.7 ms, System: 178.2 ms]
+  Range (min … max):   282.3 ms … 306.8 ms    10 runs
 ```
 
 ### GoogleNet
@@ -42,8 +42,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model emotion-ferplus-8
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model googlenet-12'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model googlenet-12
-  Time (mean ± σ):      1.226 s ±  0.017 s    [User: 1.504 s, System: 0.072 s]
-  Range (min … max):    1.206 s …  1.248 s    10 runs
+  Time (mean ± σ):      1.361 s ±  0.071 s    [User: 11.179 s, System: 1.323 s]
+  Range (min … max):    1.252 s …  1.445 s    10 runs
 ```
 
 ### GPT2
@@ -51,8 +51,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model googlenet-12
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model GPT2'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model GPT2
-  Time (mean ± σ):      2.020 s ±  0.085 s    [User: 1.788 s, System: 0.368 s]
-  Range (min … max):    1.864 s …  2.122 s    10 runs
+  Time (mean ± σ):     490.1 ms ±  21.3 ms    [User: 352.5 ms, System: 530.9 ms]
+  Range (min … max):   466.6 ms … 534.4 ms    10 runs
 ```
 
 ### Inception
@@ -60,8 +60,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model GPT2
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model inception-v2-9'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model inception-v2-9
-  Time (mean ± σ):      1.324 s ±  0.012 s    [User: 1.686 s, System: 0.109 s]
-  Range (min … max):    1.307 s …  1.336 s    10 runs
+  Time (mean ± σ):     866.6 ms ±  17.4 ms    [User: 3299.5 ms, System: 1260.5 ms]
+  Range (min … max):   834.3 ms … 886.2 ms    10 runs
 ```
 
 ### MobileNet
@@ -69,8 +69,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model inception-v2-9
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model mobilenetv2-7'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model mobilenetv2-7
-  Time (mean ± σ):     718.9 ms ±  13.1 ms    [User: 694.8 ms, System: 29.0 ms]
-  Range (min … max):   705.0 ms … 742.2 ms    10 runs
+  Time (mean ± σ):     786.6 ms ±   7.1 ms    [User: 797.9 ms, System: 191.0 ms]
+  Range (min … max):   780.1 ms … 800.7 ms    10 runs
 ```
 
 ### Mnist
@@ -78,8 +78,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model mobilenetv2-7
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model mnist-12'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model mnist-12
-  Time (mean ± σ):       4.3 ms ±   0.3 ms    [User: 4.5 ms, System: 1.3 ms]
-  Range (min … max):     3.5 ms …   5.9 ms    485 runs
+  Time (mean ± σ):       7.3 ms ±   0.9 ms    [User: 12.1 ms, System: 6.2 ms]
+  Range (min … max):     5.5 ms …  12.5 ms    229 runs
 ```
 
 ### ResNet
@@ -87,8 +87,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model mnist-12
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model resnet50-caffe2-v1-9'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model resnet50-caffe2-v1-9
-  Time (mean ± σ):     837.6 ms ±   8.6 ms    [User: 761.6 ms, System: 118.1 ms]
-  Range (min … max):   824.5 ms … 854.3 ms    10 runs
+  Time (mean ± σ):      1.089 s ±  0.013 s    [User: 1.382 s, System: 0.651 s]
+  Range (min … max):    1.056 s …  1.101 s    10 runs
 ```
 
 ### SqueezeNet
@@ -96,8 +96,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model resnet50-caffe2-v1-9
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model squeezenet1.0-12'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model squeezenet1.0-12
-  Time (mean ± σ):     131.0 ms ±   3.2 ms    [User: 117.0 ms, System: 26.1 ms]
-  Range (min … max):   126.3 ms … 139.3 ms    22 runs
+  Time (mean ± σ):     205.8 ms ±   3.6 ms    [User: 322.6 ms, System: 436.8 ms]
+  Range (min … max):   200.0 ms … 212.9 ms    14 runs
 ```
 
 ### ShuffleNet
@@ -105,8 +105,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model squeezenet1.0-12
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model shufflenet-9'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model shufflenet-9
-  Time (mean ± σ):     374.3 ms ±   4.7 ms    [User: 378.6 ms, System: 49.2 ms]
-  Range (min … max):   368.2 ms … 383.2 ms    10 runs
+  Time (mean ± σ):     475.0 ms ±   8.5 ms    [User: 647.9 ms, System: 318.3 ms]
+  Range (min … max):   463.4 ms … 487.7 ms    10 runs
 ```
 
 ### SuperResolution
@@ -114,8 +114,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model shufflenet-9
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model super_resolution'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model super_resolution
-  Time (mean ± σ):      2.384 s ±  0.030 s    [User: 2.080 s, System: 0.303 s]
-  Range (min … max):    2.342 s …  2.439 s    10 runs
+  Time (mean ± σ):      2.397 s ±  0.030 s    [User: 2.132 s, System: 0.395 s]
+  Range (min … max):    2.374 s …  2.474 s    10 runs
 ```
 
 ### Vgg19
@@ -123,8 +123,8 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model super_resolution
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model vgg19-7'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model vgg19-7
-  Time (mean ± σ):      3.832 s ±  0.038 s    [User: 3.352 s, System: 0.477 s]
-  Range (min … max):    3.788 s …  3.908 s    10 runs
+  Time (mean ± σ):      4.057 s ±  0.061 s    [User: 3.878 s, System: 2.102 s]
+  Range (min … max):    3.964 s …  4.141 s    10 runs
 ```
 
 ### ZFNet512
@@ -132,7 +132,7 @@ Benchmark 1: ./target/release/stonnx --verbose 0 --model vgg19-7
 ```bash
 hyperfine --warmup 2 './target/release/stonnx --verbose 0 --model zfnet512-12'
 Benchmark 1: ./target/release/stonnx --verbose 0 --model zfnet512-12
-  Time (mean ± σ):     474.5 ms ±   6.2 ms    [User: 356.1 ms, System: 120.5 ms]
-  Range (min … max):   469.7 ms … 490.6 ms    10 runs
+  Time (mean ± σ):     451.9 ms ±  14.3 ms    [User: 451.3 ms, System: 472.5 ms]
+  Range (min … max):   441.4 ms … 489.8 ms    10 runs
 ```
 
