@@ -43,6 +43,7 @@ enum GraphFormat {
 typedef int64_t GraphFormat;
 
 enum Verbosity {
+  Silent = -1,
   Minimal = 0,
   Informational = 1,
   Results = 2,

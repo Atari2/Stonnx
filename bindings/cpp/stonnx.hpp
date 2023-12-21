@@ -26,6 +26,7 @@ enum class GraphFormat : int64_t {
 };
 
 enum class Verbosity : int64_t {
+  Silent = -1,
   Minimal = 0,
   Informational = 1,
   Results = 2,

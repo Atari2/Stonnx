@@ -90,7 +90,7 @@ macro_rules! create_intermediate_output_dir_for {
     }};
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Represents an ONNX ValueInfo stripped down to the bare minimum.
 pub struct ValueInfo {
     pub name: String,
@@ -98,7 +98,7 @@ pub struct ValueInfo {
     pub doc_string: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Represents an output to the graph, with the ValueInfo and the data.
 pub struct OutputInfo {
     pub valueinfo: ValueInfo,
@@ -855,7 +855,7 @@ fn read_model_binary(p: &Path) -> BoxResult<onnx::ModelProto> {
 
 /// Attempts to read an ONNX model in binary format, and if it fails, tries to read it in text format.
 pub fn read_model(p: &Path) -> BoxResult<onnx::ModelProto> {
-    println!("Reading model from {}", p.display());
+    print_at_level!(VerbosityLevel::Minimal, "Reading model from {}", p.display());
     let merr = read_model_binary(p);
     match merr {
         Ok(m) => Ok(m),

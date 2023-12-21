@@ -205,10 +205,11 @@ fn create_links_and_requirements(
 /// Compare the expected outputs to the actual outputs
 pub fn compare_outputs(
     expected_outputs: HashMap<String, TensorType>,
-    graph_outputs: &mut HashMap<String, OutputInfo>,
-) -> BoxResult<()> {
+    mut graph_outputs: HashMap<String, OutputInfo>,
+) -> BoxResult<HashMap<String, OutputInfo>> {
+    let mut results = HashMap::new();
     for (name, value) in expected_outputs.iter() {
-        if let Some(gout) = graph_outputs.get_mut(name) {
+        if let Some((namestring, gout)) = graph_outputs.remove_entry(name) {
             if let Some(data) = &gout.data {
                 if value.shape() != data.shape() {
                     return Err(anyhow!(
@@ -271,9 +272,10 @@ pub fn compare_outputs(
                     ),
                 }
             }
+            results.insert(namestring, gout);
         }
     }
-    Ok(())
+    Ok(results)
 }
 
 #[cfg(feature = "custom-threadpool")]
@@ -298,9 +300,9 @@ fn wait_pool(_pool: &rayon::ThreadPool) {
     // do nothing
 }
 
-pub fn execute_model(args: &Args) -> BoxResult<()> {
+pub fn execute_model(args: &Args) -> BoxResult<HashMap<String, OutputInfo>> {
     VERBOSE
-        .store(VerbosityLevel::new(args.verbose as usize) as usize, Ordering::Relaxed);
+        .store(VerbosityLevel::new(args.verbose) as usize, Ordering::Relaxed);
     print_at_level!(
         VerbosityLevel::Minimal,
         "Running model: {}",
@@ -469,6 +471,5 @@ pub fn execute_model(args: &Args) -> BoxResult<()> {
         }
     }
     wait_pool(&pool);
-    compare_outputs(expected_outputs, &mut graph_outputs)?;
-    Ok(())
+    compare_outputs(expected_outputs, graph_outputs)
 }

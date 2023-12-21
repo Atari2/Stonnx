@@ -13,6 +13,8 @@ use crate::onnxparser::onnx;
 use crate::utils::read_model;
 use common::{Args, BoxResult, VerbosityLevel};
 use once_cell::sync::Lazy;
+use utils::OutputInfo;
+use std::collections::HashMap;
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
 
@@ -20,6 +22,7 @@ static mut LAST_ERROR: Lazy<CString> = Lazy::new(|| CString::new(*b"").unwrap())
 
 #[repr(i64)]
 pub enum Verbosity {
+    Silent = -1,
     Minimal = 0,
     Informational = 1,
     Results = 2,
@@ -136,7 +139,7 @@ pub unsafe extern "C" fn get_opset_version(model: *const onnx::ModelProto) -> i6
 
 pub struct Model {
     path: PathBuf,
-    verbose: u64,
+    verbose: VerbosityLevel,
     graph: bool,
     graph_format: String,
     failfast: bool,
@@ -148,7 +151,7 @@ impl Model {
         self
     }
     pub fn verbose(&mut self, verbose: VerbosityLevel) -> &mut Self {
-        self.verbose = verbose as u64;
+        self.verbose = verbose;
         self
     }
     pub fn graph(&mut self, graph: bool) -> &mut Self {
@@ -159,8 +162,8 @@ impl Model {
         self.graph_format = graph_format.to_owned();
         self
     }
-    pub fn run(&self) -> BoxResult<()> {
-        let args = Args::from_parts(
+    pub fn run(&self) -> BoxResult<HashMap<String, OutputInfo>> {
+        let args = Args::new(
             self.path.clone(),
             self.verbose,
             self.graph,
@@ -175,7 +178,7 @@ impl Default for Model {
     fn default() -> Self {
         Self {
             path: PathBuf::new(),
-            verbose: 0,
+            verbose: VerbosityLevel::Minimal,
             graph: false,
             graph_format: "".to_owned(),
             failfast: false,
@@ -226,7 +229,7 @@ pub unsafe extern "C" fn run_model(
     };
     let args = Args::from_parts(
         model_path.into(),
-        verbosity as u64,
+        verbosity as i64,
         graph_format != GraphFormat::None,
         gf,
         failfast != ExecutionMode::Continue,

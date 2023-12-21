@@ -47,6 +47,7 @@ pub struct Args {
     pub model: PathBuf,
 
     /// Set verbosity level
+    /// -1 - No output at all
     ///
     /// 0 - No output except basic logging
     ///
@@ -55,8 +56,8 @@ pub struct Args {
     /// 2 - Output all results from operators into .npy files
     ///
     /// 4 - Output intermediate results from operators into .npy files (only supported by conv for now)
-    #[arg(short, long, default_value = "0")]
-    pub verbose: u64,
+    #[arg(short, long, default_value = "0", allow_hyphen_values = true)]
+    pub verbose: i64,
 
     /// Generate json/dot file representing the graph of the model
     ///
@@ -81,7 +82,7 @@ impl Args {
     /// Only used in the library version of the program
     pub fn from_parts(
         model: PathBuf,
-        verbose: u64,
+        verbose: i64,
         gengraph: bool,
         graphtype: String,
         failfast: bool,
@@ -89,6 +90,22 @@ impl Args {
         Self {
             model,
             verbose,
+            gengraph,
+            graphtype,
+            failfast,
+        }
+    }
+
+    pub fn new(
+        model: PathBuf,
+        verbose: VerbosityLevel,
+        gengraph: bool,
+        graphtype: String,
+        failfast: bool,
+    ) -> Self {
+        Self {
+            model,
+            verbose: verbose as i64,
             gengraph,
             graphtype,
             failfast,
@@ -151,19 +168,21 @@ pub const MAX_OPSET_VERSION: i64 = 20;
 #[repr(usize)]
 /// Indicates the verbosity level of the program
 pub enum VerbosityLevel {
+    Silent = 0,
     /// No output except basic logging
-    Minimal = 0,
+    Minimal = 1,
     /// Outputs information about each operator that is executed
-    Informational = 1,
+    Informational = 2,
     /// Output all results from operators into .npy files
-    Results = 2,
+    Results = 3,
     /// Output intermediate results from operators into .npy files (only supported by conv for now)
-    Intermediate = 3,
+    Intermediate = 4,
 }
 
 impl VerbosityLevel {
-    pub fn new(level: usize) -> Self {
+    pub fn new(level: i64) -> Self {
         match level {
+            -1 => VerbosityLevel::Silent,
             0 => VerbosityLevel::Minimal,
             1 => VerbosityLevel::Informational,
             2 | 3 => VerbosityLevel::Results,
@@ -201,7 +220,7 @@ impl std::cmp::PartialOrd<VerbosityLevel> for usize {
 /// This macro prints a message if the verbosity level is high enough
 macro_rules! print_at_level {
     ($level:expr, $($arg:tt)*) => {
-        if VerbosityLevel::new($crate::common::VERBOSE.load(std::sync::atomic::Ordering::Relaxed)) >= $level {
+        if $crate::common::VERBOSE.load(std::sync::atomic::Ordering::Relaxed) >= $level {
             println!($($arg)*);
         }
     };
