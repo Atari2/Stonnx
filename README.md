@@ -22,7 +22,11 @@ Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il li
 
 - Eseguire il comando `cargo build --release` per compilare il progetto;
 
-  - di default il progetto viene compilato utilizzando il parallelismo con `rayon` (per compilare con il parallelismo da noi implementato utilizzare il comando `cargo build --features custom-threadpool --release`);
+  - di default il progetto viene compilato utilizzando il parallelismo con `rayon`, ma esiste anche [un'implementazione personale di ThreadPool](src/parallel/mod.rs), controllata da una feature flag `custom-threadpool`. Per compilare con il parallelismo da noi implementato utilizzare quindi il comando `cargo build --features custom-threadpool --release`.
+  
+    L'implementazione di ThreadPool da noi realizzata coesistente con quella di rayon è stata creata in questo modo per molteplici motivi:
+    1. per dimostrare le nostre conoscenze nell'ambito del parallelismo in rust e delle sue applicazioni
+    2. per confrontare la performance tra le due implementazioni, in modo da poter valutare quale sia la migliore e per verificare che la nostra implementazione non abbia problemi di performance e la sua correttezza. Dopo aver fatto molti benchmark con vari modelli, abbiamo effettivamente confermato che la nostra implementazione ha performance comparabile con quella di `rayon` e che fornisse risultati corretti e uguali.
 
 - Eseguire il comando `cargo run --release -- --model <modelname>` oppure `cargo run --release --features custom-threadpool -- --model <modelname>`
 
