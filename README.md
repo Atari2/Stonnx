@@ -75,8 +75,7 @@ Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il li
 
 ### Modelli supportati:
 
-#### Importante nota: 
-Questa sezione fa riferimento ai modelli del Model Zoo *prima* del revamp effettuato a Dicembre 2023, poichè lo sviluppo di questo programma è cominciato molto prima dell'aggiornamento del Model Zoo e quindi i modelli menzionati nei seguenti paragrafi sono quelli presenti nel vecchio Model Zoo, nello specifico, [questo commit](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82).
+> Questa sezione fa riferimento ai modelli del Model Zoo *prima* del revamp effettuato a Dicembre 2023, poichè lo sviluppo di questo programma è cominciato molto prima dell'aggiornamento del Model Zoo e quindi i modelli menzionati nei seguenti paragrafi sono quelli presenti nel vecchio Model Zoo, nello specifico, [questo commit](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82).
 
 Il programma supporta e completa l'esecuzione di circa ~70 modelli sui ~180 presenti nel vecchio Model Zoo, tuttavia per questioni di tempo e per evitare di dover scaricare tutti i modelli, abbiamo scelto di includere e testare a fondo soltanto alcuni di questi.
 
