@@ -7,6 +7,15 @@
 
 Il nome deriva dalla fusione di [Steelix](https://wiki.pokemoncentral.it/Steelix) (pokemon di metallo, scelto perchè il progetto è scritto in Rust) e ONNX. Inoltre è anche un gioco di parole con [stonks](https://www.icbz4.it/alunnifermi/wp-content/uploads/2019/12/significato-stonks-1024x766.jpg).
 
+## Indice
+1. [Descrizione progetto](#descrizione-progetto)
+2. [Modalità di utilizzo](#modalità-di-utilizzo)
+3. [Modelli supportati](#modelli-supportati)
+4. [Crate più importanti utilizzate](#crate-più-importanti-utilizzate)
+5. [Descrizione varie parti del progetto](#descrizione-varie-parti-del-progetto)
+6. [Architettura del programma](#architettura-del-programma)
+7. [Utilizzare Stonnx come libreria](#utilizzare-stonnx-come-libreria)
+
 ### Descrizione progetto:
 
 Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il linguaggio Rust. Le richieste da rispettare sono le seguenti:
@@ -66,7 +75,12 @@ Il progetto consiste nella realizzazione di un interprete ONNX utilizzando il li
 
 ### Modelli supportati:
 
-I modelli testati fanno riferimento a quelli presenti nella sezione [archive](https://github.com/onnx/models/tree/main/archive) del [repository ufficiale di ONNX](https://github.com/onnx/models), in quanto a inizio Dicembre 2023 sono stati aggiornati e aggiunti nuovi modelli, ma lo sviluppo di questo programma è cominciato molto prima dell'aggiornamento del Model Zoo. I modelli testati sono i seguenti:
+#### Importante nota: 
+Questa sezione fa riferimento ai modelli del Model Zoo *prima* del revamp effettuato a Dicembre 2023, poichè lo sviluppo di questo programma è cominciato molto prima dell'aggiornamento del Model Zoo e quindi i modelli menzionati nei seguenti paragrafi sono quelli presenti nel vecchio Model Zoo, nello specifico, [questo commit](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82).
+
+Il programma supporta e completa l'esecuzione di circa ~70 modelli sui ~180 presenti nel vecchio Model Zoo, tuttavia per questioni di tempo e per evitare di dover scaricare tutti i modelli, abbiamo scelto di includere e testare a fondo soltanto alcuni di questi.
+
+I modelli testati e con l'output correttamente confermato sono i seguenti:
 
 - [AlexNet](https://github.com/onnx/models/tree/main/archive/vision/classification/alexnet)
 - [MobileNet](https://github.com/onnx/models/tree/main/archive/vision/classification/mobilenet)
@@ -83,9 +97,9 @@ I modelli testati fanno riferimento a quelli presenti nella sezione [archive](ht
 - [VGG](https://github.com/onnx/models/tree/main/archive/vision/classification/vgg)
 - [ZFNet](https://github.com/onnx/models/tree/main/archive/vision/classification/zfnet-512)
 
-Nota: durante la scelta dei modelli è stato selezionata la versione più recente presente nella sezione [archive](https://github.com/onnx/models/tree/main/archive) del repository di ONNX.
+Nota: durante la scelta dei modelli è stato selezionata la versione più recente presente nel Model Zoo.
 
-### Crate più importanti utilizzati:
+### Crate più importanti utilizzate:
 
 Sono state utilizzate le seguenti crate:
 
