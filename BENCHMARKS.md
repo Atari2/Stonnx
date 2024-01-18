@@ -1,11 +1,11 @@
 # Benchmarks
 
-All benchmarks were done on the following hardware:
+Tutti i benchmarks sono stati effettuati su una macchina con il seguente hardware:
 
 - CPU: Intel Core i7-12700k
 - RAM: 32 GB DDR4 3600 MHz
 
-And on the following software:
+E il seguente software:
 
 - Ubuntu 22.04.3 LTS on WSL
 - rustc 1.74.1 (a28077b28 2023-12-04) 
