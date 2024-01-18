@@ -81,20 +81,20 @@ Il programma supporta e completa l'esecuzione di circa ~70 modelli sui ~180 pres
 
 I modelli testati e con l'output correttamente confermato sono i seguenti:
 
-- [AlexNet](https://github.com/onnx/models/tree/main/archive/vision/classification/alexnet)
-- [MobileNet](https://github.com/onnx/models/tree/main/archive/vision/classification/mobilenet)
-- [GoogleNet](https://github.com/onnx/models/tree/main/archive/vision/classification/inception_and_googlenet/googlenet)
-- [ResNet](https://github.com/onnx/models/tree/main/archive/vision/classification/resnet)
-- [GPT2](https://github.com/onnx/models/tree/main/archive/text/machine_comprehension/gpt-2)
-- [Emotion](https://github.com/onnx/models/tree/main/archive/vision/body_analysis/emotion_ferplus)
-- [CaffeNet](https://github.com/onnx/models/tree/main/archive/vision/classification/caffenet)
-- [Inception](https://github.com/onnx/models/tree/main/archive/vision/classification/inception_and_googlenet/inception_v2)
-- [Mnist](https://github.com/onnx/models/tree/main/archive/vision/classification/mnist)
-- [SqueezeNet](https://github.com/onnx/models/tree/main/archive/vision/classification/squeezenet)
-- [Shufflenet](https://github.com/onnx/models/tree/main/archive/vision/classification/shufflenet)
-- [Super Resolution](https://github.com/onnx/models/tree/main/archive/vision/super_resolution/sub_pixel_cnn_2016)
-- [VGG](https://github.com/onnx/models/tree/main/archive/vision/classification/vgg)
-- [ZFNet](https://github.com/onnx/models/tree/main/archive/vision/classification/zfnet-512)
+- [AlexNet](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/alexnet)
+- [MobileNet](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/mobilenet)
+- [GoogleNet](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/inception_and_googlenet/googlenet)
+- [ResNet](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/resnet)
+- [GPT2](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/text/machine_comprehension/gpt-2)
+- [Emotion](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/body_analysis/emotion_ferplus)
+- [CaffeNet](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/caffenet)
+- [Inception](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/inception_and_googlenet/inception_v2)
+- [Mnist](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/mnist)
+- [SqueezeNet](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/squeezenet)
+- [Shufflenet](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/shufflenet)
+- [Super Resolution](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/super_resolution/sub_pixel_cnn_2016)
+- [VGG](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/vgg)
+- [ZFNet](https://github.com/onnx/models/tree/5faef4c33eba0395177850e1e31c4a6a9e634c82/vision/classification/zfnet-512)
 
 Nota: durante la scelta dei modelli è stato selezionata la versione più recente presente nel Model Zoo.
 
