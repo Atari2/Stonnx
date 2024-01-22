@@ -234,12 +234,12 @@ macro_rules! print_at_level {
 ///
 /// The shape is visited in row-major order
 /// ```
-/// use common::NDIndex;
+/// use stonnx_api::common::NDIndex;
 ///
 /// let shape = vec![2, 3, 4];
 /// let mut ndindex = NDIndex::new(&shape);
 /// for i in ndindex {
-///     println!("{:?}", i); /// [0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 0, 3], [0, 1, 0], [0, 1, 1], ...
+///     println!("{:?}", i); // [0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 0, 3], [0, 1, 0], [0, 1, 1], ...
 /// }
 /// ```
 pub struct NDIndex<'a> {
