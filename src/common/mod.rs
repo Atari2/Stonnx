@@ -96,6 +96,8 @@ impl Args {
         }
     }
 
+    #[allow(dead_code)]
+    /// Only used in the library version of the program
     pub fn new(
         model: PathBuf,
         verbose: VerbosityLevel,

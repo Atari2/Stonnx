@@ -470,6 +470,7 @@ pub fn execute_model(args: &Args) -> BoxResult<HashMap<String, OutputInfo>> {
             break;
         }
     }
+    drop(tx);
     wait_pool(&pool);
     compare_outputs(expected_outputs, graph_outputs)
 }
