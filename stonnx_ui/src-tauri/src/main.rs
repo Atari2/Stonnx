@@ -12,14 +12,15 @@ async fn construct_json_result(result: HashMap<String, OutputInfo>) -> Result<se
     let mut map = Map::new();
     for (key, value) in result {
         let mut value_map = Map::new();
-        value_map.insert("shape".to_string(), Value::from(value.valueinfo.type_.1));
-        value_map.insert("data_type".to_string(), Value::from(format!("{:?}", value.valueinfo.type_.0)));
+        let (shape, data_type) = value.valueinfo.type_;
+        value_map.insert("shape".to_string(), Value::from(data_type));
+        value_map.insert("data_type".to_string(), Value::from(format!("{:?}", shape)));
         if let Some(data) = value.data {
             match data {
                 TensorType::F32(data) => {
-                    value_map.insert("data".to_string(), Value::String(serde_json::to_string(&data).unwrap()))
+                    value_map.insert("data".to_string(), Value::String(serde_json::to_string(&data).map_err(|_| ())?))
                 },
-                TensorType::F64(data) => value_map.insert("data".to_string(), Value::String(serde_json::to_string(&data).unwrap())),
+                TensorType::F64(data) => value_map.insert("data".to_string(), Value::String(serde_json::to_string(&data).map_err(|_| ())?)),
                 _ => value_map.insert("data".to_string(), Value::String("data type not supported".to_string())),
             };
         } else {
@@ -37,7 +38,7 @@ async fn run_model(path: String) -> Result<serde_json::Value, ()> {
     let model = Model::default().path(&path).graph(false).verbose(stonnx_api::common::VerbosityLevel::Silent).run();
     Ok(match model {
         Ok(result) => {
-            construct_json_result(result).await.unwrap()
+            construct_json_result(result).await?
         },
         Err(e) => format!("Model ran unsuccessfully: {e}").into()
     })
