@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stonnx UI</title>
+    <script type="module" src="/main.js" defer></script>
+  </head>
+
+  <body>
+    <div class="container">
+      <p>Run an ONNX model</p>
+
+      <form class="row" id="model-form">
+        <input id="model-input" placeholder="Enter a name..." />
+        <button type="submit">Pick</button>
+      </form>
+
+      <button id="run-button">Run</button>
+      <table id="model-msg">
+        <thead>
+            <tr>
+                <th>Output name</th>
+                <th>Type</th>
+                <th>Shape</th>
+                <th>Values</th>
+            </tr>
+        </thead>
+        <p id="model-error-msg"></p>
+        <tbody id="model-msg-body">
+
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>
