@@ -1,9 +1,18 @@
 # Stonnx
 
+## Preamble
+This project is an ONNX interpreter written in Rust. It supports a subset of ONNX operators and types and it's able to execute a model in parallel.
+
+It was developed by @Atari2 and @ClaudiuTcaciuc as a project for the course of "Programmazione di Sistema" (systems programming) at Politecnico di Torino during the academic year 2023/2024. 
+
+Since the course was taught in Italian, the following readme is also in Italian, however, the in-code documentation is in English.
+
 ### Main Contributors:
 
 - [s317659 Rosiello Alessio](https://github.com/Atari2)
 - [s317661 Tcaciuc Claudiu Constantin](https://github.com/ClaudiuTcaciuc)
+
+## Nome
 
 Il nome deriva dalla fusione di [Steelix](https://wiki.pokemoncentral.it/Steelix) (pokemon di metallo, scelto perchè il progetto è scritto in Rust) e ONNX. Inoltre è anche un gioco di parole con [stonks](https://www.icbz4.it/alunnifermi/wp-content/uploads/2019/12/significato-stonks-1024x766.jpg).
 
