@@ -3,6 +3,7 @@ use num::traits::AsPrimitive;
 use std::io::Read;
 use std::os::raw::c_uchar;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::{collections::HashMap, io, path::Path};
 
@@ -41,19 +42,19 @@ pub fn log_array_to_file<A: ndarray_npy::WritableElement, D: ndarray::Dimension>
     name: &str,
     a: &ndarray::ArrayBase<ndarray::ViewRepr<&A>, D>,
 ) -> BoxResult<()> {
-    let verbose_flag = VERBOSE.load(std::sync::atomic::Ordering::Relaxed);
+    let verbose_flag = VERBOSE.load(Ordering::Relaxed);
     if verbose_flag == VerbosityLevel::Intermediate as usize {
-        static mut COUNTER: usize = 0;
-        unsafe {
-            ndarray_npy::write_npy(
-                format!(
-                    "{}_intermediate_outputs/{}_{}.npy",
-                    operation, COUNTER, name
-                ),
-                a,
-            )?;
-            COUNTER += 1;
-        }
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        ndarray_npy::write_npy(
+            format!(
+                "{}_intermediate_outputs/{}_{}.npy",
+                operation,
+                COUNTER.load(Ordering::Relaxed),
+                name
+            ),
+            a,
+        )?;
+        COUNTER.fetch_add(1, Ordering::SeqCst);
     }
     Ok(())
 }
@@ -76,7 +77,8 @@ macro_rules! named_array_to_file {
 macro_rules! create_intermediate_output_dir_for {
     ($name:ident) => {{
         use $crate::common::VerbosityLevel;
-        let verbose_flag = VERBOSE.load(std::sync::atomic::Ordering::Relaxed);
+        use std::sync::atomic::Ordering;
+        let verbose_flag = VERBOSE.load(Ordering::Relaxed);
         if verbose_flag == VerbosityLevel::Intermediate {
             match std::fs::create_dir(concat!(stringify!($name), "_intermediate_outputs")) {
                 Ok(_) => {}
@@ -855,7 +857,11 @@ fn read_model_binary(p: &Path) -> BoxResult<onnx::ModelProto> {
 
 /// Attempts to read an ONNX model in binary format, and if it fails, tries to read it in text format.
 pub fn read_model(p: &Path) -> BoxResult<onnx::ModelProto> {
-    print_at_level!(VerbosityLevel::Minimal, "Reading model from {}", p.display());
+    print_at_level!(
+        VerbosityLevel::Minimal,
+        "Reading model from {}",
+        p.display()
+    );
     let merr = read_model_binary(p);
     match merr {
         Ok(m) => Ok(m),

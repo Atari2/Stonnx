@@ -1,5 +1,5 @@
 #![cfg(feature = "custom-threadpool")]
-use std::sync::{atomic::AtomicUsize, Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{atomic::{AtomicUsize, Ordering}, Arc, Condvar, Mutex, MutexGuard};
 
 /// Type alias for a function that can be queued to a thread pool.
 type WorkFnType = Box<dyn FnOnce() + Send>;
@@ -81,7 +81,7 @@ impl Worker {
                 };
                 drop(queue);
                 f();
-                queuestate.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+                queuestate.fetch_sub(1, Ordering::SeqCst);
                 queue = ylock(worker_fn);
             }
         });
@@ -113,7 +113,7 @@ impl ThreadPool {
         {
             let mut queue = ylock(&self.queue.0);
             self.queuestate
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                .fetch_add(1, Ordering::SeqCst);
             queue.push(WorkerMessage::Work(Box::new(f)));
         }
         self.queue.1.notify_all();
@@ -121,7 +121,7 @@ impl ThreadPool {
 
     /// Waits for all queued functions to be executed.
     pub fn wait(&self) {
-        while self.queuestate.load(std::sync::atomic::Ordering::Relaxed) > 0 {
+        while self.queuestate.load(Ordering::Relaxed) > 0 {
             std::thread::yield_now();
         }
     }
